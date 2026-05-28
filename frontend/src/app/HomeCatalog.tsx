@@ -6,6 +6,7 @@ import { catalogApi } from "@/api/catalog";
 import { Button } from "@/components/ui/Button";
 import { FeaturedMovieBanner } from "@/components/movies";
 import { MovieCarousel } from "@/components/movies";
+import { TabbedMovieCatalog } from "@/components/movies/TabbedMovieCatalog";
 import { StateMessage } from "@/components/ui/StateMessage";
 import type { CatalogMovie } from "@/types/catalog";
 
@@ -144,45 +145,12 @@ export function HomeCatalogSections({
         className="grid gap-7 pt-[var(--layout-page-block)] max-md:pt-[var(--layout-page-block-compact)]"
         id="catalogo"
       >
-        {nowShowing.status === "error" ? (
-          <CatalogErrorState
-            message={
-              nowShowing.errorMessage ??
-              "Não foi possível carregar os filmes em cartaz. Tente novamente."
-            }
-            onRetry={onRetryNowShowing}
-            title="Em cartaz indisponível"
-          />
-        ) : (
-          <MovieCarousel
-            emptyDescription="Ainda não há filmes em cartaz no catálogo."
-            emptyTitle="Nenhum filme em cartaz"
-            isLoading={nowShowing.status === "loading"}
-            loadingLabel="Carregando filmes em cartaz..."
-            movies={nowShowing.movies}
-            title="Em cartaz"
-          />
-        )}
-
-        {preSale.status === "error" ? (
-          <CatalogErrorState
-            message={
-              preSale.errorMessage ??
-              "Não foi possível carregar os filmes em pré-venda. Tente novamente."
-            }
-            onRetry={onRetryPreSale}
-            title="Pré-venda indisponível"
-          />
-        ) : (
-          <MovieCarousel
-            emptyDescription="Ainda não há filmes em pré-venda no catálogo."
-            emptyTitle="Nenhum filme em pré-venda"
-            isLoading={preSale.status === "loading"}
-            loadingLabel="Carregando filmes em pré-venda..."
-            movies={preSale.movies}
-            title="Pré-venda"
-          />
-        )}
+        <TabbedMovieCatalog
+          nowShowing={nowShowing}
+          onRetryNowShowing={onRetryNowShowing}
+          onRetryPreSale={onRetryPreSale}
+          preSale={preSale}
+        />
 
         {upcoming.status === "error" ? (
           <CatalogErrorState

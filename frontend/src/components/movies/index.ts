@@ -3,6 +3,7 @@ export { MovieDetail, MovieDetailView, type MovieDetailState } from "./MovieDeta
 export { MovieCard } from "./MovieCard";
 export { MovieCarousel } from "./MovieCarousel";
 export { MovieGrid } from "./MovieGrid";
+export { TabbedMovieCatalog } from "./TabbedMovieCatalog";
 export {
   formatMovieDuration,
   formatMovieGenres,
