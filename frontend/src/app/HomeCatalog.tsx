@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { catalogApi } from "@/api/catalog";
+import { Button } from "@/components/ui/Button";
 import { FeaturedMovieBanner } from "@/components/movies";
 import { MovieCarousel } from "@/components/movies";
 import { StateMessage } from "@/components/ui/StateMessage";
@@ -94,28 +95,41 @@ export function HomeCatalogSections({
   upcoming,
 }: HomeCatalogSectionsProps) {
   return (
-    <div className="home-catalog" id="catalogo">
+    <div>
+      {/* Cinematic hero area — full-bleed, full-height */}
       {featured.status === "loading" ? (
-        <StateMessage title="Carregando filme em destaque" tone="loading">
-          Buscando os destaques do catálogo.
-        </StateMessage>
+        <div
+          aria-busy="true"
+          className="relative overflow-hidden text-white ml-[calc(50%_-_50vw)] mr-[calc(50%_-_50vw)] w-screen mt-[calc(-1_*_var(--layout-page-block))] bg-[rgb(8_10_16)] h-[75svh] min-h-[400px] flex items-center justify-center"
+        >
+          <div className="shell-container">
+            <StateMessage title="Carregando filme em destaque" tone="loading">
+              Buscando os destaques do catálogo.
+            </StateMessage>
+          </div>
+        </div>
       ) : null}
 
       {featured.status === "error" ? (
-        <CatalogErrorState
-          message={
-            featured.errorMessage ??
-            "Não foi possível carregar o filme em destaque. Tente novamente."
-          }
-          onRetry={onRetryFeatured}
-          title="Destaque indisponível"
-        />
+        <div className="relative overflow-hidden text-white ml-[calc(50%_-_50vw)] mr-[calc(50%_-_50vw)] w-screen mt-[calc(-1_*_var(--layout-page-block))] bg-[rgb(8_10_16)] h-[75svh] min-h-[400px] flex items-center justify-center">
+          <div className="shell-container">
+            <CatalogErrorState
+              message={
+                featured.errorMessage ??
+                "Não foi possível carregar o filme em destaque. Tente novamente."
+              }
+              onRetry={onRetryFeatured}
+              title="Destaque indisponível"
+            />
+          </div>
+        </div>
       ) : null}
 
       {featured.status === "success" && featured.movies.length === 0 ? (
-        <StateMessage title="Nenhum destaque disponível">
-          Ainda não há filme marcado como destaque no catálogo.
-        </StateMessage>
+        <div
+          aria-hidden="true"
+          className="ml-[calc(50%_-_50vw)] mr-[calc(50%_-_50vw)] w-screen mt-[calc(-1_*_var(--layout-page-block))] bg-[rgb(8_10_16)] min-h-[320px]"
+        />
       ) : null}
 
       {featured.status === "success" && featured.movies.length > 0 ? (
@@ -125,65 +139,71 @@ export function HomeCatalogSections({
         />
       ) : null}
 
-      {nowShowing.status === "error" ? (
-        <CatalogErrorState
-          message={
-            nowShowing.errorMessage ??
-            "Não foi possível carregar os filmes em cartaz. Tente novamente."
-          }
-          onRetry={onRetryNowShowing}
-          title="Em cartaz indisponível"
-        />
-      ) : (
-        <MovieCarousel
-          emptyDescription="Ainda não há filmes em cartaz no catálogo."
-          emptyTitle="Nenhum filme em cartaz"
-          isLoading={nowShowing.status === "loading"}
-          loadingLabel="Carregando filmes em cartaz..."
-          movies={nowShowing.movies}
-          title="Em cartaz"
-        />
-      )}
+      {/* Catalog sections — anchored for scroll-to-catalog links */}
+      <div
+        className="grid gap-7 pt-[var(--layout-page-block)] max-md:pt-[var(--layout-page-block-compact)]"
+        id="catalogo"
+      >
+        {nowShowing.status === "error" ? (
+          <CatalogErrorState
+            message={
+              nowShowing.errorMessage ??
+              "Não foi possível carregar os filmes em cartaz. Tente novamente."
+            }
+            onRetry={onRetryNowShowing}
+            title="Em cartaz indisponível"
+          />
+        ) : (
+          <MovieCarousel
+            emptyDescription="Ainda não há filmes em cartaz no catálogo."
+            emptyTitle="Nenhum filme em cartaz"
+            isLoading={nowShowing.status === "loading"}
+            loadingLabel="Carregando filmes em cartaz..."
+            movies={nowShowing.movies}
+            title="Em cartaz"
+          />
+        )}
 
-      {preSale.status === "error" ? (
-        <CatalogErrorState
-          message={
-            preSale.errorMessage ??
-            "Não foi possível carregar os filmes em pré-venda. Tente novamente."
-          }
-          onRetry={onRetryPreSale}
-          title="Pré-venda indisponível"
-        />
-      ) : (
-        <MovieCarousel
-          emptyDescription="Ainda não há filmes em pré-venda no catálogo."
-          emptyTitle="Nenhum filme em pré-venda"
-          isLoading={preSale.status === "loading"}
-          loadingLabel="Carregando filmes em pré-venda..."
-          movies={preSale.movies}
-          title="Pré-venda"
-        />
-      )}
+        {preSale.status === "error" ? (
+          <CatalogErrorState
+            message={
+              preSale.errorMessage ??
+              "Não foi possível carregar os filmes em pré-venda. Tente novamente."
+            }
+            onRetry={onRetryPreSale}
+            title="Pré-venda indisponível"
+          />
+        ) : (
+          <MovieCarousel
+            emptyDescription="Ainda não há filmes em pré-venda no catálogo."
+            emptyTitle="Nenhum filme em pré-venda"
+            isLoading={preSale.status === "loading"}
+            loadingLabel="Carregando filmes em pré-venda..."
+            movies={preSale.movies}
+            title="Pré-venda"
+          />
+        )}
 
-      {upcoming.status === "error" ? (
-        <CatalogErrorState
-          message={
-            upcoming.errorMessage ??
-            "Não foi possível carregar os filmes em breve. Tente novamente."
-          }
-          onRetry={onRetryUpcoming}
-          title="Em breve indisponível"
-        />
-      ) : (
-        <MovieCarousel
-          emptyDescription="Ainda não há filmes em breve no catálogo."
-          emptyTitle="Nenhum filme em breve"
-          isLoading={upcoming.status === "loading"}
-          loadingLabel="Carregando filmes em breve..."
-          movies={upcoming.movies}
-          title="Em breve"
-        />
-      )}
+        {upcoming.status === "error" ? (
+          <CatalogErrorState
+            message={
+              upcoming.errorMessage ??
+              "Não foi possível carregar os filmes em breve. Tente novamente."
+            }
+            onRetry={onRetryUpcoming}
+            title="Em breve indisponível"
+          />
+        ) : (
+          <MovieCarousel
+            emptyDescription="Ainda não há filmes em breve no catálogo."
+            emptyTitle="Nenhum filme em breve"
+            isLoading={upcoming.status === "loading"}
+            loadingLabel="Carregando filmes em breve..."
+            movies={upcoming.movies}
+            title="Em breve"
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -223,9 +243,9 @@ function CatalogErrorState({
     <StateMessage
       action={
         onRetry ? (
-          <button className="button button-ghost" onClick={onRetry} type="button">
+          <Button onClick={onRetry} variant="ghost">
             Tentar novamente
-          </button>
+          </Button>
         ) : undefined
       }
       title={title}
