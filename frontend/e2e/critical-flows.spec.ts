@@ -163,6 +163,53 @@ test("expires a temporary reservation and resets the seat selection state", asyn
   await expect(page.getByText("Nenhum assento selecionado")).toBeVisible();
 });
 
+test("tabbed catalog switches to Pré-venda panel on click", async ({ page }) => {
+  await setupMockApi(page);
+  await page.goto("/");
+
+  const emCartazTab = page.getByRole("tab", { name: "Em cartaz" });
+  const preVendaTab = page.getByRole("tab", { name: "Pré-venda" });
+
+  await expect(emCartazTab).toHaveAttribute("aria-selected", "true");
+  await expect(preVendaTab).toHaveAttribute("aria-selected", "false");
+
+  const nowShowingPanel = page.getByRole("tabpanel", { name: "Em cartaz" });
+  await expect(nowShowingPanel).toBeVisible();
+  await expect(
+    nowShowingPanel.getByRole("link", { name: /Ver detalhes de A Jornada de Natal/ })
+  ).toBeVisible();
+
+  await preVendaTab.click();
+
+  await expect(preVendaTab).toHaveAttribute("aria-selected", "true");
+  await expect(emCartazTab).toHaveAttribute("aria-selected", "false");
+
+  const preSalePanel = page.getByRole("tabpanel", { name: "Pré-venda" });
+  await expect(preSalePanel).toBeVisible();
+  await expect(
+    preSalePanel.getByRole("link", { name: /Ver detalhes de Estreia da Semana/ })
+  ).toBeVisible();
+
+  await expect(nowShowingPanel).toBeHidden();
+});
+
+test("tabbed catalog switches to Pré-venda panel with ArrowRight key", async ({ page }) => {
+  await setupMockApi(page);
+  await page.goto("/");
+
+  await page.getByRole("tab", { name: "Em cartaz" }).focus();
+  await page.keyboard.press("ArrowRight");
+
+  const preVendaTab = page.getByRole("tab", { name: "Pré-venda" });
+  await expect(preVendaTab).toHaveAttribute("aria-selected", "true");
+
+  const preSalePanel = page.getByRole("tabpanel", { name: "Pré-venda" });
+  await expect(preSalePanel).toBeVisible();
+  await expect(
+    preSalePanel.getByRole("link", { name: /Ver detalhes de Estreia da Semana/ })
+  ).toBeVisible();
+});
+
 async function login(page: Page, redirectPath = "/") {
   const loginPath =
     redirectPath === "/"
