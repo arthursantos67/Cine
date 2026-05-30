@@ -42,7 +42,7 @@ const success = (movies: CatalogMovie[]): MovieSectionState => ({
   status: "success",
 });
 
-test("home catalog renders featured, now showing, pre-sale, and upcoming movie sections", () => {
+test("home catalog renders featured banner, tabbed catalog, and upcoming section", () => {
   const html = renderToStaticMarkup(
     createElement(HomeCatalogSections, {
       featured: success([featuredMovie]),
@@ -147,4 +147,157 @@ test("home catalog keeps successful sections visible when another section errors
   assert.match(html, /Em cartaz indisponível/);
   assert.match(html, /Estreia da Semana/);
   assert.match(html, /Em Breve na Tela/);
+});
+
+test("tabbed catalog renders both tab buttons with correct ARIA attributes", () => {
+  const html = renderToStaticMarkup(
+    createElement(HomeCatalogSections, {
+      featured: success([]),
+      nowShowing: success([featuredMovie]),
+      preSale: success([preSaleMovie]),
+      upcoming: success([]),
+    })
+  );
+
+  assert.match(html, /role="tablist"/);
+  assert.match(html, /role="tab"/);
+  assert.match(html, /role="tabpanel"/);
+  assert.match(html, /aria-selected="true"/);
+  assert.match(html, /aria-selected="false"/);
+});
+
+test("tabbed catalog default tab is Em cartaz (aria-selected=true on first tab)", () => {
+  const html = renderToStaticMarkup(
+    createElement(HomeCatalogSections, {
+      featured: success([]),
+      nowShowing: success([featuredMovie]),
+      preSale: success([preSaleMovie]),
+      upcoming: success([]),
+    })
+  );
+
+  // First tab (Em cartaz) is selected, second (Pré-venda) is not
+  assert.ok(html.includes('aria-selected="true"'));
+  assert.ok(html.includes('aria-selected="false"'));
+
+  // Pre-sale panel is present but hidden
+  assert.match(html, /hidden/);
+  assert.match(html, /Estreia da Semana/);
+});
+
+test("tabbed catalog shows independent loading state for now showing", () => {
+  const html = renderToStaticMarkup(
+    createElement(HomeCatalogSections, {
+      featured: success([]),
+      nowShowing: { movies: [], status: "loading" },
+      preSale: success([preSaleMovie]),
+      upcoming: success([]),
+    })
+  );
+
+  assert.match(html, /Carregando filmes em cartaz/);
+  assert.match(html, /Estreia da Semana/);
+});
+
+test("tabbed catalog shows independent loading state for pre-sale", () => {
+  const html = renderToStaticMarkup(
+    createElement(HomeCatalogSections, {
+      featured: success([]),
+      nowShowing: success([featuredMovie]),
+      preSale: { movies: [], status: "loading" },
+      upcoming: success([]),
+    })
+  );
+
+  assert.match(html, /A Jornada/);
+  assert.match(html, /Carregando filmes em pré-venda/);
+});
+
+test("tabbed catalog error state for now showing does not affect pre-sale", () => {
+  const html = renderToStaticMarkup(
+    createElement(HomeCatalogSections, {
+      featured: success([]),
+      nowShowing: { errorMessage: "Falha em cartaz.", movies: [], status: "error" },
+      onRetryNowShowing: () => undefined,
+      preSale: success([preSaleMovie]),
+      upcoming: success([]),
+    })
+  );
+
+  assert.match(html, /Em cartaz indisponível/);
+  assert.match(html, /Estreia da Semana/);
+});
+
+test("tabbed catalog error state for pre-sale does not affect now showing", () => {
+  const html = renderToStaticMarkup(
+    createElement(HomeCatalogSections, {
+      featured: success([]),
+      nowShowing: success([featuredMovie]),
+      onRetryPreSale: () => undefined,
+      preSale: { errorMessage: "Falha pré-venda.", movies: [], status: "error" },
+      upcoming: success([]),
+    })
+  );
+
+  assert.match(html, /A Jornada/);
+  assert.match(html, /Pré-venda indisponível/);
+});
+
+test("tabbed catalog renders carousel navigation buttons when movies exist", () => {
+  const manyMovies = Array.from({ length: 8 }, (_, i) => ({
+    ...featuredMovie,
+    id: `movie-${i}`,
+    title: `Filme ${i + 1}`,
+  }));
+
+  const html = renderToStaticMarkup(
+    createElement(HomeCatalogSections, {
+      featured: success([]),
+      nowShowing: success(manyMovies),
+      preSale: success([]),
+      upcoming: success([]),
+    })
+  );
+
+  assert.match(html, /Filme anterior em Em cartaz/);
+  assert.match(html, /Próximo filme em Em cartaz/);
+});
+
+test("movie card renders pre-sale badge for pre_venda movies", () => {
+  const html = renderToStaticMarkup(
+    createElement(HomeCatalogSections, {
+      featured: success([]),
+      nowShowing: success([preSaleMovie]),
+      preSale: success([]),
+      upcoming: success([]),
+    })
+  );
+
+  assert.match(html, /Pré-venda/);
+});
+
+test("movie card renders destaque badge for featured movies", () => {
+  const html = renderToStaticMarkup(
+    createElement(HomeCatalogSections, {
+      featured: success([]),
+      nowShowing: success([featuredMovie]),
+      preSale: success([]),
+      upcoming: success([]),
+    })
+  );
+
+  assert.match(html, /Destaque/);
+});
+
+test("home catalog shows cinema indicator in tabbed catalog", () => {
+  const html = renderToStaticMarkup(
+    createElement(HomeCatalogSections, {
+      featured: success([]),
+      nowShowing: success([]),
+      preSale: success([]),
+      upcoming: success([]),
+    })
+  );
+
+  assert.match(html, /CinePrime Natal/);
 });

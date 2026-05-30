@@ -20,6 +20,7 @@ type MovieCarouselProps = {
   previousButtonLabel?: string;
   skeletonCount?: number;
   title: string;
+  titleVisible?: boolean;
 };
 
 export function MovieCarousel({
@@ -33,6 +34,7 @@ export function MovieCarousel({
   previousButtonLabel,
   skeletonCount = 6,
   title,
+  titleVisible = true,
 }: MovieCarouselProps) {
   const railRef = useRef<HTMLUListElement>(null);
   const [canScroll, setCanScroll] = useState(movies.length > 1);
@@ -110,7 +112,9 @@ export function MovieCarousel({
       className="movie-carousel-section"
     >
       <div className="movie-carousel-section__header">
-        <h2 id={headingId}>{title}</h2>
+        <h2 className={titleVisible ? undefined : "sr-only"} id={headingId}>
+          {title}
+        </h2>
       </div>
 
       {isLoading ? (
