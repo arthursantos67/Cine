@@ -153,13 +153,25 @@ export function FeaturedMovieBanner({
               aria-label="Destaques"
               className="flex gap-2 pt-2"
               role="tablist"
+              onKeyDown={(e) => {
+                if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+                e.preventDefault();
+                const next =
+                  e.key === "ArrowRight"
+                    ? (activeIndex + 1) % featuredMovies.length
+                    : (activeIndex - 1 + featuredMovies.length) % featuredMovies.length;
+                setActiveIndex(next);
+                resetAutoAdvance();
+                const tabs = e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]');
+                tabs[next]?.focus();
+              }}
             >
               {featuredMovies.map((fm, i) => (
                 <button
                   key={fm.id}
                   aria-label={`Destaque ${i + 1}: ${fm.title}`}
                   aria-selected={i === activeIndex}
-                  className={`h-1.5 rounded-pill border-0 cursor-pointer p-0 transition-all duration-200 ${
+                  className={`h-1.5 rounded-pill border-0 cursor-pointer p-0 transition-all duration-200 focus-visible:outline-none focus-visible:shadow-focus ${
                     i === activeIndex
                       ? "w-10 bg-white"
                       : "w-6 bg-white/35 hover:bg-white/60"
@@ -169,6 +181,7 @@ export function FeaturedMovieBanner({
                     resetAutoAdvance();
                   }}
                   role="tab"
+                  tabIndex={i === activeIndex ? 0 : -1}
                   type="button"
                 />
               ))}

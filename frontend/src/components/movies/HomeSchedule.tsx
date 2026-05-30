@@ -182,7 +182,7 @@ export function HomeSchedule({
           <div aria-label="Selecionar data" className="flex items-stretch gap-1" role="group">
             <button
               aria-label="Data anterior"
-              className="flex items-center justify-center rounded-control border border-border px-2 text-muted transition-colors hover:border-brand hover:text-text focus-visible:outline-none focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex items-center justify-center rounded-control border border-border px-2 text-muted transition duration-150 hover:border-brand hover:text-text active:scale-[0.92] focus-visible:outline-none focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
               disabled={!canGoPrev}
               onClick={goToPrevDate}
               type="button"
@@ -199,10 +199,10 @@ export function HomeSchedule({
                   <button
                     aria-pressed={isSelected}
                     className={cn(
-                      "flex flex-1 flex-col items-center justify-center gap-0.5 rounded-control border-2 py-2.5 text-center transition-colors focus-visible:outline-none focus-visible:shadow-focus",
+                      "flex flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-2.5 text-center transition duration-150 active:scale-[0.95] focus-visible:outline-none focus-visible:shadow-focus",
                       isSelected
-                        ? "border-[#0f1b3c] bg-[#0f1b3c] text-white"
-                        : "border-border bg-surface-muted text-muted hover:border-brand hover:text-text"
+                        ? "bg-white/[0.14] text-white ring-1 ring-inset ring-white/25"
+                        : "text-muted hover:bg-white/[0.07] hover:text-text"
                     )}
                     key={option.value}
                     onClick={() => setSelectedDate(option.value)}
@@ -219,7 +219,7 @@ export function HomeSchedule({
 
             <button
               aria-label="Próxima data"
-              className="flex items-center justify-center rounded-control border border-border px-2 text-muted transition-colors hover:border-brand hover:text-text focus-visible:outline-none focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex items-center justify-center rounded-control border border-border px-2 text-muted transition duration-150 hover:border-brand hover:text-text active:scale-[0.92] focus-visible:outline-none focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
               disabled={!canGoNext}
               onClick={goToNextDate}
               type="button"
@@ -230,7 +230,7 @@ export function HomeSchedule({
             <div className="relative">
               <button
                 aria-label="Abrir calendário"
-                className="flex h-full items-center justify-center rounded-control border border-border px-2 text-muted transition-colors hover:border-brand hover:text-text focus-visible:outline-none focus-visible:shadow-focus"
+                className="flex h-full items-center justify-center rounded-control border border-border px-2 text-muted transition duration-150 hover:border-brand hover:text-text active:scale-[0.92] focus-visible:outline-none focus-visible:shadow-focus"
                 onClick={() => calendarInputRef.current?.showPicker?.()}
                 type="button"
               >
@@ -358,7 +358,7 @@ function MovieScheduleEntry({ date, group }: { date: string; group: MovieSession
   const experienceGroups = groupSessionsByExperienceType(allSessions);
 
   return (
-    <article className="flex gap-5 border-b border-border py-8 first:pt-0 last:border-b-0 last:pb-0">
+    <article className="flex gap-5 border-b border-white/10 py-8 first:pt-0 last:border-b-0 last:pb-0">
       <Link
         aria-hidden="true"
         className="shrink-0"
@@ -445,7 +445,7 @@ function ExperienceGroupEntry({ group }: { group: ExperienceSessionGroup }) {
           return (
             <Link
               aria-label={`Selecionar sessão das ${formatSessionTime(session.start_time)}, sala ${session.room.name}${badgeDescription}, valor ${formatSessionPrice(session.base_price)}`}
-              className="flex min-w-[4.5rem] items-center justify-center rounded-control bg-brand px-4 py-3 font-extrabold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:shadow-focus"
+              className="flex min-w-[4.5rem] items-center justify-center rounded-control bg-brand px-4 py-3 font-extrabold text-white transition duration-150 hover:opacity-90 active:scale-[0.97] active:opacity-80 focus-visible:outline-none focus-visible:shadow-focus"
               href={getSessionSeatsHref(session.id)}
               key={session.id}
             >

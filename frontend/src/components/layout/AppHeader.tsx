@@ -79,7 +79,7 @@ export function AppHeader() {
               <Link
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "rounded-[6px] px-3 py-2.5 text-sm font-bold leading-none whitespace-nowrap transition-colors",
+                  "rounded-[6px] px-3 py-2.5 text-sm font-bold leading-none whitespace-nowrap transition duration-150 active:scale-[0.97]",
                   isActive
                     ? "bg-white/[0.08] text-white"
                     : "text-white/60 hover:bg-white/[0.08] hover:text-white"

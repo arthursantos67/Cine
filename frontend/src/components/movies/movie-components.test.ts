@@ -102,7 +102,7 @@ test("movie carousel renders an accessible horizontal rail with controls", () =>
     })
   );
 
-  assert.match(html, /movie-carousel-section/);
+  assert.match(html, /aria-labelledby="movie-carousel/);
   assert.match(html, /Em breve: carrossel de filmes/);
   assert.match(html, /role="list"/);
   assert.match(html, /Filme anterior em Em breve/);
@@ -137,7 +137,7 @@ test("movie carousel preserves empty and loading states", () => {
   assert.match(loadingHtml, /role="status"/);
   assert.match(loadingHtml, /Carregando próximos lançamentos.../);
   assert.match(loadingHtml, /aria-busy="true"/);
-  assert.match(loadingHtml, /movie-card--skeleton/);
+  assert.match(loadingHtml, /animate-pulse/);
 });
 
 test("featured banner renders featured movie media and primary action", () => {
