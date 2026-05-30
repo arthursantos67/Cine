@@ -162,13 +162,19 @@ function MovieDetailSuccess({ movie }: { movie: CatalogMovieDetail }) {
         </div>
 
         <dl className="movie-detail__metadata" aria-label="Informações do filme">
-          <div>
-            <dt>Gêneros</dt>
-            <dd>{genres}</dd>
-          </div>
+          {movie.age_rating && (
+            <div>
+              <dt>Faixa etária</dt>
+              <dd>{movie.age_rating === "L" ? "Livre" : `${movie.age_rating} anos`}</dd>
+            </div>
+          )}
           <div>
             <dt>Duração</dt>
             <dd>{duration}</dd>
+          </div>
+          <div>
+            <dt>Gêneros</dt>
+            <dd>{genres}</dd>
           </div>
           {movie.release_date ? (
             <div>
@@ -176,6 +182,18 @@ function MovieDetailSuccess({ movie }: { movie: CatalogMovieDetail }) {
               <dd>{releaseDate}</dd>
             </div>
           ) : null}
+          {movie.director && (
+            <div>
+              <dt>Direção</dt>
+              <dd>{movie.director}</dd>
+            </div>
+          )}
+          {movie.cast && movie.cast.length > 0 && (
+            <div>
+              <dt>Elenco</dt>
+              <dd>{movie.cast.join(", ")}</dd>
+            </div>
+          )}
         </dl>
 
         <section className="movie-detail__synopsis" aria-labelledby="sinopse">

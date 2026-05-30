@@ -1,8 +1,7 @@
 "use client";
 
 import { MapPin } from "lucide-react";
-import type { KeyboardEvent } from "react";
-import { useId, useState } from "react";
+import { Fragment, type KeyboardEvent, useId, useState } from "react";
 
 import type { MovieSectionState } from "@/app/HomeCatalog";
 import { Button } from "@/components/ui/Button";
@@ -49,7 +48,6 @@ export function TabbedMovieCatalog({
 }: TabbedMovieCatalogProps) {
   const [activeTab, setActiveTab] = useState<CatalogTab>("em_cartaz");
   const uid = useId();
-  const headingId = `${uid}-catalog-heading`;
 
   function handleTabKeyDown(e: KeyboardEvent<HTMLButtonElement>, idx: number) {
     if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
@@ -59,8 +57,9 @@ export function TabbedMovieCatalog({
           ? (idx + 1) % TABS.length
           : (idx - 1 + TABS.length) % TABS.length;
       setActiveTab(TABS[nextIdx].value);
-      const tabList = e.currentTarget.parentElement;
-      (tabList?.children[nextIdx] as HTMLElement | undefined)?.focus();
+      const tabList = e.currentTarget.closest('[role="tablist"]');
+      const tabs = tabList?.querySelectorAll<HTMLElement>('[role="tab"]');
+      tabs?.[nextIdx]?.focus();
     }
   }
 
@@ -73,51 +72,46 @@ export function TabbedMovieCatalog({
   }
 
   return (
-    <section
-      aria-labelledby={headingId}
-      className="grid gap-5 rounded-panel border border-border bg-surface p-6 shadow-soft max-sm:p-4"
-    >
-      {/* Section header: title + cinema indicator */}
+    <section aria-label="Programação" className="grid gap-0.5">
+      {/* Tab list + location */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2
-          className="text-[length:var(--text-section)] font-extrabold leading-[var(--text-section--line-height)] text-text"
-          id={headingId}
+        <div
+          aria-label="Seções de programação"
+          className="flex items-center"
+          role="tablist"
         >
-          Programação
-        </h2>
-        <CinemaIndicator name={cinemaName} />
-      </div>
-
-      {/* Tab list */}
-      <div
-        aria-label="Seções de programação"
-        className="inline-flex w-fit max-w-full gap-1 overflow-x-auto rounded-panel border border-border bg-surface-muted p-1"
-        role="tablist"
-      >
         {TABS.map((tab, idx) => {
           const isSelected = activeTab === tab.value;
           return (
-            <button
-              aria-controls={`${uid}-${tab.value}-panel`}
-              aria-selected={isSelected}
-              className={cn(
-                "min-h-9 whitespace-nowrap rounded-control px-3 py-2 text-sm font-extrabold transition-colors duration-150 focus-visible:outline-none focus-visible:shadow-focus",
-                isSelected
-                  ? "bg-surface text-text shadow-soft"
-                  : "text-muted hover:bg-surface hover:text-text"
+            <Fragment key={tab.value}>
+              {idx > 0 && (
+                <span aria-hidden="true" className="mx-3 select-none text-border">
+                  |
+                </span>
               )}
-              id={`${uid}-${tab.value}-tab`}
-              key={tab.value}
-              onClick={() => setActiveTab(tab.value)}
-              onKeyDown={(e) => handleTabKeyDown(e, idx)}
-              role="tab"
-              tabIndex={isSelected ? 0 : -1}
-              type="button"
-            >
-              {tab.label}
-            </button>
+              <button
+                aria-controls={`${uid}-${tab.value}-panel`}
+                aria-selected={isSelected}
+                className={cn(
+                  "whitespace-nowrap pb-0.5 text-sm font-extrabold transition-colors duration-150 focus-visible:outline-none focus-visible:shadow-focus",
+                  isSelected
+                    ? "border-b-2 border-brand text-text"
+                    : "text-muted hover:text-text"
+                )}
+                id={`${uid}-${tab.value}-tab`}
+                onClick={() => setActiveTab(tab.value)}
+                onKeyDown={(e) => handleTabKeyDown(e, idx)}
+                role="tab"
+                tabIndex={isSelected ? 0 : -1}
+                type="button"
+              >
+                {tab.label}
+              </button>
+            </Fragment>
           );
         })}
+        </div>
+        <CinemaIndicator name={cinemaName} />
       </div>
 
       {/* Tab panels */}

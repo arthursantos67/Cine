@@ -218,8 +218,7 @@ test("SessionSchedule renders movies grouped by movie with session buttons", () 
   );
 
   assert.match(html, /Em Cartaz Agora/);
-  assert.match(html, /Aventura/);
-  assert.match(html, /Sala VIP Prime/);
+  assert.match(html, /VIP/);
   assert.match(html, /18:00/);
   assert.match(html, /42,00/);
   assert.match(html, new RegExp(`href="/sessions/session-a/seats"`));

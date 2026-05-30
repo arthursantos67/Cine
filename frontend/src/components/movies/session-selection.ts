@@ -203,6 +203,75 @@ function compareSessionsByRoomAndTime(
   );
 }
 
+const roomExperienceGroupLabels: Record<CatalogRoomExperienceType, string> = {
+  "": "Sala",
+  imax: "IMAX",
+  premium: "Premium",
+  standard: "Sala Tradicional",
+  vip: "VIP",
+};
+
+export function getRoomExperienceLabel(
+  type: CatalogRoomExperienceType | null | undefined
+): string {
+  if (!type) return "";
+  return roomExperienceLabels[type] ?? "";
+}
+
+export type ExperienceSessionGroup = {
+  experienceType: CatalogRoomExperienceType;
+  label: string;
+  sessions: CatalogSession[];
+};
+
+export function groupSessionsByExperienceType(
+  sessions: CatalogSession[]
+): ExperienceSessionGroup[] {
+  const groups = new Map<string, ExperienceSessionGroup>();
+
+  const sorted = [...sessions].sort(
+    (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+  );
+
+  for (const session of sorted) {
+    const expType = (session.room.experience_type ?? "") as CatalogRoomExperienceType;
+    const existing = groups.get(expType);
+    if (existing) {
+      existing.sessions.push(session);
+    } else {
+      groups.set(expType, {
+        experienceType: expType,
+        label: roomExperienceGroupLabels[expType] ?? "Sala",
+        sessions: [session],
+      });
+    }
+  }
+
+  return Array.from(groups.values()).sort((a, b) =>
+    a.label.localeCompare(b.label, ptBrLocale)
+  );
+}
+
+export function formatScheduleDateHeading(
+  dateValue: string,
+  today: Date = new Date()
+): string {
+  const todayValue = formatDateForSessionQuery(today);
+  const tomorrowDate = new Date(today);
+  tomorrowDate.setDate(today.getDate() + 1);
+  const tomorrowValue = formatDateForSessionQuery(tomorrowDate);
+
+  if (dateValue === todayValue) return "Hoje";
+  if (dateValue === tomorrowValue) return "Amanhã";
+
+  return new Intl.DateTimeFormat(ptBrLocale, {
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+    weekday: "long",
+  }).format(new Date(`${dateValue}T00:00:00Z`));
+}
+
 function addDaysToDateValue(dateValue: string, days: number) {
   const [year, month, day] = parseDateParts(dateValue);
   const date = new Date(Date.UTC(year, month - 1, day + days, 12, 0, 0));

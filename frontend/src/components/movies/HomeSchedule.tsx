@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { type KeyboardEvent, useCallback, useEffect, useId, useMemo, useState } from "react";
-
+import { CalendarDays, ChevronLeft, ChevronRight, HelpCircle } from "lucide-react";
+import { Fragment, type KeyboardEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { catalogApi } from "@/api/catalog";
 import type { MovieSectionState } from "@/app/HomeCatalog";
 import { Button } from "@/components/ui/Button";
@@ -20,11 +20,15 @@ import {
 import { SessionBadgeList } from "./SessionBadges";
 import {
   buildSessionDateOptions,
+  type ExperienceSessionGroup,
+  formatScheduleDateHeading,
   formatSessionFullDate,
   formatSessionPrice,
   formatSessionTime,
   getSessionBadges,
+  getRoomExperienceLabel,
   getSessionSeatsHref,
+  groupSessionsByExperienceType,
   groupSessionsByMovie,
   type MovieSessionGroup,
 } from "./session-selection";
@@ -55,7 +59,7 @@ export function HomeSchedule({
 }: HomeScheduleProps) {
   const [activeTab, setActiveTab] = useState<ScheduleTab>("em_cartaz");
   const uid = useId();
-  const headingId = `${uid}-schedule-heading`;
+  const calendarInputRef = useRef<HTMLInputElement>(null);
 
   const dateOptions = useMemo(() => buildSessionDateOptions(new Date()), []);
   const [selectedDate, setSelectedDate] = useState(dateOptions[0]?.value ?? "");
@@ -97,55 +101,72 @@ export function HomeSchedule({
           ? (idx + 1) % SCHEDULE_TABS.length
           : (idx - 1 + SCHEDULE_TABS.length) % SCHEDULE_TABS.length;
       setActiveTab(SCHEDULE_TABS[nextIdx].value);
-      const tabList = e.currentTarget.parentElement;
-      (tabList?.children[nextIdx] as HTMLElement | undefined)?.focus();
+      const tabList = e.currentTarget.closest('[role="tablist"]');
+      const tabs = tabList?.querySelectorAll<HTMLElement>('[role="tab"]');
+      tabs?.[nextIdx]?.focus();
     }
   }
 
-  return (
-    <section
-      aria-labelledby={headingId}
-      className="grid gap-5 rounded-panel border border-border bg-surface p-6 shadow-soft max-sm:p-4"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2
-          className="text-[length:var(--text-section)] font-extrabold leading-[var(--text-section--line-height)] text-text"
-          id={headingId}
-        >
-          Horários
-        </h2>
-        <span className="text-sm font-bold text-muted">{cinemaName}</span>
-      </div>
+  const selectedDateIdx = dateOptions.findIndex((o) => o.value === selectedDate);
+  const canGoPrev = selectedDateIdx > 0;
+  const canGoNext = selectedDateIdx < dateOptions.length - 1;
 
-      <div
-        aria-label="Seções de horários"
-        className="inline-flex w-fit max-w-full gap-1 overflow-x-auto rounded-panel border border-border bg-surface-muted p-1"
-        role="tablist"
-      >
-        {SCHEDULE_TABS.map((tab, idx) => {
-          const isSelected = activeTab === tab.value;
-          return (
-            <button
-              aria-controls={`${uid}-${tab.value}-panel`}
-              aria-selected={isSelected}
-              className={cn(
-                "min-h-9 whitespace-nowrap rounded-control px-3 py-2 text-sm font-extrabold transition-colors duration-150 focus-visible:outline-none focus-visible:shadow-focus",
-                isSelected
-                  ? "bg-surface text-text shadow-soft"
-                  : "text-muted hover:bg-surface hover:text-text"
-              )}
-              id={`${uid}-${tab.value}-tab`}
-              key={tab.value}
-              onClick={() => setActiveTab(tab.value)}
-              onKeyDown={(e) => handleTabKeyDown(e, idx)}
-              role="tab"
-              tabIndex={isSelected ? 0 : -1}
-              type="button"
-            >
-              {tab.label}
-            </button>
-          );
-        })}
+  function goToPrevDate() {
+    if (canGoPrev) setSelectedDate(dateOptions[selectedDateIdx - 1].value);
+  }
+
+  function goToNextDate() {
+    if (canGoNext) setSelectedDate(dateOptions[selectedDateIdx + 1].value);
+  }
+
+  function handleCalendarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = e.target.value;
+    const match = dateOptions.find((o) => o.value === picked);
+    if (match) setSelectedDate(match.value);
+  }
+
+  return (
+    <section aria-label="Horários" className="grid gap-5">
+      {/* Header: tabs + cinema name — sem título visível */}
+      <div className="flex flex-wrap items-center gap-y-2">
+        <div
+          aria-label="Seções de horários"
+          className="flex items-center"
+          role="tablist"
+        >
+          {SCHEDULE_TABS.map((tab, idx) => {
+            const isSelected = activeTab === tab.value;
+            return (
+              <Fragment key={tab.value}>
+                {idx > 0 && (
+                  <span aria-hidden="true" className="mx-3 select-none text-border">
+                    |
+                  </span>
+                )}
+                <button
+                  aria-controls={`${uid}-${tab.value}-panel`}
+                  aria-selected={isSelected}
+                  className={cn(
+                    "whitespace-nowrap pb-0.5 text-sm font-extrabold transition-colors duration-150 focus-visible:outline-none focus-visible:shadow-focus",
+                    isSelected
+                      ? "border-b-2 border-brand text-text"
+                      : "text-muted hover:text-text"
+                  )}
+                  id={`${uid}-${tab.value}-tab`}
+                  onClick={() => setActiveTab(tab.value)}
+                  onKeyDown={(e) => handleTabKeyDown(e, idx)}
+                  role="tab"
+                  tabIndex={isSelected ? 0 : -1}
+                  type="button"
+                >
+                  {tab.label}
+                </button>
+              </Fragment>
+            );
+          })}
+        </div>
+
+        <span className="ml-auto text-sm font-bold text-muted">{cinemaName}</span>
       </div>
 
       {/* Em cartaz panel */}
@@ -157,28 +178,76 @@ export function HomeSchedule({
         tabIndex={0}
       >
         <div className="grid gap-4">
-          <div
-            aria-label="Selecionar data"
-            className="flex gap-2 overflow-x-auto pb-1"
-            role="group"
-          >
-            {dateOptions.map((option) => (
+          {/* Date carousel */}
+          <div aria-label="Selecionar data" className="flex items-stretch gap-1" role="group">
+            <button
+              aria-label="Data anterior"
+              className="flex items-center justify-center rounded-control border border-border px-2 text-muted transition-colors hover:border-brand hover:text-text focus-visible:outline-none focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={!canGoPrev}
+              onClick={goToPrevDate}
+              type="button"
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+
+            <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
+              {dateOptions.map((option) => {
+                const isSelected = option.value === selectedDate;
+                const dayNumber = option.label.split("/")[0];
+                const weekday = option.weekday.toUpperCase();
+                return (
+                  <button
+                    aria-pressed={isSelected}
+                    className={cn(
+                      "flex flex-1 flex-col items-center justify-center gap-0.5 rounded-control border-2 py-2.5 text-center transition-colors focus-visible:outline-none focus-visible:shadow-focus",
+                      isSelected
+                        ? "border-[#0f1b3c] bg-[#0f1b3c] text-white"
+                        : "border-border bg-surface-muted text-muted hover:border-brand hover:text-text"
+                    )}
+                    key={option.value}
+                    onClick={() => setSelectedDate(option.value)}
+                    type="button"
+                  >
+                    <span className="text-[0.65rem] font-bold leading-none tracking-wide">
+                      {weekday}.
+                    </span>
+                    <strong className="text-xl font-extrabold leading-none">{dayNumber}</strong>
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              aria-label="Próxima data"
+              className="flex items-center justify-center rounded-control border border-border px-2 text-muted transition-colors hover:border-brand hover:text-text focus-visible:outline-none focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={!canGoNext}
+              onClick={goToNextDate}
+              type="button"
+            >
+              <ChevronRight className="size-4" />
+            </button>
+
+            <div className="relative">
               <button
-                aria-pressed={option.value === selectedDate}
-                className={cn(
-                  "flex min-w-[3.25rem] flex-col items-center gap-0.5 rounded-control border px-2.5 py-2 text-center text-xs font-bold transition-colors focus-visible:outline-none focus-visible:shadow-focus",
-                  option.value === selectedDate
-                    ? "border-brand bg-brand text-white"
-                    : "border-border bg-surface-muted text-muted hover:border-brand hover:text-text"
-                )}
-                key={option.value}
-                onClick={() => setSelectedDate(option.value)}
+                aria-label="Abrir calendário"
+                className="flex h-full items-center justify-center rounded-control border border-border px-2 text-muted transition-colors hover:border-brand hover:text-text focus-visible:outline-none focus-visible:shadow-focus"
+                onClick={() => calendarInputRef.current?.showPicker?.()}
                 type="button"
               >
-                <span className="capitalize">{option.weekday}</span>
-                <strong>{option.label}</strong>
+                <CalendarDays className="size-4" />
               </button>
-            ))}
+              <input
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 opacity-0"
+                max={dateOptions[dateOptions.length - 1]?.value}
+                min={dateOptions[0]?.value}
+                onChange={handleCalendarChange}
+                ref={calendarInputRef}
+                tabIndex={-1}
+                type="date"
+                value={selectedDate}
+              />
+            </div>
           </div>
 
           <SessionSchedule
@@ -278,15 +347,18 @@ export function SessionSchedule({
   return (
     <div aria-label="Programação do dia">
       {movieGroups.map((group) => (
-        <MovieScheduleEntry group={group} key={group.movie.id} />
+        <MovieScheduleEntry date={date} group={group} key={group.movie.id} />
       ))}
     </div>
   );
 }
 
-function MovieScheduleEntry({ group }: { group: MovieSessionGroup }) {
+function MovieScheduleEntry({ date, group }: { date: string; group: MovieSessionGroup }) {
+  const allSessions = group.roomGroups.flatMap((rg) => rg.sessions);
+  const experienceGroups = groupSessionsByExperienceType(allSessions);
+
   return (
-    <article className="grid grid-cols-[auto_1fr] gap-4 border-b border-border py-5 first:pt-0 last:border-b-0 last:pb-0">
+    <article className="flex gap-5 border-b border-border py-8 first:pt-0 last:border-b-0 last:pb-0">
       <Link
         aria-hidden="true"
         className="shrink-0"
@@ -295,62 +367,93 @@ function MovieScheduleEntry({ group }: { group: MovieSessionGroup }) {
       >
         <ResponsiveImage
           alt={`Poster de ${group.movie.title}`}
-          className="h-24 w-16 rounded-control object-cover"
-          height={144}
+          className="h-52 w-[8.5rem] rounded-control object-cover"
+          height={312}
           loading="lazy"
-          sizes="64px"
+          sizes="136px"
           src={group.movie.poster_url}
           unoptimized
-          width={96}
+          width={204}
         />
       </Link>
 
-      <div className="grid gap-3">
-        <div>
+      <div className="grid min-w-0 content-start gap-3">
+        <div className="grid gap-1">
           <Link
-            className="font-extrabold leading-snug text-text hover:text-brand"
+            className="text-xl font-extrabold leading-snug text-text hover:text-brand"
             href={getMovieDetailsHref(group.movie.id)}
           >
             {group.movie.title}
           </Link>
-          <p className="mt-0.5 text-sm text-muted">
-            {formatMovieGenres(group.movie.genres)}
-            {" · "}
-            {formatMovieDuration(group.movie.duration_minutes)}
-          </p>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+            {group.movie.age_rating && (
+              <span className="inline-flex items-center rounded border border-current px-1.5 py-px text-xs font-bold leading-none">
+                {group.movie.age_rating}
+              </span>
+            )}
+            <span>{formatMovieDuration(group.movie.duration_minutes)}</span>
+            <span aria-hidden="true">·</span>
+            <span>{formatMovieGenres(group.movie.genres)}</span>
+          </div>
+          {group.movie.director && (
+            <p className="text-sm text-muted">
+              <span className="font-semibold text-text">Direção:</span>{" "}
+              {group.movie.director}
+            </p>
+          )}
+          {group.movie.cast && group.movie.cast.length > 0 && (
+            <p className="text-sm text-muted">
+              <span className="font-semibold text-text">Elenco:</span>{" "}
+              {group.movie.cast.slice(0, 3).join(", ")}
+            </p>
+          )}
         </div>
 
-        {group.roomGroups.map((roomGroup) => (
-          <div className="grid gap-1.5" key={roomGroup.roomId}>
-            <h3 className="text-sm font-bold text-text">{roomGroup.roomName}</h3>
-            <div className="flex flex-wrap gap-2">
-              {roomGroup.sessions.map((session) => {
-                const badges = getSessionBadges(session);
-                const badgeText = badges.map((b) => b.label).join(", ");
-                const badgeDescription = badgeText ? `, formatos ${badgeText}` : "";
+        <p className="text-sm font-extrabold capitalize text-text">
+          {formatScheduleDateHeading(date)}
+        </p>
 
-                return (
-                  <Link
-                    aria-label={`Selecionar sessão das ${formatSessionTime(session.start_time)}, sala ${roomGroup.roomName}${badgeDescription}, valor ${formatSessionPrice(session.base_price)}`}
-                    className="flex flex-col items-start gap-1 rounded-control border border-border bg-surface-muted px-3 py-2 text-left text-sm transition-colors hover:border-brand hover:bg-surface focus-visible:outline-none focus-visible:shadow-focus"
-                    href={getSessionSeatsHref(session.id)}
-                    key={session.id}
-                  >
-                    <strong className="text-text">{formatSessionTime(session.start_time)}</strong>
-                    <span className="text-xs text-muted">
-                      até {formatSessionTime(session.end_time)}
-                    </span>
-                    {badges.length > 0 && <SessionBadgeList badges={badges} />}
-                    <span className="text-xs font-bold text-muted">
-                      {formatSessionPrice(session.base_price)}
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+        <div className="grid gap-4">
+          {experienceGroups.map((expGroup) => (
+            <ExperienceGroupEntry group={expGroup} key={expGroup.experienceType} />
+          ))}
+        </div>
       </div>
     </article>
+  );
+}
+
+function ExperienceGroupEntry({ group }: { group: ExperienceSessionGroup }) {
+  const repSession = group.sessions[0];
+  const allBadges = repSession ? getSessionBadges(repSession) : [];
+  const expLabel = getRoomExperienceLabel(repSession?.room.experience_type);
+  const headerBadges = allBadges.filter((b) => b.label !== expLabel);
+
+  return (
+    <div className="grid gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-sm font-bold text-text">{group.label}</h3>
+        {headerBadges.length > 0 && <SessionBadgeList badges={headerBadges} />}
+        <HelpCircle className="size-3.5 shrink-0 text-muted/50" />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {group.sessions.map((session) => {
+          const badges = getSessionBadges(session);
+          const badgeText = badges.map((b) => b.label).join(", ");
+          const badgeDescription = badgeText ? `, formatos ${badgeText}` : "";
+
+          return (
+            <Link
+              aria-label={`Selecionar sessão das ${formatSessionTime(session.start_time)}, sala ${session.room.name}${badgeDescription}, valor ${formatSessionPrice(session.base_price)}`}
+              className="flex min-w-[4.5rem] items-center justify-center rounded-control bg-brand px-4 py-3 font-extrabold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:shadow-focus"
+              href={getSessionSeatsHref(session.id)}
+              key={session.id}
+            >
+              {formatSessionTime(session.start_time)}
+            </Link>
+          );
+        })}
+      </div>
+    </div>
   );
 }

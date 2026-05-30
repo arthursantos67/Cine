@@ -133,7 +133,7 @@ class GenreDetailView(RetrieveUpdateDestroyAPIView):
 
 @extend_schema(tags=["Catalog"], summary="List or create movies")
 class MovieListCreateView(ListCreateAPIView):
-    queryset = Movie.objects.prefetch_related("genres").all()
+    queryset = Movie.objects.prefetch_related("genres", "cast").all()
     permission_classes = [IsAdminUserOrReadOnly]
     CACHE_TTL_SECONDS = 300
     IS_FEATURED_FILTER_VALUES = {
@@ -224,7 +224,7 @@ class MovieListCreateView(ListCreateAPIView):
 
 @extend_schema(tags=["Catalog"], summary="Get, update or delete movie")
 class MovieDetailView(RetrieveUpdateDestroyAPIView):
-    queryset = Movie.objects.prefetch_related("genres").all()
+    queryset = Movie.objects.prefetch_related("genres", "cast").all()
     permission_classes = [IsAdminUserOrReadOnly]
 
     def get_serializer_class(self):
@@ -269,7 +269,7 @@ class RoomDetailView(RetrieveUpdateDestroyAPIView):
 class SessionListCreateView(ListCreateAPIView):
     queryset = (
         Session.objects.select_related("movie", "room")
-        .prefetch_related("movie__genres")
+        .prefetch_related("movie__genres", "movie__cast")
         .all()
     )
     permission_classes = [IsAdminUserOrReadOnly]
@@ -428,7 +428,7 @@ class SessionListCreateView(ListCreateAPIView):
 class SessionDetailView(RetrieveUpdateDestroyAPIView):
     queryset = (
         Session.objects.select_related("movie", "room")
-        .prefetch_related("movie__genres")
+        .prefetch_related("movie__genres", "movie__cast")
         .all()
     )
     permission_classes = [IsAdminUserOrReadOnly]

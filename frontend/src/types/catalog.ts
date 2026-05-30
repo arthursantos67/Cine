@@ -18,15 +18,20 @@ export type CatalogGenre = {
   name: string;
 };
 
+export type CatalogMovieAgeRating = "" | "L" | "10" | "12" | "14" | "16" | "18";
+
 export type CatalogMovie = {
-  id: string;
-  title: string;
-  genres: CatalogGenre[];
+  age_rating?: CatalogMovieAgeRating | null;
+  cast?: string[] | null;
+  director?: string | null;
   duration_minutes: number;
-  release_date?: string | null;
-  poster_url: string;
-  status: MovieStatus;
+  genres: CatalogGenre[];
+  id: string;
   is_featured: boolean;
+  poster_url: string;
+  release_date?: string | null;
+  status: MovieStatus;
+  title: string;
 };
 
 export type CatalogMovieDetail = CatalogMovie & {
