@@ -183,9 +183,22 @@ function MovieDetailSuccess({ movie }: { movie: CatalogMovieDetail }) {
           <p>{movie.synopsis || "Sinopse indisponível."}</p>
         </section>
 
-        <MovieSessionSelector movieId={movie.id} />
+        {movie.status === "em_breve" ? (
+          <MovieComingSoonNotice />
+        ) : (
+          <MovieSessionSelector movieId={movie.id} />
+        )}
       </article>
     </div>
+  );
+}
+
+function MovieComingSoonNotice() {
+  return (
+    <StateMessage title="Em breve nas telas">
+      Este filme ainda não está em cartaz. Fique de olho na programação para saber quando as
+      sessões estarão disponíveis.
+    </StateMessage>
   );
 }
 

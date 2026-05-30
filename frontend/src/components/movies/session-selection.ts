@@ -1,5 +1,6 @@
 import type {
   CatalogAudioFormat,
+  CatalogMovie,
   CatalogProjectionFormat,
   CatalogRoomExperienceType,
   CatalogRoomSummary,
@@ -133,6 +134,31 @@ export function getSessionBadges(session: CatalogSession): SessionBadge[] {
 
 export function getSessionSeatsHref(sessionId: string) {
   return `/sessions/${sessionId}/seats`;
+}
+
+export type MovieSessionGroup = {
+  movie: CatalogMovie;
+  roomGroups: SessionRoomGroup[];
+};
+
+export function groupSessionsByMovie(
+  sessions: CatalogSession[]
+): MovieSessionGroup[] {
+  const movieMap = new Map<string, { movie: CatalogMovie; sessions: CatalogSession[] }>();
+
+  for (const s of sessions) {
+    const existing = movieMap.get(s.movie.id);
+    if (existing) {
+      existing.sessions.push(s);
+    } else {
+      movieMap.set(s.movie.id, { movie: s.movie, sessions: [s] });
+    }
+  }
+
+  return Array.from(movieMap.values()).map(({ movie, sessions: movieSessions }) => ({
+    movie,
+    roomGroups: groupSessionsByRoom(movieSessions),
+  }));
 }
 
 export function groupSessionsByRoom(

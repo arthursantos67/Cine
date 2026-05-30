@@ -13,6 +13,7 @@ import {
   getRoomDisplayName,
   getSessionBadges,
   getSessionSeatsHref,
+  groupSessionsByMovie,
   groupSessionsByRoom,
 } from "./session-selection";
 
@@ -146,4 +147,54 @@ test("room display names and session badges use optional metadata", () => {
 
 test("session navigation targets seat selection route", () => {
   assert.equal(getSessionSeatsHref("session-123"), "/sessions/session-123/seats");
+});
+
+const movieB = {
+  duration_minutes: 90,
+  genres: [{ id: "genre-2", name: "Comédia" }],
+  id: "movie-456",
+  is_featured: false,
+  poster_url: "https://cdn.example.com/movie-b.jpg",
+  status: "em_cartaz" as const,
+  title: "O Outro Filme",
+};
+
+test("groupSessionsByMovie groups sessions by movie preserving room order within each movie", () => {
+  const groups = groupSessionsByMovie([
+    session("s1", { capacity: 80, id: "room-1", name: "Sala 1" }, "2026-05-22T18:00:00-03:00"),
+    session("s2", { capacity: 80, id: "room-1", name: "Sala 1" }, "2026-05-22T20:00:00-03:00"),
+    {
+      ...session("s3", { capacity: 48, id: "room-vip", name: "Sala VIP" }, "2026-05-22T19:00:00-03:00"),
+      movie: movieB,
+    },
+    session("s4", { capacity: 48, id: "room-2", name: "Sala 2" }, "2026-05-22T21:00:00-03:00"),
+  ]);
+
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].movie.id, "movie-123");
+  assert.deepEqual(
+    groups[0].roomGroups.map((g) => g.roomId),
+    ["room-1", "room-2"]
+  );
+  assert.deepEqual(
+    groups[0].roomGroups[0].sessions.map((s) => s.id),
+    ["s1", "s2"]
+  );
+  assert.equal(groups[1].movie.id, "movie-456");
+  assert.equal(groups[1].roomGroups.length, 1);
+  assert.equal(groups[1].roomGroups[0].sessions[0].id, "s3");
+});
+
+test("groupSessionsByMovie returns empty array for empty input", () => {
+  assert.deepEqual(groupSessionsByMovie([]), []);
+});
+
+test("groupSessionsByMovie returns single group for single movie", () => {
+  const groups = groupSessionsByMovie([
+    session("s1", { capacity: 80, id: "room-1", name: "Sala 1" }, "2026-05-22T18:00:00-03:00"),
+  ]);
+
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].movie.id, "movie-123");
+  assert.equal(groups[0].roomGroups[0].sessions[0].id, "s1");
 });
