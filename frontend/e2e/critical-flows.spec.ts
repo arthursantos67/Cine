@@ -167,13 +167,14 @@ test("tabbed catalog switches to Pré-venda panel on click", async ({ page }) =>
   await setupMockApi(page);
   await page.goto("/");
 
-  const emCartazTab = page.getByRole("tab", { name: "Em cartaz" });
-  const preVendaTab = page.getByRole("tab", { name: "Pré-venda" });
+  const catalogSection = page.getByRole("region", { name: "Programação" });
+  const emCartazTab = catalogSection.getByRole("tab", { name: "Em cartaz" });
+  const preVendaTab = catalogSection.getByRole("tab", { name: "Pré-venda" });
 
   await expect(emCartazTab).toHaveAttribute("aria-selected", "true");
   await expect(preVendaTab).toHaveAttribute("aria-selected", "false");
 
-  const nowShowingPanel = page.getByRole("tabpanel", { name: "Em cartaz" });
+  const nowShowingPanel = catalogSection.getByRole("tabpanel", { name: "Em cartaz" });
   await expect(nowShowingPanel).toBeVisible();
   await expect(
     nowShowingPanel.getByRole("link", { name: /Ver detalhes de A Jornada de Natal/ })
@@ -184,7 +185,7 @@ test("tabbed catalog switches to Pré-venda panel on click", async ({ page }) =>
   await expect(preVendaTab).toHaveAttribute("aria-selected", "true");
   await expect(emCartazTab).toHaveAttribute("aria-selected", "false");
 
-  const preSalePanel = page.getByRole("tabpanel", { name: "Pré-venda" });
+  const preSalePanel = catalogSection.getByRole("tabpanel", { name: "Pré-venda" });
   await expect(preSalePanel).toBeVisible();
   await expect(
     preSalePanel.getByRole("link", { name: /Ver detalhes de Estreia da Semana/ })
@@ -193,17 +194,91 @@ test("tabbed catalog switches to Pré-venda panel on click", async ({ page }) =>
   await expect(nowShowingPanel).toBeHidden();
 });
 
+test("home schedule section renders Em cartaz and Em breve tabs", async ({ page }) => {
+  await setupMockApi(page);
+  await page.goto("/");
+
+  const scheduleSection = page.getByRole("region", { name: "Horários" });
+  const emCartazTab = scheduleSection.getByRole("tab", { name: "Em cartaz" });
+  const emBreveTab = scheduleSection.getByRole("tab", { name: "Em breve" });
+
+  await expect(emCartazTab).toBeVisible();
+  await expect(emBreveTab).toBeVisible();
+  await expect(emCartazTab).toHaveAttribute("aria-selected", "true");
+  await expect(emBreveTab).toHaveAttribute("aria-selected", "false");
+});
+
+test("home schedule Em cartaz tab shows session buttons linking to seat selection", async ({
+  page,
+}) => {
+  await setupMockApi(page);
+  await page.goto("/");
+
+  const scheduleSection = page.getByRole("region", { name: "Horários" });
+  await expect(scheduleSection).toBeVisible();
+
+  await expect(
+    scheduleSection.getByRole("link", {
+      name: /Selecionar sessão das 15:00, sala Sala 1/,
+    })
+  ).toBeVisible();
+});
+
+test("home schedule Em cartaz session button navigates to seat selection", async ({ page }) => {
+  await setupMockApi(page);
+  await page.goto("/");
+
+  const scheduleSection = page.getByRole("region", { name: "Horários" });
+  await scheduleSection.getByRole("link", { name: /Selecionar sessão das 15:00/ }).click();
+
+  await expect(page).toHaveURL(/\/sessions\/session-morning\/seats/);
+});
+
+test("home schedule switches to Em breve tab and shows upcoming movie without session links", async ({
+  page,
+}) => {
+  await setupMockApi(page);
+  await page.goto("/");
+
+  const scheduleSection = page.getByRole("region", { name: "Horários" });
+  await scheduleSection.getByRole("tab", { name: "Em breve" }).click();
+
+  const emBrevePanel = scheduleSection.getByRole("tabpanel", { name: "Em breve" });
+  await expect(emBrevePanel).toBeVisible();
+  await expect(
+    emBrevePanel.getByRole("link", { name: /Ver detalhes de Em Breve em Natal/ })
+  ).toBeVisible();
+
+  await expect(
+    emBrevePanel.getByRole("link", { name: /Selecionar sessão/ })
+  ).toHaveCount(0);
+});
+
+test("movie detail for em_breve movie shows coming-soon notice and hides session selector", async ({
+  page,
+}) => {
+  await setupMockApi(page);
+  await page.goto("/movies/movie-upcoming");
+
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Em Breve em Natal" })
+  ).toBeVisible();
+  await expect(page.getByText("Em breve nas telas")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sessões" })).toHaveCount(0);
+});
+
 test("tabbed catalog switches to Pré-venda panel with ArrowRight key", async ({ page }) => {
   await setupMockApi(page);
   await page.goto("/");
 
-  await page.getByRole("tab", { name: "Em cartaz" }).focus();
+  const catalogSection = page.getByRole("region", { name: "Programação" });
+  await catalogSection.getByRole("tab", { name: "Em cartaz" }).focus();
   await page.keyboard.press("ArrowRight");
 
-  const preVendaTab = page.getByRole("tab", { name: "Pré-venda" });
+  const preVendaTab = catalogSection.getByRole("tab", { name: "Pré-venda" });
   await expect(preVendaTab).toHaveAttribute("aria-selected", "true");
 
-  const preSalePanel = page.getByRole("tabpanel", { name: "Pré-venda" });
+  const preSalePanel = catalogSection.getByRole("tabpanel", { name: "Pré-venda" });
   await expect(preSalePanel).toBeVisible();
   await expect(
     preSalePanel.getByRole("link", { name: /Ver detalhes de Estreia da Semana/ })

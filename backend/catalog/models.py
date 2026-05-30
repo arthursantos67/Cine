@@ -16,6 +16,15 @@ class MovieStatus(models.TextChoices):
     EM_BREVE = "em_breve", "Em breve"
 
 
+class AgeRating(models.TextChoices):
+    LIVRE = "L", "Livre"
+    TEN = "10", "10 anos"
+    TWELVE = "12", "12 anos"
+    FOURTEEN = "14", "14 anos"
+    SIXTEEN = "16", "16 anos"
+    EIGHTEEN = "18", "18 anos"
+
+
 class RoomExperienceType(models.TextChoices):
     STANDARD = "standard", "Traditional"
     VIP = "vip", "VIP"
@@ -57,6 +66,14 @@ class Movie(models.Model):
         choices=MovieStatus.choices,
         default=MovieStatus.EM_CARTAZ,
     )
+    age_rating = models.CharField(
+        max_length=2,
+        choices=AgeRating.choices,
+        blank=True,
+        default="",
+        verbose_name="Faixa etária",
+    )
+    director = models.CharField(max_length=255, blank=True, default="", verbose_name="Direção")
     is_featured = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -269,6 +286,20 @@ class Session(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
+
+
+class CastMember(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name="cast")
+    name = models.CharField(max_length=255)
+    order = models.PositiveSmallIntegerField(default=0, verbose_name="Ordem")
+
+    class Meta:
+        db_table = "cast_members"
+        ordering = ["order", "name"]
+
+    def __str__(self):
+        return self.name
 
 
 class Genre(models.Model):

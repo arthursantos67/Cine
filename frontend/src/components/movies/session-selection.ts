@@ -1,5 +1,6 @@
 import type {
   CatalogAudioFormat,
+  CatalogMovie,
   CatalogProjectionFormat,
   CatalogRoomExperienceType,
   CatalogRoomSummary,
@@ -135,6 +136,31 @@ export function getSessionSeatsHref(sessionId: string) {
   return `/sessions/${sessionId}/seats`;
 }
 
+export type MovieSessionGroup = {
+  movie: CatalogMovie;
+  roomGroups: SessionRoomGroup[];
+};
+
+export function groupSessionsByMovie(
+  sessions: CatalogSession[]
+): MovieSessionGroup[] {
+  const movieMap = new Map<string, { movie: CatalogMovie; sessions: CatalogSession[] }>();
+
+  for (const s of sessions) {
+    const existing = movieMap.get(s.movie.id);
+    if (existing) {
+      existing.sessions.push(s);
+    } else {
+      movieMap.set(s.movie.id, { movie: s.movie, sessions: [s] });
+    }
+  }
+
+  return Array.from(movieMap.values()).map(({ movie, sessions: movieSessions }) => ({
+    movie,
+    roomGroups: groupSessionsByRoom(movieSessions),
+  }));
+}
+
 export function groupSessionsByRoom(
   sessions: CatalogSession[]
 ): SessionRoomGroup[] {
@@ -175,6 +201,75 @@ function compareSessionsByRoomAndTime(
   return (
     new Date(first.start_time).getTime() - new Date(second.start_time).getTime()
   );
+}
+
+const roomExperienceGroupLabels: Record<CatalogRoomExperienceType, string> = {
+  "": "Sala",
+  imax: "IMAX",
+  premium: "Premium",
+  standard: "Sala Tradicional",
+  vip: "VIP",
+};
+
+export function getRoomExperienceLabel(
+  type: CatalogRoomExperienceType | null | undefined
+): string {
+  if (!type) return "";
+  return roomExperienceLabels[type] ?? "";
+}
+
+export type ExperienceSessionGroup = {
+  experienceType: CatalogRoomExperienceType;
+  label: string;
+  sessions: CatalogSession[];
+};
+
+export function groupSessionsByExperienceType(
+  sessions: CatalogSession[]
+): ExperienceSessionGroup[] {
+  const groups = new Map<string, ExperienceSessionGroup>();
+
+  const sorted = [...sessions].sort(
+    (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+  );
+
+  for (const session of sorted) {
+    const expType = (session.room.experience_type ?? "") as CatalogRoomExperienceType;
+    const existing = groups.get(expType);
+    if (existing) {
+      existing.sessions.push(session);
+    } else {
+      groups.set(expType, {
+        experienceType: expType,
+        label: roomExperienceGroupLabels[expType] ?? "Sala",
+        sessions: [session],
+      });
+    }
+  }
+
+  return Array.from(groups.values()).sort((a, b) =>
+    a.label.localeCompare(b.label, ptBrLocale)
+  );
+}
+
+export function formatScheduleDateHeading(
+  dateValue: string,
+  today: Date = new Date()
+): string {
+  const todayValue = formatDateForSessionQuery(today);
+  const tomorrowDate = new Date(today);
+  tomorrowDate.setDate(today.getDate() + 1);
+  const tomorrowValue = formatDateForSessionQuery(tomorrowDate);
+
+  if (dateValue === todayValue) return "Hoje";
+  if (dateValue === tomorrowValue) return "Amanhã";
+
+  return new Intl.DateTimeFormat(ptBrLocale, {
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+    weekday: "long",
+  }).format(new Date(`${dateValue}T00:00:00Z`));
 }
 
 function addDaysToDateValue(dateValue: string, days: number) {

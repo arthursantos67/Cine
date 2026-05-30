@@ -107,6 +107,40 @@ test("movie detail omits release date when unavailable", () => {
   assert.doesNotMatch(html, /Estreia indisponível/);
 });
 
+test("em_breve movie detail shows coming-soon notice and hides session selector", () => {
+  const comingSoonMovie: CatalogMovieDetail = {
+    ...movie,
+    id: "movie-upcoming",
+    release_date: "2026-08-01",
+    status: "em_breve",
+    title: "Ainda Por Vir",
+  };
+
+  const html = renderToStaticMarkup(
+    createElement(MovieDetailView, {
+      state: { movie: comingSoonMovie, status: "success" },
+    })
+  );
+
+  assert.match(html, /Ainda Por Vir/);
+  assert.match(html, /Em breve nas telas/);
+  assert.doesNotMatch(html, /Sessões/);
+  assert.doesNotMatch(html, /Carregando sessões/);
+  assert.doesNotMatch(html, /Selecionar sessão/);
+});
+
+test("em_cartaz movie detail still shows session selector", () => {
+  const html = renderToStaticMarkup(
+    createElement(MovieDetailView, {
+      state: { movie, status: "success" },
+    })
+  );
+
+  assert.match(html, /Sessões/);
+  assert.match(html, /Carregando sessões/);
+  assert.doesNotMatch(html, /Em breve nas telas/);
+});
+
 test("movie detail renders stable loading state", () => {
   const html = renderToStaticMarkup(
     createElement(MovieDetailView, {

@@ -152,6 +152,10 @@ async function handleApiRoute(route: Route, state: ApiRouteState) {
     return json(route, movie);
   }
 
+  if (method === "GET" && url.pathname === `/api/v1/catalog/movies/${upcomingMovie.id}/`) {
+    return json(route, { ...upcomingMovie, synopsis: "Ainda por vir nas telas do cinema." });
+  }
+
   if (method === "GET" && url.pathname === "/api/v1/catalog/sessions/") {
     return json(route, paginated([session]));
   }

@@ -2,7 +2,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from rest_framework import serializers
 
-from catalog.models import Genre, Movie, Room, Session
+from catalog.models import CastMember, Genre, Movie, Room, Session
 from reservations.models import SessionSeat, SessionSeatStatus, Seat
 
 
@@ -102,6 +102,8 @@ class MovieWriteSerializer(serializers.ModelSerializer):
             "duration_minutes",
             "release_date",
             "poster_url",
+            "age_rating",
+            "director",
             "status",
             "is_featured",
             "created_at",
@@ -112,6 +114,10 @@ class MovieWriteSerializer(serializers.ModelSerializer):
 
 class MovieReadSerializer(serializers.ModelSerializer):
     genres = GenreSummarySerializer(many=True, read_only=True)
+    cast = serializers.SerializerMethodField()
+
+    def get_cast(self, obj):
+        return [m.name for m in obj.cast.all()]
 
     class Meta:
         model = Movie
@@ -123,6 +129,9 @@ class MovieReadSerializer(serializers.ModelSerializer):
             "duration_minutes",
             "release_date",
             "poster_url",
+            "age_rating",
+            "director",
+            "cast",
             "status",
             "is_featured",
             "created_at",
@@ -132,6 +141,10 @@ class MovieReadSerializer(serializers.ModelSerializer):
 
 class MovieSummarySerializer(serializers.ModelSerializer):
     genres = GenreSummarySerializer(many=True, read_only=True)
+    cast = serializers.SerializerMethodField()
+
+    def get_cast(self, obj):
+        return [m.name for m in obj.cast.all()]
 
     class Meta:
         model = Movie
@@ -142,6 +155,9 @@ class MovieSummarySerializer(serializers.ModelSerializer):
             "duration_minutes",
             "release_date",
             "poster_url",
+            "age_rating",
+            "director",
+            "cast",
             "status",
             "is_featured",
         ]

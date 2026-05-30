@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { catalogApi } from "@/api/catalog";
 import { Button } from "@/components/ui/Button";
 import { FeaturedMovieBanner } from "@/components/movies";
-import { MovieCarousel } from "@/components/movies";
+import { HomeSchedule } from "@/components/movies/HomeSchedule";
 import { TabbedMovieCatalog } from "@/components/movies/TabbedMovieCatalog";
 import { StateMessage } from "@/components/ui/StateMessage";
 import type { CatalogMovie } from "@/types/catalog";
@@ -152,25 +152,10 @@ export function HomeCatalogSections({
           preSale={preSale}
         />
 
-        {upcoming.status === "error" ? (
-          <CatalogErrorState
-            message={
-              upcoming.errorMessage ??
-              "Não foi possível carregar os filmes em breve. Tente novamente."
-            }
-            onRetry={onRetryUpcoming}
-            title="Em breve indisponível"
-          />
-        ) : (
-          <MovieCarousel
-            emptyDescription="Ainda não há filmes em breve no catálogo."
-            emptyTitle="Nenhum filme em breve"
-            isLoading={upcoming.status === "loading"}
-            loadingLabel="Carregando filmes em breve..."
-            movies={upcoming.movies}
-            title="Em breve"
-          />
-        )}
+        <HomeSchedule
+          onRetryUpcoming={onRetryUpcoming}
+          upcoming={upcoming}
+        />
       </div>
     </div>
   );
