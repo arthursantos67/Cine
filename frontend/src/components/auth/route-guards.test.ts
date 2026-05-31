@@ -3,8 +3,10 @@ import test from "node:test";
 
 import {
   buildCurrentInternalPath,
+  getAdminRouteDecision,
   getGuardedActionDecision,
   getProtectedRouteDecision,
+  isAdminRoute,
   isProtectedRoute,
 } from "./route-guards";
 
@@ -100,6 +102,41 @@ test("guarded actions wait during auth resolution and allow authenticated users"
       loginUrl: null,
       pending: false,
     }
+  );
+});
+
+test("admin route list matches /admin and nested paths", () => {
+  assert.equal(isAdminRoute("/admin"), true);
+  assert.equal(isAdminRoute("/admin/users"), true);
+  assert.equal(isAdminRoute("/my-tickets"), false);
+  assert.equal(isAdminRoute("/checkout"), false);
+});
+
+test("admin route decision waits during auth resolution", () => {
+  assert.deepEqual(
+    getAdminRouteDecision({ isAdmin: false, isAuthenticated: false, status: "loading" }),
+    { redirectToForbidden: false, redirectToLogin: false, renderContent: false }
+  );
+});
+
+test("admin route decision redirects unauthenticated users to login", () => {
+  assert.deepEqual(
+    getAdminRouteDecision({ isAdmin: false, isAuthenticated: false, status: "unauthenticated" }),
+    { redirectToForbidden: false, redirectToLogin: true, renderContent: false }
+  );
+});
+
+test("admin route decision shows forbidden for authenticated non-admin users", () => {
+  assert.deepEqual(
+    getAdminRouteDecision({ isAdmin: false, isAuthenticated: true, status: "authenticated" }),
+    { redirectToForbidden: true, redirectToLogin: false, renderContent: false }
+  );
+});
+
+test("admin route decision renders content for authenticated admin users", () => {
+  assert.deepEqual(
+    getAdminRouteDecision({ isAdmin: true, isAuthenticated: true, status: "authenticated" }),
+    { redirectToForbidden: false, redirectToLogin: false, renderContent: true }
   );
 });
 

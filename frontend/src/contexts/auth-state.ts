@@ -2,6 +2,7 @@ export type AuthUser = {
   created_at?: string;
   email: string;
   id?: string;
+  is_staff?: boolean;
   name?: string;
   username: string;
 };

@@ -26,7 +26,8 @@ function isActiveLink(pathname: string, href: string) {
 
 export function AppHeader() {
   const pathname = usePathname();
-  const { isAuthenticated, signOut } = useAuth();
+  const { isAuthenticated, signOut, user } = useAuth();
+  const isAdmin = isAuthenticated && Boolean(user?.is_staff);
 
   return (
     <header className="sticky top-0 z-10 border-b border-white/[0.07] bg-[rgb(10_13_20/0.97)] [backdrop-filter:blur(20px)]">
@@ -101,6 +102,15 @@ export function AppHeader() {
         >
           {isAuthenticated ? (
             <>
+              {isAdmin && (
+                <ButtonLink
+                  className="border-white/[0.16] text-white/80 hover:bg-white/10 hover:border-white/[0.24] hover:text-white"
+                  href="/admin"
+                  variant="ghost"
+                >
+                  Admin
+                </ButtonLink>
+              )}
               <ButtonLink
                 className="border-white/[0.16] text-white/80 hover:bg-white/10 hover:border-white/[0.24] hover:text-white"
                 href="/my-tickets"
