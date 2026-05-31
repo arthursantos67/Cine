@@ -21,11 +21,13 @@ type SessionSeat = {
 
 type MockOptions = {
   failNextReservation?: boolean;
+  isAdmin?: boolean;
   reservationExpiresAt?: string;
 };
 
 export function createMockApiState(options: MockOptions = {}) {
   let failNextReservation = options.failNextReservation ?? false;
+  const isAdmin = options.isAdmin ?? false;
   const reservationExpiresAt =
     options.reservationExpiresAt ??
     new Date(fixedNow.getTime() + 10 * 60 * 1000).toISOString();
@@ -76,6 +78,7 @@ export function createMockApiState(options: MockOptions = {}) {
       handleApiRoute(route, {
         checkoutPayloads,
         failNextReservation: () => failNextReservation,
+        isAdmin,
         markReservationFailureConsumed: () => {
           failNextReservation = false;
         },
@@ -98,6 +101,7 @@ export async function setupMockApi(page: Page, options: MockOptions = {}) {
 
 type ApiRouteState = {
   checkoutPayloads: unknown[];
+  isAdmin: boolean;
   failNextReservation: () => boolean;
   markReservationFailureConsumed: () => void;
   reservationExpiresAt: string;
@@ -132,8 +136,13 @@ async function handleApiRoute(route: Route, state: ApiRouteState) {
       created_at: fixedNow.toISOString(),
       email: "ana@example.com",
       id: "user-1",
+      is_staff: state.isAdmin,
       username: "ana",
     });
+  }
+
+  if (method === "GET" && url.pathname === "/api/v1/catalog/rooms/") {
+    return json(route, paginated([{ id: "room-1", name: "Sala 1" }]));
   }
 
   if (method === "GET" && url.pathname === "/api/v1/catalog/movies/") {

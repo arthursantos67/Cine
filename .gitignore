@@ -213,6 +213,7 @@ __marimo__/
 node_modules/
 frontend/dist/
 frontend/.next/
+frontend/.next.*/
 frontend/out/
 frontend/.env
 frontend/.env.local

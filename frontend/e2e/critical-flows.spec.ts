@@ -285,6 +285,42 @@ test("tabbed catalog switches to Pré-venda panel with ArrowRight key", async ({
   ).toBeVisible();
 });
 
+test("blocks non-admin users from the admin area", async ({ page }) => {
+  await setupMockApi(page, { isAdmin: false });
+
+  await login(page);
+  await page.goto("/admin");
+
+  await expect(
+    page.getByText("Você não tem permissão para acessar esta página.")
+  ).toBeVisible();
+});
+
+test("shows admin dashboard to authenticated admin users", async ({ page }) => {
+  await setupMockApi(page, { isAdmin: true });
+
+  await login(page);
+  await page.goto("/admin");
+
+  await expect(
+    page.getByRole("heading", { name: "Dashboard" })
+  ).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "Navegação administrativa" }).first()
+  ).toBeVisible();
+});
+
+test("admin nav links are reachable from the dashboard", async ({ page }) => {
+  await setupMockApi(page, { isAdmin: true });
+
+  await login(page);
+  await page.goto("/admin");
+
+  await page.getByRole("link", { name: "Filmes" }).first().click();
+  await expect(page).toHaveURL("/admin/movies");
+  await expect(page.getByRole("heading", { name: "Filmes" })).toBeVisible();
+});
+
 async function login(page: Page, redirectPath = "/") {
   const loginPath =
     redirectPath === "/"
