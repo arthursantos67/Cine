@@ -131,6 +131,10 @@ async function handleApiRoute(route: Route, state: ApiRouteState) {
     });
   }
 
+  if (method === "POST" && url.pathname === "/api/v1/auth/token/refresh/") {
+    return json(route, { access: "access-token-e2e" });
+  }
+
   if (method === "GET" && url.pathname === "/api/v1/users/me/") {
     return json(route, {
       created_at: fixedNow.toISOString(),
