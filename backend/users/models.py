@@ -65,3 +65,30 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
+
+
+class AdminPermissionLog(models.Model):
+    class Action(models.TextChoices):
+        GRANTED = "granted", "Granted"
+        REVOKED = "revoked", "Revoked"
+
+    actor = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="admin_actions_performed",
+    )
+    target = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="admin_permission_logs",
+    )
+    action = models.CharField(max_length=10, choices=Action.choices)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "admin_permission_logs"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.actor} {self.action} admin to {self.target}"

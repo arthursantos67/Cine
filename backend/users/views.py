@@ -7,9 +7,9 @@ from drf_spectacular.utils import (
 )
 from rest_framework import status
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.generics import CreateAPIView, ListAPIView
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
@@ -18,6 +18,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from cineprime_api.throttling import LoginRateThrottle
 from reservations.models import Ticket
+from users.models import AdminPermissionLog, User
 from users.serializers import (
     UserLoginSerializer,
     UserRegistrationSerializer,
@@ -188,3 +189,86 @@ class MyTicketsView(ListAPIView):
             queryset = queryset.filter(session_seat__session__start_time__lte=now)
 
         return queryset
+
+
+class AdminGrantResponseSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    email = serializers.EmailField()
+    username = serializers.CharField()
+    is_staff = serializers.BooleanField()
+
+
+@extend_schema(
+    tags=["Admin"],
+    responses={
+        200: AdminGrantResponseSerializer,
+        400: OpenApiResponse(description="Cannot demote the last active administrator."),
+        403: OpenApiResponse(description="Admin access required."),
+        404: OpenApiResponse(description="User not found."),
+    },
+)
+class AdminGrantView(APIView):
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        summary="Grant admin permission",
+        description="Promote a user to administrator. Only admins can call this endpoint.",
+        request=None,
+    )
+    def post(self, request, user_id, *args, **kwargs):
+        target = self._get_target(user_id)
+
+        if not target.is_staff:
+            target.is_staff = True
+            target.is_superuser = True
+            target.save(update_fields=["is_staff", "is_superuser", "updated_at"])
+            AdminPermissionLog.objects.create(
+                actor=request.user,
+                target=target,
+                action=AdminPermissionLog.Action.GRANTED,
+            )
+
+        return Response(self._serialize(target), status=status.HTTP_200_OK)
+
+    @extend_schema(
+        summary="Revoke admin permission",
+        description=(
+            "Demote a user from administrator. "
+            "Blocked if the target is the last active administrator."
+        ),
+        request=None,
+    )
+    def delete(self, request, user_id, *args, **kwargs):
+        target = self._get_target(user_id)
+
+        if target.is_staff:
+            active_admins = User.objects.filter(is_staff=True, is_active=True).count()
+            if active_admins <= 1:
+                raise ValidationError(
+                    "Cannot revoke the last active administrator."
+                )
+
+            target.is_staff = False
+            target.is_superuser = False
+            target.save(update_fields=["is_staff", "is_superuser", "updated_at"])
+            AdminPermissionLog.objects.create(
+                actor=request.user,
+                target=target,
+                action=AdminPermissionLog.Action.REVOKED,
+            )
+
+        return Response(self._serialize(target), status=status.HTTP_200_OK)
+
+    def _get_target(self, user_id):
+        try:
+            return User.objects.get(pk=user_id)
+        except (User.DoesNotExist, ValueError):
+            raise NotFound("User not found.")
+
+    def _serialize(self, user):
+        return {
+            "id": str(user.id),
+            "email": user.email,
+            "username": user.username,
+            "is_staff": user.is_staff,
+        }

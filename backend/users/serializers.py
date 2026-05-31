@@ -4,7 +4,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 
-from users.models import User
+from users.models import AdminPermissionLog, User
 from reservations.models import Ticket
 
 
@@ -146,3 +146,12 @@ class UserTicketSerializer(serializers.ModelSerializer):
             "number": seat.number,
             "identifier": f"{seat.row.name}{seat.number}",
         }
+
+
+class AdminPermissionLogSerializer(serializers.ModelSerializer):
+    actor = serializers.EmailField(source="actor.email", read_only=True)
+    target = serializers.EmailField(source="target.email", read_only=True)
+
+    class Meta:
+        model = AdminPermissionLog
+        fields = ("actor", "target", "action", "created_at")
