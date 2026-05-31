@@ -15,7 +15,16 @@ const user = {
   created_at: "2026-05-21T10:00:00Z",
   email: "orlando@gmail.com",
   id: "user-1",
+  is_staff: false,
   username: "pablo2265",
+};
+
+const adminUser = {
+  ...user,
+  email: "admin@gmail.com",
+  id: "user-admin",
+  is_staff: true,
+  username: "adminuser",
 };
 
 test("auth state starts without persisted tokens or user data", () => {
@@ -83,4 +92,23 @@ test("logout clears tokens and protected identity state", () => {
 
 test("loading status can be represented without exposing protected content", () => {
   assert.equal(startAuthLoading(initialAuthState).status, "loading");
+});
+
+test("admin user carries is_staff true in authenticated state", () => {
+  const state = applyCurrentUser(
+    applyLogin(initialAuthState, { access: "access-token", refresh: "refresh-token" }),
+    adminUser
+  );
+
+  assert.equal(state.user?.is_staff, true);
+  assert.equal(isAuthenticated(state), true);
+});
+
+test("regular user carries is_staff false in authenticated state", () => {
+  const state = applyCurrentUser(
+    applyLogin(initialAuthState, { access: "access-token", refresh: "refresh-token" }),
+    user
+  );
+
+  assert.equal(state.user?.is_staff, false);
 });

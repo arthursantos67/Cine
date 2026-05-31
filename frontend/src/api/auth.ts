@@ -27,6 +27,7 @@ export type CurrentUserResponse = {
   created_at: string;
   email: string;
   id: string;
+  is_staff: boolean;
   username: string;
 };
 

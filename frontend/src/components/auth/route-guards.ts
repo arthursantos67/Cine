@@ -8,6 +8,8 @@ export const PROTECTED_ROUTES = [
   "/my-tickets",
 ] as const;
 
+export const ADMIN_ROUTES = ["/admin"] as const;
+
 type ProtectedRouteDecision = {
   renderContent: boolean;
   redirectToLogin: boolean;
@@ -35,6 +37,12 @@ type AuthGateInput = {
   status: AuthStatus;
 };
 
+type AdminRouteDecision = {
+  renderContent: boolean;
+  redirectToLogin: boolean;
+  redirectToForbidden: boolean;
+};
+
 type LocationParts = {
   hash?: string;
   pathname: string;
@@ -45,6 +53,32 @@ export function isProtectedRoute(pathname: string) {
   return PROTECTED_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`)
   );
+}
+
+export function isAdminRoute(pathname: string) {
+  return ADMIN_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
+}
+
+export function getAdminRouteDecision({
+  isAuthenticated,
+  isAdmin,
+  status,
+}: AuthGateInput & { isAdmin: boolean }): AdminRouteDecision {
+  if (status === "loading") {
+    return { redirectToForbidden: false, redirectToLogin: false, renderContent: false };
+  }
+
+  if (!isAuthenticated) {
+    return { redirectToForbidden: false, redirectToLogin: true, renderContent: false };
+  }
+
+  if (!isAdmin) {
+    return { redirectToForbidden: true, redirectToLogin: false, renderContent: false };
+  }
+
+  return { redirectToForbidden: false, redirectToLogin: false, renderContent: true };
 }
 
 export function getProtectedRouteDecision({

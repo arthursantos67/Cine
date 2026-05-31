@@ -40,6 +40,7 @@ class CurrentUserResponseSerializer(serializers.Serializer):
     email = serializers.EmailField()
     username = serializers.CharField()
     created_at = serializers.DateTimeField()
+    is_staff = serializers.BooleanField()
 
 
 @extend_schema_view(
@@ -129,6 +130,7 @@ class CurrentUserView(APIView):
                 "email": request.user.email,
                 "username": request.user.username,
                 "created_at": request.user.created_at,
+                "is_staff": request.user.is_staff,
             },
             status=status.HTTP_200_OK,
         )
