@@ -2,9 +2,9 @@
 
 import type { KeyboardEvent, MouseEvent } from "react";
 import { useEffect, useId, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import type { CatalogMovie } from "@/types/catalog";
-
 import { StateMessage } from "@/components/ui/StateMessage";
 
 import { MovieCard } from "./MovieCard";
@@ -22,6 +22,19 @@ type MovieCarouselProps = {
   title: string;
   titleVisible?: boolean;
 };
+
+const railClasses = [
+  "m-0 list-none cursor-grab",
+  "grid grid-flow-col gap-[18px]",
+  "[grid-auto-columns:clamp(180px,22vw,220px)]",
+  "max-[820px]:[grid-auto-columns:clamp(180px,44vw,240px)]",
+  "max-[420px]:[grid-auto-columns:minmax(210px,84vw)]",
+  "overflow-x-auto overscroll-x-contain pb-3",
+  "[scroll-padding-inline:2px] [scroll-snap-type:x_mandatory]",
+  "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+].join(" ");
+
+const itemClasses = "grid min-w-0 [scroll-snap-align:start]";
 
 export function MovieCarousel({
   ariaLabel,
@@ -41,6 +54,9 @@ export function MovieCarousel({
   const isDragging = useRef(false);
   const dragStartX = useRef(0);
   const dragScrollLeft = useRef(0);
+  const lastDragX = useRef(0);
+  const lastDragTime = useRef(0);
+  const velocityX = useRef(0);
   const uid = useId();
   const headingId = `movie-carousel-${uid}`;
 
@@ -80,6 +96,9 @@ export function MovieCarousel({
     isDragging.current = true;
     dragStartX.current = e.pageX;
     dragScrollLeft.current = railRef.current?.scrollLeft ?? 0;
+    lastDragX.current = e.pageX;
+    lastDragTime.current = Date.now();
+    velocityX.current = 0;
     const rail = railRef.current;
     if (rail) {
       rail.style.cursor = "grabbing";
@@ -90,6 +109,14 @@ export function MovieCarousel({
   function handleMouseMove(e: MouseEvent<HTMLUListElement>) {
     if (!isDragging.current || !railRef.current) return;
     e.preventDefault();
+
+    const now = Date.now();
+    const elapsed = Math.max(now - lastDragTime.current, 1);
+    const dx = e.pageX - lastDragX.current;
+    velocityX.current = velocityX.current * 0.6 + (dx / elapsed) * 0.4;
+    lastDragX.current = e.pageX;
+    lastDragTime.current = now;
+
     railRef.current.scrollLeft =
       dragScrollLeft.current - (e.pageX - dragStartX.current);
   }
@@ -98,10 +125,22 @@ export function MovieCarousel({
     if (!isDragging.current) return;
     isDragging.current = false;
     const rail = railRef.current;
-    if (rail) {
-      rail.style.cursor = "";
-      rail.style.userSelect = "";
+    if (!rail) return;
+
+    rail.style.cursor = "";
+    rail.style.userSelect = "";
+
+    const momentumPx = velocityX.current * 300;
+    if (Math.abs(momentumPx) > 4) {
+      const { scrollLeft, scrollWidth, clientWidth } = rail;
+      const target = Math.max(
+        0,
+        Math.min(scrollLeft - momentumPx, scrollWidth - clientWidth)
+      );
+      rail.scrollTo({ behavior: "smooth", left: target });
     }
+
+    velocityX.current = 0;
   }
 
   return (
@@ -109,26 +148,33 @@ export function MovieCarousel({
       aria-busy={isLoading || undefined}
       aria-label={ariaLabel}
       aria-labelledby={ariaLabel ? undefined : headingId}
-      className="movie-carousel-section"
+      className="grid gap-4"
     >
-      <div className="movie-carousel-section__header">
-        <h2 className={titleVisible ? undefined : "sr-only"} id={headingId}>
+      <div className="flex min-h-[40px] items-center">
+        <h2
+          className={
+            titleVisible
+              ? "m-0 text-2xl font-extrabold leading-[1.2]"
+              : "sr-only"
+          }
+          id={headingId}
+        >
           {title}
         </h2>
       </div>
 
       {isLoading ? (
-        <div className="movie-carousel-loading" role="status">
-          <span>{loadingLabel}</span>
-          <ul aria-hidden="true" className="movie-carousel" role="list">
+        <div className="grid gap-3" role="status">
+          <span className="font-[750] text-muted">{loadingLabel}</span>
+          <ul aria-hidden="true" className={railClasses} role="list">
             {Array.from({ length: skeletonCount }, (_, index) => (
-              <li className="movie-carousel__item" key={index}>
-                <div className="movie-card movie-card--skeleton">
-                  <div className="movie-card__poster movie-card__poster--skeleton" />
-                  <div className="movie-card__body">
-                    <span className="skeleton-line skeleton-line--title" />
-                    <span className="skeleton-line" />
-                    <span className="skeleton-line skeleton-line--short" />
+              <li className={itemClasses} key={index}>
+                <div className="h-full overflow-hidden rounded-card bg-[#1e2535]">
+                  <div className="aspect-[2/3] w-full animate-pulse bg-surface-muted" />
+                  <div className="grid content-start gap-2 p-[14px]">
+                    <span className="block h-[18px] w-full animate-pulse rounded-full bg-surface-muted" />
+                    <span className="block h-3 w-full animate-pulse rounded-full bg-surface-muted" />
+                    <span className="block h-3 w-[52%] animate-pulse rounded-full bg-surface-muted" />
                   </div>
                 </div>
               </li>
@@ -142,21 +188,21 @@ export function MovieCarousel({
       ) : null}
 
       {!isLoading && movies.length > 0 ? (
-        <div className="movie-carousel-outer">
+        <div className="relative min-w-0">
           {canScroll ? (
             <button
               aria-label={previousButtonLabel ?? `Filme anterior em ${title}`}
-              className="carousel-button carousel-button--side carousel-button--prev"
+              className="absolute left-1 top-[42%] z-[2] flex h-[52px] w-9 -translate-y-1/2 items-center justify-center rounded-[6px] border-0 bg-white/55 text-[rgba(20,20,20,0.65)] shadow-[0_1px_4px_rgb(0_0_0/0.12)] transition-[background-color,box-shadow,transform,color] duration-[180ms] hover:scale-[1.08] hover:bg-white/[0.92] hover:text-[rgba(20,20,20,0.9)] hover:shadow-[0_2px_8px_rgb(0_0_0/0.18)] focus-visible:outline-none focus-visible:shadow-focus"
               onClick={() => scrollRail("previous")}
-              title={previousButtonLabel ?? `Filme anterior em ${title}`}
               type="button"
             >
-              <span aria-hidden="true">{"<"}</span>
+              <ChevronLeft aria-hidden="true" size={18} strokeWidth={2.5} />
             </button>
           ) : null}
+
           <ul
             aria-label={`${title}: carrossel de filmes`}
-            className="movie-carousel"
+            className={railClasses}
             onDragStart={(e) => e.preventDefault()}
             onKeyDown={handleCarouselKeyDown}
             onMouseDown={handleMouseDown}
@@ -167,20 +213,20 @@ export function MovieCarousel({
             role="list"
           >
             {movies.map((movie) => (
-              <li className="movie-carousel__item" key={movie.id}>
+              <li className={itemClasses} key={movie.id}>
                 <MovieCard movie={movie} />
               </li>
             ))}
           </ul>
+
           {canScroll ? (
             <button
               aria-label={nextButtonLabel ?? `Próximo filme em ${title}`}
-              className="carousel-button carousel-button--side carousel-button--next"
+              className="absolute right-1 top-[42%] z-[2] flex h-[52px] w-9 -translate-y-1/2 items-center justify-center rounded-[6px] border-0 bg-white/55 text-[rgba(20,20,20,0.65)] shadow-[0_1px_4px_rgb(0_0_0/0.12)] transition-[background-color,box-shadow,transform,color] duration-[180ms] hover:scale-[1.08] hover:bg-white/[0.92] hover:text-[rgba(20,20,20,0.9)] hover:shadow-[0_2px_8px_rgb(0_0_0/0.18)] focus-visible:outline-none focus-visible:shadow-focus"
               onClick={() => scrollRail("next")}
-              title={nextButtonLabel ?? `Próximo filme em ${title}`}
               type="button"
             >
-              <span aria-hidden="true">{">"}</span>
+              <ChevronRight aria-hidden="true" size={18} strokeWidth={2.5} />
             </button>
           ) : null}
         </div>
@@ -200,32 +246,21 @@ function handleCarouselKeyDown(event: KeyboardEvent<HTMLUListElement>) {
   }
 
   const cards = Array.from(
-    event.currentTarget.querySelectorAll<HTMLAnchorElement>(".movie-card__link")
+    event.currentTarget.querySelectorAll<HTMLAnchorElement>(
+      "[data-carousel-item-link]"
+    )
   );
 
-  if (cards.length === 0) {
-    return;
-  }
+  if (cards.length === 0) return;
 
   const activeElement = document.activeElement;
   const activeIndex = cards.findIndex((card) => card === activeElement);
   let nextIndex = activeIndex >= 0 ? activeIndex : 0;
 
-  if (event.key === "ArrowRight") {
-    nextIndex = Math.min(nextIndex + 1, cards.length - 1);
-  }
-
-  if (event.key === "ArrowLeft") {
-    nextIndex = Math.max(nextIndex - 1, 0);
-  }
-
-  if (event.key === "Home") {
-    nextIndex = 0;
-  }
-
-  if (event.key === "End") {
-    nextIndex = cards.length - 1;
-  }
+  if (event.key === "ArrowRight") nextIndex = Math.min(nextIndex + 1, cards.length - 1);
+  if (event.key === "ArrowLeft") nextIndex = Math.max(nextIndex - 1, 0);
+  if (event.key === "Home") nextIndex = 0;
+  if (event.key === "End") nextIndex = cards.length - 1;
 
   event.preventDefault();
   cards[nextIndex].focus();

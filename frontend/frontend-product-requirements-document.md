@@ -111,7 +111,7 @@ Django/DRF REST API
 |---|---|
 | Framework | Next.js 15 with App Router |
 | Language | TypeScript |
-| Styling | Global CSS or CSS Modules; Tailwind CSS only if added as a project dependency |
+| Styling | Tailwind CSS v4 (primary); `src/styles/tokens.css` for design tokens; `src/app/globals.css` for CSS reset, theme-level variables, and accessibility rules; `src/styles/public-legacy.css` is a temporary migration shim — do not add new component CSS there |
 | State Management | React Context and custom hooks; Zustand/Jotai may be introduced if complexity justifies it |
 | API Communication | Native `fetch` wrapped by `src/api/client.ts` |
 | Tests | Node.js test runner with `tsx` for current pure modules; Testing Library and Playwright/Cypress when UI flows are implemented |

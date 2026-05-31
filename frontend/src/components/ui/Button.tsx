@@ -28,7 +28,7 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & ButtonVisualProps;
 type ButtonLinkProps = ComponentProps<typeof Link> & ButtonVisualProps;
 
 const baseButtonClasses =
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control border font-extrabold leading-none transition-colors duration-150 focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-[0.68]";
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control border font-extrabold leading-none transition duration-150 active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-[0.68] disabled:active:scale-100";
 
 const sizeClasses: Record<ButtonSize, string> = {
   lg: "min-h-[var(--control-height-lg)] px-5 py-3 text-base",

@@ -29,7 +29,7 @@ export function CarouselControls({
   tone = "light",
 }: CarouselControlsProps) {
   const buttonClasses = cn(
-    "inline-flex size-10 items-center justify-center rounded-pill border transition-colors duration-150 focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-[0.45]",
+    "inline-flex size-10 items-center justify-center rounded-pill border transition duration-150 active:scale-[0.92] focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-[0.45] disabled:active:scale-100",
     toneClasses[tone]
   );
 

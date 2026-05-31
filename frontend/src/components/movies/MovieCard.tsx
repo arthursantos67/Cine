@@ -33,16 +33,17 @@ export function MovieCard({ movie }: MovieCardProps) {
   const badge = getStatusBadge(movie);
 
   return (
-    <article className="movie-card">
+    <article className="h-full overflow-hidden rounded-card bg-[#1e2535] border border-white/[0.08] shadow-[0_4px_20px_rgb(0_0_0/0.3)]">
       <Link
         aria-label={`Ver detalhes de ${movie.title}`}
-        className="movie-card__link"
+        className="group grid h-full focus-visible:outline-offset-[-4px]"
+        data-carousel-item-link
         href={getMovieDetailsHref(movie.id)}
       >
         <div className="relative">
           <ResponsiveImage
             alt={`Poster de ${movie.title}`}
-            className="movie-card__poster"
+            className="aspect-[2/3] w-full object-cover bg-surface-muted block"
             height={480}
             loading="lazy"
             src={movie.poster_url}
@@ -58,10 +59,12 @@ export function MovieCard({ movie }: MovieCardProps) {
             </div>
           ) : null}
         </div>
-        <div className="movie-card__body">
-          <h2 className="movie-card__title">{movie.title}</h2>
-          <p className="movie-card__genres">{genres}</p>
-          <p className="movie-card__duration">{duration}</p>
+        <div className="content-start grid gap-2 p-[14px]">
+          <h2 className="m-0 text-[17px] leading-[1.25] text-text transition-colors duration-150 group-hover:text-brand">
+            {movie.title}
+          </h2>
+          <p className="m-0 text-sm leading-[1.45] text-muted">{genres}</p>
+          <p className="m-0 text-sm font-extrabold leading-[1.45] text-text">{duration}</p>
         </div>
       </Link>
     </article>
