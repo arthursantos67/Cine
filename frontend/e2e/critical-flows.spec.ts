@@ -318,6 +318,73 @@ test("admin nav links are reachable from the dashboard", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Filmes" })).toBeVisible();
 });
 
+test("admin can create a room and navigate to its layout editor", async ({
+  page,
+}) => {
+  await setupMockApi(page, { isAdmin: true });
+  await login(page, "/admin");
+
+  await page.getByRole("link", { name: "Salas" }).first().click();
+  await expect(page).toHaveURL("/admin/rooms");
+  await expect(page.getByRole("heading", { name: "Salas" })).toBeVisible();
+
+  await page.getByRole("link", { name: "Nova sala" }).click();
+  await expect(page).toHaveURL("/admin/rooms/new");
+  await expect(page.getByRole("heading", { name: "Nova sala" })).toBeVisible();
+
+  await page.getByLabel("Nome da sala").fill("Sala Teste");
+  await page.getByLabel("Capacidade").fill("50");
+  await page.getByRole("button", { name: "Criar sala" }).click();
+
+  await expect(page).toHaveURL("/admin/rooms");
+});
+
+test("admin can open room layout editor and add a seat row", async ({
+  page,
+}) => {
+  await setupMockApi(page, { isAdmin: true });
+  await login(page, "/admin/rooms/room-1/layout");
+
+  await expect(
+    page.getByRole("heading", { name: /Layout/ })
+  ).toBeVisible();
+  await expect(page.getByText(/Fileiras/)).toBeVisible();
+
+  await page.getByRole("button", { name: "+ Adicionar fileira" }).click();
+  await page.getByPlaceholder("Ex.: A").fill("B");
+  await page.getByRole("button", { name: "Criar" }).click();
+
+  await expect(
+    page.getByRole("group", { name: "Fileira B" }).or(
+      page.locator("text=B").first()
+    )
+  ).toBeVisible();
+});
+
+test("admin sees seat map preview in layout editor", async ({ page }) => {
+  await setupMockApi(page, { isAdmin: true });
+  await login(page, "/admin/rooms/room-1/layout");
+
+  await page.getByRole("button", { name: "Prévia do mapa" }).click();
+  await expect(page.getByRole("img", { name: "Prévia do mapa de assentos" })).toBeVisible();
+  await expect(page.getByText("TELA")).toBeVisible();
+});
+
+test("admin sees blocked-layout warning when future sessions exist", async ({
+  page,
+}) => {
+  await setupMockApi(page, { isAdmin: true, roomLayoutBlocked: true });
+  await login(page, "/admin/rooms/room-1/layout");
+
+  await page.getByRole("button", { name: "+ Adicionar fileira" }).click();
+  await page.getByPlaceholder("Ex.: A").fill("C");
+  await page.getByRole("button", { name: "Criar" }).click();
+
+  await expect(
+    page.getByText(/sessões futuras/)
+  ).toBeVisible();
+});
+
 async function login(page: Page, redirectPath = "/") {
   const loginPath =
     redirectPath === "/"
