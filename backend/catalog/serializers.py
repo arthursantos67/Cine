@@ -91,6 +91,12 @@ class MovieWriteSerializer(serializers.ModelSerializer):
         many=True,
         queryset=Genre.objects.all(),
     )
+    cast = serializers.ListField(
+        child=serializers.CharField(max_length=255),
+        required=False,
+        default=list,
+        write_only=True,
+    )
 
     class Meta:
         model = Movie
@@ -104,12 +110,34 @@ class MovieWriteSerializer(serializers.ModelSerializer):
             "poster_url",
             "age_rating",
             "director",
+            "cast",
             "status",
             "is_featured",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["cast"] = [m.name for m in instance.cast.all()]
+        return data
+
+    def create(self, validated_data):
+        cast_names = validated_data.pop("cast", [])
+        movie = super().create(validated_data)
+        for i, name in enumerate(cast_names):
+            CastMember.objects.create(movie=movie, name=name, order=i)
+        return movie
+
+    def update(self, instance, validated_data):
+        cast_names = validated_data.pop("cast", None)
+        movie = super().update(instance, validated_data)
+        if cast_names is not None:
+            instance.cast.all().delete()
+            for i, name in enumerate(cast_names):
+                CastMember.objects.create(movie=movie, name=name, order=i)
+        return movie
 
 
 class MovieReadSerializer(serializers.ModelSerializer):

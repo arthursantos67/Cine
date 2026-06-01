@@ -1,5 +1,8 @@
 export { AdminConfirmDialog } from "./AdminConfirmDialog";
 export { AdminEmptyState } from "./AdminEmptyState";
+export { AdminGenreList } from "./AdminGenreList";
+export { AdminMovieForm } from "./AdminMovieForm";
+export { AdminMovieList } from "./AdminMovieList";
 export { isAdminNavItemActive, ADMIN_NAV_LINKS } from "./admin-nav-utils";
 export type { AdminNavLink } from "./admin-nav-utils";
 export { AdminShell } from "./AdminShell";
