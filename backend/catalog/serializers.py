@@ -123,20 +123,24 @@ class MovieWriteSerializer(serializers.ModelSerializer):
         data["cast"] = [m.name for m in instance.cast.all()]
         return data
 
+    @transaction.atomic
     def create(self, validated_data):
         cast_names = validated_data.pop("cast", [])
         movie = super().create(validated_data)
-        for i, name in enumerate(cast_names):
-            CastMember.objects.create(movie=movie, name=name, order=i)
+        CastMember.objects.bulk_create(
+            [CastMember(movie=movie, name=name, order=i) for i, name in enumerate(cast_names)]
+        )
         return movie
 
+    @transaction.atomic
     def update(self, instance, validated_data):
         cast_names = validated_data.pop("cast", None)
         movie = super().update(instance, validated_data)
         if cast_names is not None:
             instance.cast.all().delete()
-            for i, name in enumerate(cast_names):
-                CastMember.objects.create(movie=movie, name=name, order=i)
+            CastMember.objects.bulk_create(
+                [CastMember(movie=movie, name=name, order=i) for i, name in enumerate(cast_names)]
+            )
         return movie
 
 

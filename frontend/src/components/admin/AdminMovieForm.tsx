@@ -262,6 +262,11 @@ export function AdminMovieForm({ movie }: AdminMovieFormProps) {
           {globalError}
         </p>
       ) : null}
+      {fieldErrors.non_field_errors ? (
+        <p className="rounded-[8px] border border-error/30 bg-error/10 px-4 py-3 text-sm font-bold text-error" role="alert">
+          {fieldErrors.non_field_errors}
+        </p>
+      ) : null}
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Left column */}

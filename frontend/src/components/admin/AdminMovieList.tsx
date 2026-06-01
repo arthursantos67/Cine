@@ -27,11 +27,17 @@ const STATUS_TONES: Record<MovieStatus, "success" | "info" | "neutral"> = {
 export function AdminMovieList() {
   const [movies, setMovies] = useState<CatalogMovieDetail[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<MovieStatus | "">("");
   const [deleteTarget, setDeleteTarget] = useState<CatalogMovieDetail | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput), 400);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const fetchMovies = useCallback(async () => {
     setLoading(true);
@@ -182,7 +188,7 @@ export function AdminMovieList() {
             <option value="em_breve">Em breve</option>
           </select>
         }
-        onSearch={setSearch}
+        onSearch={setSearchInput}
         searchPlaceholder="Buscar filme..."
         title="Filmes"
       />
