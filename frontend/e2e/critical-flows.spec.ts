@@ -348,7 +348,7 @@ test("admin can open room layout editor and add a seat row", async ({
   await expect(
     page.getByRole("heading", { name: /Layout/ })
   ).toBeVisible();
-  await expect(page.getByText(/Fileiras/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Fileiras/ })).toBeVisible();
 
   await page.getByRole("button", { name: "+ Adicionar fileira" }).click();
   await page.getByPlaceholder("Ex.: A").fill("B");
