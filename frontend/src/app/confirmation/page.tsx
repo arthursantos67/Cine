@@ -11,7 +11,7 @@ export default function ConfirmationPage() {
         eyebrow="Pedido"
         title="Confirmação"
       >
-        <PurchaseFlowLayout currentStep="confirmation">
+        <PurchaseFlowLayout currentStep="confirmation" showSummary={false}>
           <CheckoutConfirmation />
         </PurchaseFlowLayout>
       </PageSection>

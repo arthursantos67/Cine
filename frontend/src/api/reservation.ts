@@ -44,7 +44,7 @@ async function getSeatMap(sessionId: string) {
     throw new Error("Unexpected reservation seat map response.");
   }
 
-  return response satisfies SessionSeatMapResponse;
+  return response.map(normalizeSessionSeatMapItem) satisfies SessionSeatMapResponse;
 }
 
 async function reserveSeats(sessionId: string, seatIds: string[]) {
@@ -163,7 +163,27 @@ function isTemporaryReservationReleaseSeat(
 }
 
 function isSessionSeatStatus(value: unknown): value is SessionSeatStatus {
-  return value === "AVAILABLE" || value === "RESERVED" || value === "PURCHASED";
+  return (
+    value === "AVAILABLE" ||
+    value === "RESERVED" ||
+    value === "PURCHASED" ||
+    value === "available" ||
+    value === "reserved" ||
+    value === "purchased"
+  );
+}
+
+function normalizeSessionSeatMapItem(
+  seat: SessionSeatMapItem
+): SessionSeatMapItem {
+  return {
+    ...seat,
+    status: normalizeSessionSeatStatus(seat.status),
+  };
+}
+
+function normalizeSessionSeatStatus(status: SessionSeatStatus) {
+  return status.toUpperCase() as SessionSeatStatus;
 }
 
 function optionalBoolean(value: unknown) {

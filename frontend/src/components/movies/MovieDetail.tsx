@@ -1,7 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { CalendarDays, ChevronLeft, ChevronRight, HelpCircle } from "lucide-react";
+import {
+  type ChangeEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { ApiError, getApiErrorUserMessage } from "@/api/client";
 import { catalogApi } from "@/api/catalog";
@@ -17,6 +25,7 @@ import {
 import { SessionBadgeList } from "./SessionBadges";
 import {
   buildSessionDateOptions,
+  formatScheduleDateHeading,
   formatSessionFullDate,
   formatSessionPrice,
   formatSessionTime,
@@ -126,6 +135,11 @@ export function MovieDetailView({ onRetry, state }: MovieDetailViewProps) {
 }
 
 function MovieDetailSuccess({ movie }: { movie: CatalogMovieDetail }) {
+  const ageRating = movie.age_rating
+    ? movie.age_rating === "L"
+      ? "L"
+      : movie.age_rating
+    : null;
   const genres = formatMovieGenres(movie.genres);
   const duration = formatMovieDuration(movie.duration_minutes);
   const releaseDate = formatMovieReleaseDate(movie.release_date);
@@ -161,40 +175,35 @@ function MovieDetailSuccess({ movie }: { movie: CatalogMovieDetail }) {
           <h1>{movie.title}</h1>
         </div>
 
-        <dl className="movie-detail__metadata" aria-label="Informações do filme">
-          {movie.age_rating && (
-            <div>
-              <dt>Faixa etária</dt>
-              <dd>{movie.age_rating === "L" ? "Livre" : `${movie.age_rating} anos`}</dd>
-            </div>
-          )}
-          <div>
-            <dt>Duração</dt>
-            <dd>{duration}</dd>
-          </div>
-          <div>
-            <dt>Gêneros</dt>
-            <dd>{genres}</dd>
-          </div>
-          {movie.release_date ? (
-            <div>
-              <dt>Estreia</dt>
-              <dd>{releaseDate}</dd>
-            </div>
+        <div className="movie-detail__metadata" aria-label="Informações do filme">
+          {ageRating ? (
+            <span className="movie-detail__rating">{ageRating}</span>
           ) : null}
-          {movie.director && (
-            <div>
-              <dt>Direção</dt>
-              <dd>{movie.director}</dd>
-            </div>
-          )}
-          {movie.cast && movie.cast.length > 0 && (
-            <div>
-              <dt>Elenco</dt>
-              <dd>{movie.cast.join(", ")}</dd>
-            </div>
-          )}
-        </dl>
+          <span>{duration}</span>
+          <span aria-hidden="true">·</span>
+          <span>{genres}</span>
+          {movie.release_date ? (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>Estreia {releaseDate}</span>
+            </>
+          ) : null}
+        </div>
+
+        {(movie.director || (movie.cast && movie.cast.length > 0)) && (
+          <div className="movie-detail__credits">
+            {movie.director && (
+              <p>
+                <strong>Direção:</strong> {movie.director}
+              </p>
+            )}
+            {movie.cast && movie.cast.length > 0 && (
+              <p>
+                <strong>Elenco:</strong> {movie.cast.join(", ")}
+              </p>
+            )}
+          </div>
+        )}
 
         <section className="movie-detail__synopsis" aria-labelledby="sinopse">
           <h2 id="sinopse">Sinopse</h2>
@@ -223,6 +232,8 @@ function MovieComingSoonNotice() {
 function MovieSessionSelector({ movieId }: { movieId: string }) {
   const dateOptions = useMemo(() => buildSessionDateOptions(new Date()), []);
   const [selectedDate, setSelectedDate] = useState(dateOptions[0]?.value ?? "");
+  const calendarInputRef = useRef<HTMLInputElement>(null);
+  const dateRailRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<SessionListState>({
     sessions: [],
     status: "loading",
@@ -298,6 +309,62 @@ function MovieSessionSelector({ movieId }: { movieId: string }) {
     };
   }, [movieId, selectedDate]);
 
+  useEffect(() => {
+    const selectedButton = dateRailRef.current?.querySelector<HTMLButtonElement>(
+      `[data-session-date="${selectedDate}"]`
+    );
+
+    selectedButton?.scrollIntoView({
+      block: "nearest",
+      inline: "center",
+      behavior: "smooth",
+    });
+  }, [selectedDate]);
+
+  const selectedDateIdx = dateOptions.findIndex(
+    (dateOption) => dateOption.value === selectedDate
+  );
+  const canGoPrev = selectedDateIdx > 0;
+  const canGoNext = selectedDateIdx < dateOptions.length - 1;
+
+  function goToPrevDate() {
+    if (canGoPrev) {
+      setSelectedDate(dateOptions[selectedDateIdx - 1].value);
+    }
+  }
+
+  function goToNextDate() {
+    if (canGoNext) {
+      setSelectedDate(dateOptions[selectedDateIdx + 1].value);
+    }
+  }
+
+  function handleCalendarChange(event: ChangeEvent<HTMLInputElement>) {
+    const pickedDate = event.target.value;
+    const matchingDate = dateOptions.find(
+      (dateOption) => dateOption.value === pickedDate
+    );
+
+    if (matchingDate) {
+      setSelectedDate(matchingDate.value);
+    }
+  }
+
+  function openCalendarPicker() {
+    const calendarInput = calendarInputRef.current;
+
+    if (!calendarInput) {
+      return;
+    }
+
+    if (typeof calendarInput.showPicker === "function") {
+      calendarInput.showPicker();
+      return;
+    }
+
+    calendarInput.click();
+  }
+
   return (
     <section
       aria-labelledby="selecionar-sessao"
@@ -309,21 +376,76 @@ function MovieSessionSelector({ movieId }: { movieId: string }) {
       </div>
 
       <div
-        aria-label="Datas disponíveis"
-        className="session-date-selector"
+        aria-label="Selecionar data"
+        className="session-date-carousel"
+        role="group"
       >
-        {dateOptions.map((dateOption) => (
+        <button
+          aria-label="Data anterior"
+          className="session-date-carousel__nav"
+          disabled={!canGoPrev}
+          onClick={goToPrevDate}
+          type="button"
+        >
+          <ChevronLeft aria-hidden="true" size={18} />
+        </button>
+
+        <div
+          aria-label="Datas disponíveis"
+          className="session-date-selector"
+          ref={dateRailRef}
+        >
+          {dateOptions.map((dateOption) => {
+            const isSelected = dateOption.value === selectedDate;
+            const dayNumber = dateOption.label.split("/")[0];
+
+            return (
+              <button
+                aria-label={`${dateOption.weekday}, ${formatSessionFullDate(dateOption.value)}`}
+                aria-pressed={isSelected}
+                className="session-date-selector__button"
+                data-session-date={dateOption.value}
+                key={dateOption.value}
+                onClick={() => setSelectedDate(dateOption.value)}
+                type="button"
+              >
+                <span>{dateOption.weekday}</span>
+                <strong>{dayNumber}</strong>
+              </button>
+            );
+          })}
+        </div>
+
+        <button
+          aria-label="Próxima data"
+          className="session-date-carousel__nav"
+          disabled={!canGoNext}
+          onClick={goToNextDate}
+          type="button"
+        >
+          <ChevronRight aria-hidden="true" size={18} />
+        </button>
+
+        <div className="session-date-carousel__calendar">
           <button
-            aria-pressed={dateOption.value === selectedDate}
-            className="session-date-selector__button"
-            key={dateOption.value}
-            onClick={() => setSelectedDate(dateOption.value)}
+            aria-label="Abrir calendário"
+            className="session-date-carousel__nav"
+            onClick={openCalendarPicker}
             type="button"
           >
-            <span>{dateOption.weekday}</span>
-            <strong>{dateOption.label}</strong>
+            <CalendarDays aria-hidden="true" size={18} />
           </button>
-        ))}
+          <input
+            aria-hidden="true"
+            max={dateOptions[dateOptions.length - 1]?.value}
+            min={dateOptions[0]?.value}
+            onChange={handleCalendarChange}
+            ref={calendarInputRef}
+            tabIndex={-1}
+            type="date"
+            value={selectedDate}
+          />
+        </div>
       </div>
 
       <SessionList
@@ -382,9 +504,20 @@ export function SessionList({
 
   return (
     <div aria-label="Sessões disponíveis" className="session-list">
+      <p className="session-list__date-heading">
+        {formatScheduleDateHeading(date)}
+      </p>
       {groups.map((group) => (
         <section className="session-room-group" key={group.roomId}>
-          <h3>{group.roomName}</h3>
+          <div className="session-room-group__heading">
+            <div>
+              <h3>{group.roomName}</h3>
+              {group.sessions[0] ? (
+                <SessionBadgeList badges={getSessionBadges(group.sessions[0])} />
+              ) : null}
+            </div>
+            <HelpCircle aria-hidden="true" size={16} />
+          </div>
           <div className="session-time-grid">
             {group.sessions.map((session) => {
               const badges = getSessionBadges(session);
@@ -405,9 +538,10 @@ export function SessionList({
                   key={session.id}
                 >
                   <strong>{formatSessionTime(session.start_time)}</strong>
-                  <span>até {formatSessionTime(session.end_time)}</span>
-                  <SessionBadgeList badges={badges} />
-                  <span>{formatSessionPrice(session.base_price)}</span>
+                  <span className="sr-only">
+                    até {formatSessionTime(session.end_time)},{" "}
+                    {formatSessionPrice(session.base_price)}
+                  </span>
                 </Link>
               );
             })}
