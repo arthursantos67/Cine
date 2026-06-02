@@ -2,10 +2,14 @@ import type {
   AdminRoom,
   AdminSeat,
   AdminSeatRow,
+  AdminSession,
+  CatalogAudioFormat,
   CatalogGenre,
   CatalogMovieAgeRating,
   CatalogMovieDetail,
+  CatalogProjectionFormat,
   CatalogRoomExperienceType,
+  CatalogSessionType,
   MovieStatus,
 } from "@/types/catalog";
 
@@ -59,6 +63,24 @@ export type AdminSeatWritePayload = {
   row: string;
 };
 
+export type AdminSessionWritePayload = {
+  audio_format?: CatalogAudioFormat;
+  base_price: string;
+  end_time: string;
+  movie: string;
+  projection_format?: CatalogProjectionFormat;
+  room: string;
+  session_type?: CatalogSessionType;
+  start_time: string;
+};
+
+export type ListSessionsParams = {
+  date?: string;
+  movie?: string;
+  page?: number;
+  room?: string;
+};
+
 export type AdminGenre = CatalogGenre & {
   created_at?: string;
   updated_at?: string;
@@ -67,6 +89,7 @@ export type AdminGenre = CatalogGenre & {
 const MOVIES_PATH = "/api/v1/catalog/movies/";
 const GENRES_PATH = "/api/v1/catalog/genres/";
 const ROOMS_PATH = "/api/v1/catalog/rooms/";
+const SESSIONS_PATH = "/api/v1/catalog/sessions/";
 const SEAT_ROWS_PATH = "/api/v1/reservation/seat-rows/";
 const SEATS_PATH = "/api/v1/reservation/seats/";
 
@@ -350,6 +373,68 @@ export const adminApi = {
       method: "DELETE",
     });
   },
+
+  async listSessions(params: ListSessionsParams = {}) {
+    const query = buildSessionsQuery(params);
+    const response = await apiRequest<unknown>(
+      query ? `${SESSIONS_PATH}?${query}` : SESSIONS_PATH,
+      { auth: "required", method: "GET" }
+    );
+
+    if (!isPaginatedResponse<AdminSession>(response)) {
+      throw new Error("Unexpected admin session list response.");
+    }
+
+    return response satisfies PaginatedResponse<AdminSession>;
+  },
+
+  async getSession(sessionId: string) {
+    const response = await apiRequest<unknown>(`${SESSIONS_PATH}${sessionId}/`, {
+      auth: "required",
+      method: "GET",
+    });
+
+    if (!isAdminSession(response)) {
+      throw new Error("Unexpected admin session detail response.");
+    }
+
+    return response satisfies AdminSession;
+  },
+
+  async createSession(payload: AdminSessionWritePayload) {
+    const response = await apiRequest<unknown>(SESSIONS_PATH, {
+      auth: "required",
+      json: payload,
+      method: "POST",
+    });
+
+    if (!isAdminSession(response)) {
+      throw new Error("Unexpected admin create session response.");
+    }
+
+    return response satisfies AdminSession;
+  },
+
+  async updateSession(sessionId: string, payload: Partial<AdminSessionWritePayload>) {
+    const response = await apiRequest<unknown>(`${SESSIONS_PATH}${sessionId}/`, {
+      auth: "required",
+      json: payload,
+      method: "PATCH",
+    });
+
+    if (!isAdminSession(response)) {
+      throw new Error("Unexpected admin update session response.");
+    }
+
+    return response satisfies AdminSession;
+  },
+
+  async deleteSession(sessionId: string) {
+    await apiRequest<unknown>(`${SESSIONS_PATH}${sessionId}/`, {
+      auth: "required",
+      method: "DELETE",
+    });
+  },
 };
 
 function buildMoviesPath({
@@ -486,4 +571,29 @@ function isMovieStatus(value: unknown): value is MovieStatus {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function isAdminSession(value: unknown): value is AdminSession {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.start_time === "string" &&
+    typeof value.end_time === "string" &&
+    typeof value.base_price === "string" &&
+    isRecord(value.movie) &&
+    typeof value.movie.id === "string" &&
+    isRecord(value.room) &&
+    typeof value.room.id === "string"
+  );
+}
+
+function buildSessionsQuery({ date, movie, page, room }: ListSessionsParams) {
+  const searchParams = new URLSearchParams();
+
+  if (date) searchParams.set("date", date);
+  if (movie) searchParams.set("movie", movie);
+  if (room) searchParams.set("room", room);
+  if (page !== undefined) searchParams.set("page", String(page));
+
+  return searchParams.toString();
 }
