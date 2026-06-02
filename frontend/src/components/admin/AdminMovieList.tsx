@@ -1,16 +1,14 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { adminApi } from "@/api/admin";
-import type { CatalogMovieDetail } from "@/types/catalog";
-import type { MovieStatus } from "@/types/catalog";
+import type { CatalogMovieDetail, MovieStatus } from "@/types/catalog";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { ButtonLink } from "@/components/ui/Button";
 import { AdminConfirmDialog, AdminTable, AdminToolbar } from "@/components/admin";
 import type { AdminTableColumn } from "@/components/admin";
-import { ButtonLink } from "@/components/ui/Button";
 
 const STATUS_LABELS: Record<MovieStatus, string> = {
   em_cartaz: "Em cartaz",
@@ -26,7 +24,10 @@ const STATUS_TONES: Record<MovieStatus, "success" | "info" | "neutral"> = {
 
 export function AdminMovieList() {
   const [movies, setMovies] = useState<CatalogMovieDetail[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<MovieStatus | "">("");
@@ -34,30 +35,61 @@ export function AdminMovieList() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput), 400);
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  const fetchMovies = useCallback(async () => {
-    setLoading(true);
-    setErrorMessage(null);
-    try {
-      const result = await adminApi.listMovies({
-        search: search || undefined,
-        status: statusFilter || undefined,
-      });
-      setMovies(result.results);
-    } catch {
-      setErrorMessage("Não foi possível carregar os filmes. Tente novamente.");
-    } finally {
-      setLoading(false);
-    }
-  }, [search, statusFilter]);
+  const fetchPage = useCallback(
+    async (pageNum: number, replace: boolean) => {
+      if (replace) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+      setErrorMessage(null);
 
+      try {
+        const result = await adminApi.listMovies({
+          page: pageNum,
+          search: search || undefined,
+          status: statusFilter || undefined,
+        });
+
+        setMovies((prev) => (replace ? result.results : [...prev, ...result.results]));
+        setHasMore(result.next !== null);
+        setPage(pageNum);
+      } catch {
+        setErrorMessage("Não foi possível carregar os filmes. Tente novamente.");
+      } finally {
+        if (replace) {
+          setLoading(false);
+        } else {
+          setLoadingMore(false);
+        }
+      }
+    },
+    [search, statusFilter]
+  );
+
+  // Reset and fetch page 1 whenever filters change.
   useEffect(() => {
-    fetchMovies();
-  }, [fetchMovies]);
+    setMovies([]);
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
+    fetchPage(1, true);
+  }, [fetchPage]);
+
+  function handleScroll(e: React.UIEvent<HTMLDivElement>) {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    const nearBottom = scrollHeight - scrollTop - clientHeight < 120;
+    if (nearBottom && hasMore && !loadingMore && !loading) {
+      fetchPage(page + 1, false);
+    }
+  }
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -65,7 +97,8 @@ export function AdminMovieList() {
     try {
       await adminApi.deleteMovie(deleteTarget.id);
       setDeleteTarget(null);
-      fetchMovies();
+      setMovies([]);
+      fetchPage(1, true);
     } catch {
       setErrorMessage("Não foi possível excluir o filme. Tente novamente.");
       setDeleteTarget(null);
@@ -199,15 +232,28 @@ export function AdminMovieList() {
         </p>
       ) : null}
 
-      <AdminTable
-        caption="Lista de filmes"
-        columns={columns}
-        data={movies as unknown as Record<string, unknown>[]}
-        emptyDescription="Nenhum filme encontrado. Adicione um novo filme para começar."
-        emptyTitle="Nenhum filme cadastrado"
-        keyField="id"
-        loading={loading}
-      />
+      {/* Scrollable table container — scroll happens here, not on the page */}
+      <div
+        className="max-h-[600px] overflow-y-auto rounded-[8px]"
+        onScroll={handleScroll}
+        ref={scrollContainerRef}
+      >
+        <AdminTable
+          caption="Lista de filmes"
+          columns={columns}
+          data={movies as unknown as Record<string, unknown>[]}
+          emptyDescription="Nenhum filme encontrado. Adicione um novo filme para começar."
+          emptyTitle="Nenhum filme cadastrado"
+          keyField="id"
+          loading={loading}
+        />
+
+        {loadingMore ? (
+          <p className="border-t border-white/[0.05] py-3 text-center text-xs text-white/40">
+            Carregando mais filmes…
+          </p>
+        ) : null}
+      </div>
 
       <AdminConfirmDialog
         confirmLabel={isDeleting ? "Excluindo..." : "Excluir"}
