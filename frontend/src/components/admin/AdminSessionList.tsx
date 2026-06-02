@@ -257,7 +257,7 @@ export function AdminSessionList() {
             Data
           </label>
           <input
-            className="min-h-9 rounded-control border border-border bg-surface px-3 py-2 text-sm text-white outline-none transition focus:border-brand focus:shadow-focus"
+            className="min-h-9 rounded-control border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none transition focus:border-brand focus:shadow-focus"
             id={dateFilterId}
             onChange={(e) => setDateFilter(e.target.value)}
             type="date"
@@ -273,7 +273,7 @@ export function AdminSessionList() {
             Filme
           </label>
           <select
-            className="min-h-9 rounded-control border border-border bg-surface px-3 py-2 text-sm text-white outline-none transition focus:border-brand focus:shadow-focus"
+            className="min-h-9 rounded-control border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none transition focus:border-brand focus:shadow-focus"
             id={movieFilterId}
             onChange={(e) => setMovieFilter(e.target.value)}
             value={movieFilter}
@@ -295,7 +295,7 @@ export function AdminSessionList() {
             Sala
           </label>
           <select
-            className="min-h-9 rounded-control border border-border bg-surface px-3 py-2 text-sm text-white outline-none transition focus:border-brand focus:shadow-focus"
+            className="min-h-9 rounded-control border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none transition focus:border-brand focus:shadow-focus"
             id={roomFilterId}
             onChange={(e) => setRoomFilter(e.target.value)}
             value={roomFilter}
