@@ -62,9 +62,11 @@ function extractConstraintMessage(error: unknown): string | null {
 
 function SeatPreviewCell({
   seat,
+  disabled,
   onClick,
 }: {
   seat: AdminSeat;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -74,8 +76,10 @@ function SeatPreviewCell({
         "flex h-7 w-7 items-center justify-center rounded-[4px] text-[10px] font-bold transition",
         seat.is_accessible
           ? "border-2 border-brand bg-brand/20 text-brand"
-          : "border border-white/[0.25] bg-white/[0.06] text-white/60 hover:border-white/50 hover:text-white"
+          : "border border-white/[0.25] bg-white/[0.06] text-white/60 hover:border-white/50 hover:text-white",
+        disabled && "cursor-wait opacity-50"
       )}
+      disabled={disabled}
       onClick={onClick}
       title={seat.is_accessible ? "Acessível — clique para alternar" : "Clique para marcar como acessível"}
       type="button"
@@ -282,8 +286,9 @@ function RowEditor({
             key={seat.id}
           >
             <SeatPreviewCell
+              disabled={togglingId === seat.id}
               onClick={() => handleToggleAccessible(seat)}
-              seat={togglingId === seat.id ? { ...seat } : seat}
+              seat={seat}
             />
             <button
               aria-label={`Remover assento ${seat.number}`}
@@ -338,27 +343,30 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
 
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const createRowInputRef = useRef<HTMLInputElement>(null);
 
   const loadLayout = useCallback(async () => {
     setState({ status: "loading" });
     try {
-      const [room, rows] = await Promise.all([
+      const [room, rows, allSeats] = await Promise.all([
         adminApi.getRoom(roomId),
         adminApi.listAllSeatRows(roomId),
+        adminApi.listAllSeats(),
       ]);
 
       const sortedRows = [...rows].sort((a, b) =>
         a.name.localeCompare(b.name, "pt-BR")
       );
 
+      const rowIds = new Set(sortedRows.map((r) => r.id));
       const seatsByRow: Record<string, AdminSeat[]> = {};
-      await Promise.all(
-        sortedRows.map(async (row) => {
-          seatsByRow[row.id] = await adminApi.listAllSeats(row.id);
-        })
-      );
+      for (const seat of allSeats) {
+        if (rowIds.has(seat.row)) {
+          (seatsByRow[seat.row] ??= []).push(seat);
+        }
+      }
 
       setState({ room, rows: sortedRows, seatsByRow, status: "ready" });
     } catch {
@@ -421,6 +429,7 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
   async function handleConfirmDelete() {
     if (!deleteTarget) return;
     setIsDeleting(true);
+    setDeleteError(null);
     try {
       if (deleteTarget.kind === "row") {
         await adminApi.deleteSeatRow(deleteTarget.row.id);
@@ -455,17 +464,9 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
       setDeleteTarget(null);
     } catch (err) {
       const constraintMsg = extractConstraintMessage(err);
-      setState((prev) => {
-        if (prev.status !== "ready") return prev;
-        return prev;
-      });
-      if (constraintMsg) {
-        setState((prev) => {
-          if (prev.status !== "ready") return prev;
-          return { ...prev };
-        });
-        alert(constraintMsg);
-      }
+      setDeleteError(
+        constraintMsg ?? "Não foi possível excluir. Tente novamente."
+      );
       setDeleteTarget(null);
     } finally {
       setIsDeleting(false);
@@ -619,6 +620,11 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
 
       {/* Seat rows */}
       <div className="grid gap-4">
+        {deleteError ? (
+          <p className="text-sm font-bold text-error" role="alert">
+            {deleteError}
+          </p>
+        ) : null}
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-sm font-extrabold uppercase tracking-wider text-white/60">
             Fileiras

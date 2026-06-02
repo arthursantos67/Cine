@@ -298,9 +298,22 @@ export const adminApi = {
     });
   },
 
-  async listAllSeats(rowId: string): Promise<AdminSeat[]> {
-    const all = await fetchAllPages<AdminSeat>(SEATS_PATH, isAdminSeat);
-    return all.filter((seat) => seat.row === rowId);
+  async updateSeatRow(seatRowId: string, payload: Partial<AdminSeatRowWritePayload>) {
+    const response = await apiRequest<unknown>(`${SEAT_ROWS_PATH}${seatRowId}/`, {
+      auth: "required",
+      json: payload,
+      method: "PATCH",
+    });
+
+    if (!isAdminSeatRow(response)) {
+      throw new Error("Unexpected admin update seat row response.");
+    }
+
+    return response satisfies AdminSeatRow;
+  },
+
+  async listAllSeats(): Promise<AdminSeat[]> {
+    return fetchAllPages<AdminSeat>(SEATS_PATH, isAdminSeat);
   },
 
   async createSeat(payload: AdminSeatWritePayload) {

@@ -275,7 +275,7 @@ test("adminApi.deleteSeatRow sends a DELETE request", async () => {
 
 // ─── adminApi.listAllSeats ────────────────────────────────────────────────────
 
-test("adminApi.listAllSeats fetches and filters seats by row", async () => {
+test("adminApi.listAllSeats fetches all seats without filtering", async () => {
   const originalFetch = globalThis.fetch;
   const otherSeat = { id: "seat-x1", is_accessible: false, number: 1, row: "row-other" };
   try {
@@ -284,9 +284,10 @@ test("adminApi.listAllSeats fetches and filters seats by row", async () => {
         ...paginatedSeats,
         results: [seat, otherSeat],
       });
-    const seats = await adminApi.listAllSeats("row-a");
-    assert.equal(seats.length, 1);
+    const seats = await adminApi.listAllSeats();
+    assert.equal(seats.length, 2);
     assert.equal(seats[0].id, "seat-a1");
+    assert.equal(seats[1].id, "seat-x1");
   } finally {
     globalThis.fetch = originalFetch;
   }
