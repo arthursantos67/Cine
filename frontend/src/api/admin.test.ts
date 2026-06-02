@@ -301,3 +301,257 @@ test("adminApi.createGenre rejects unexpected response shape", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+// ─── Session fixtures ─────────────────────────────────────────────────────────
+
+const sessionMovie = {
+  age_rating: null,
+  cast: null,
+  director: null,
+  duration_minutes: 120,
+  genres: [{ id: "genre-1", name: "Ação" }],
+  id: "movie-1",
+  is_featured: false,
+  poster_url: "https://cdn.example.com/poster.jpg",
+  release_date: "2026-06-01",
+  status: "em_cartaz",
+  title: "Filme Teste",
+};
+
+const sessionRoom = {
+  capacity: 100,
+  description: null,
+  display_name: "Sala VIP Prime",
+  experience_type: "vip",
+  id: "room-1",
+  name: "Sala 1",
+};
+
+const session = {
+  audio_format: "legendado",
+  base_price: "54.00",
+  created_at: "2026-06-01T10:00:00Z",
+  end_time: "2026-06-10T22:00:00Z",
+  has_purchases: false,
+  has_reservations: false,
+  id: "session-1",
+  movie: sessionMovie,
+  projection_format: "3d",
+  room: sessionRoom,
+  seat_count: 48,
+  session_type: "preview",
+  start_time: "2026-06-10T19:30:00Z",
+  updated_at: "2026-06-01T10:00:00Z",
+};
+
+const paginatedSessions = {
+  count: 1,
+  next: null,
+  previous: null,
+  results: [session],
+};
+
+// ─── adminApi.listSessions ────────────────────────────────────────────────────
+
+test("adminApi.listSessions fetches the paginated session list", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async (input) => {
+      assert.equal(input, "http://localhost:8000/api/v1/catalog/sessions/");
+      return Response.json(paginatedSessions);
+    };
+
+    const response = await adminApi.listSessions();
+
+    assert.equal(response.count, 1);
+    assert.equal(response.results[0].id, "session-1");
+    assert.equal(response.results[0].base_price, "54.00");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("adminApi.listSessions builds date, movie, and room filters", async () => {
+  const originalFetch = globalThis.fetch;
+  const requestedUrls: string[] = [];
+
+  try {
+    globalThis.fetch = async (input) => {
+      requestedUrls.push(String(input));
+      return Response.json({ count: 0, next: null, previous: null, results: [] });
+    };
+
+    await adminApi.listSessions({ date: "2026-06-10" });
+    await adminApi.listSessions({ movie: "movie-1" });
+    await adminApi.listSessions({ room: "room-1", page: 2 });
+    await adminApi.listSessions({ date: "2026-06-10", movie: "movie-1", room: "room-1" });
+
+    assert.deepEqual(requestedUrls, [
+      "http://localhost:8000/api/v1/catalog/sessions/?date=2026-06-10",
+      "http://localhost:8000/api/v1/catalog/sessions/?movie=movie-1",
+      "http://localhost:8000/api/v1/catalog/sessions/?room=room-1&page=2",
+      "http://localhost:8000/api/v1/catalog/sessions/?date=2026-06-10&movie=movie-1&room=room-1",
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("adminApi.listSessions rejects non-paginated response", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async () => Response.json([]);
+
+    await assert.rejects(
+      adminApi.listSessions(),
+      /Unexpected admin session list response/
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+// ─── adminApi.getSession ──────────────────────────────────────────────────────
+
+test("adminApi.getSession fetches a single session by id", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async (input) => {
+      assert.equal(
+        input,
+        "http://localhost:8000/api/v1/catalog/sessions/session-1/"
+      );
+      return Response.json(session);
+    };
+
+    const result = await adminApi.getSession("session-1");
+
+    assert.equal(result.id, "session-1");
+    assert.equal(result.base_price, "54.00");
+    assert.equal(result.movie.title, "Filme Teste");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("adminApi.getSession rejects unexpected response shape", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async () => Response.json({ id: "session-1" });
+
+    await assert.rejects(
+      adminApi.getSession("session-1"),
+      /Unexpected admin session detail response/
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+// ─── adminApi.createSession ───────────────────────────────────────────────────
+
+test("adminApi.createSession posts the session payload", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async (input, init) => {
+      assert.equal(input, "http://localhost:8000/api/v1/catalog/sessions/");
+      assert.equal(init?.method, "POST");
+      const body = JSON.parse(init?.body as string);
+      assert.equal(body.movie, "movie-1");
+      assert.equal(body.room, "room-1");
+      assert.equal(body.base_price, "54.00");
+      assert.equal(body.audio_format, "legendado");
+      assert.equal(body.projection_format, "3d");
+      return Response.json(session);
+    };
+
+    const created = await adminApi.createSession({
+      audio_format: "legendado",
+      base_price: "54.00",
+      end_time: "2026-06-10T22:00:00Z",
+      movie: "movie-1",
+      projection_format: "3d",
+      room: "room-1",
+      session_type: "preview",
+      start_time: "2026-06-10T19:30:00Z",
+    });
+
+    assert.equal(created.id, "session-1");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("adminApi.createSession rejects unexpected response shape", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async () => Response.json({ id: "session-1" });
+
+    await assert.rejects(
+      adminApi.createSession({
+        base_price: "54.00",
+        end_time: "2026-06-10T22:00:00Z",
+        movie: "movie-1",
+        room: "room-1",
+        start_time: "2026-06-10T19:30:00Z",
+      }),
+      /Unexpected admin create session response/
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+// ─── adminApi.updateSession ───────────────────────────────────────────────────
+
+test("adminApi.updateSession patches the session by id", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async (input, init) => {
+      assert.equal(
+        input,
+        "http://localhost:8000/api/v1/catalog/sessions/session-1/"
+      );
+      assert.equal(init?.method, "PATCH");
+      const body = JSON.parse(init?.body as string);
+      assert.equal(body.audio_format, "dublado");
+      return Response.json({ ...session, audio_format: "dublado" });
+    };
+
+    const updated = await adminApi.updateSession("session-1", {
+      audio_format: "dublado",
+    });
+
+    assert.equal(updated.audio_format, "dublado");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+// ─── adminApi.deleteSession ───────────────────────────────────────────────────
+
+test("adminApi.deleteSession sends a DELETE request", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async (input, init) => {
+      assert.equal(
+        input,
+        "http://localhost:8000/api/v1/catalog/sessions/session-1/"
+      );
+      assert.equal(init?.method, "DELETE");
+      return new Response(null, { status: 204 });
+    };
+
+    await adminApi.deleteSession("session-1");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
