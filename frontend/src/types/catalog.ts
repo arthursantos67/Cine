@@ -62,21 +62,3 @@ export type CatalogSession = {
   start_time: string;
   updated_at?: string;
 };
-
-export type AdminRoom = CatalogRoomSummary & {
-  created_at?: string;
-  updated_at?: string;
-};
-
-export type AdminSeatRow = {
-  id: string;
-  name: string;
-  room: string;
-};
-
-export type AdminSeat = {
-  id: string;
-  is_accessible: boolean;
-  number: number;
-  row: string;
-};

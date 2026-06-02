@@ -1,11 +1,7 @@
 import type {
-  AdminRoom,
-  AdminSeat,
-  AdminSeatRow,
   CatalogGenre,
   CatalogMovieAgeRating,
   CatalogMovieDetail,
-  CatalogRoomExperienceType,
   MovieStatus,
 } from "@/types/catalog";
 
@@ -40,25 +36,6 @@ export type AdminGenreWritePayload = {
   name: string;
 };
 
-export type AdminRoomWritePayload = {
-  capacity: number;
-  description?: string;
-  display_name?: string;
-  experience_type?: CatalogRoomExperienceType;
-  name: string;
-};
-
-export type AdminSeatRowWritePayload = {
-  name: string;
-  room: string;
-};
-
-export type AdminSeatWritePayload = {
-  is_accessible?: boolean;
-  number: number;
-  row: string;
-};
-
 export type AdminGenre = CatalogGenre & {
   created_at?: string;
   updated_at?: string;
@@ -66,9 +43,6 @@ export type AdminGenre = CatalogGenre & {
 
 const MOVIES_PATH = "/api/v1/catalog/movies/";
 const GENRES_PATH = "/api/v1/catalog/genres/";
-const ROOMS_PATH = "/api/v1/catalog/rooms/";
-const SEAT_ROWS_PATH = "/api/v1/reservation/seat-rows/";
-const SEATS_PATH = "/api/v1/reservation/seats/";
 
 export const adminApi = {
   async getSummary(): Promise<AdminSummary> {
@@ -209,134 +183,6 @@ export const adminApi = {
       method: "DELETE",
     });
   },
-
-  async listRooms(params: { page?: number; search?: string } = {}) {
-    const query = buildQueryString(params);
-    const response = await apiRequest<unknown>(
-      query ? `${ROOMS_PATH}?${query}` : ROOMS_PATH,
-      { auth: "required", method: "GET" }
-    );
-
-    if (!isPaginatedResponse<AdminRoom>(response)) {
-      throw new Error("Unexpected admin room list response.");
-    }
-
-    return response satisfies PaginatedResponse<AdminRoom>;
-  },
-
-  async getRoom(roomId: string) {
-    const response = await apiRequest<unknown>(`${ROOMS_PATH}${roomId}/`, {
-      auth: "required",
-      method: "GET",
-    });
-
-    if (!isAdminRoom(response)) {
-      throw new Error("Unexpected admin room detail response.");
-    }
-
-    return response satisfies AdminRoom;
-  },
-
-  async createRoom(payload: AdminRoomWritePayload) {
-    const response = await apiRequest<unknown>(ROOMS_PATH, {
-      auth: "required",
-      json: payload,
-      method: "POST",
-    });
-
-    if (!isAdminRoom(response)) {
-      throw new Error("Unexpected admin create room response.");
-    }
-
-    return response satisfies AdminRoom;
-  },
-
-  async updateRoom(roomId: string, payload: Partial<AdminRoomWritePayload>) {
-    const response = await apiRequest<unknown>(`${ROOMS_PATH}${roomId}/`, {
-      auth: "required",
-      json: payload,
-      method: "PATCH",
-    });
-
-    if (!isAdminRoom(response)) {
-      throw new Error("Unexpected admin update room response.");
-    }
-
-    return response satisfies AdminRoom;
-  },
-
-  async deleteRoom(roomId: string) {
-    await apiRequest<unknown>(`${ROOMS_PATH}${roomId}/`, {
-      auth: "required",
-      method: "DELETE",
-    });
-  },
-
-  async listAllSeatRows(roomId: string): Promise<AdminSeatRow[]> {
-    const all = await fetchAllPages<AdminSeatRow>(SEAT_ROWS_PATH, isAdminSeatRow);
-    return all.filter((row) => row.room === roomId);
-  },
-
-  async createSeatRow(payload: AdminSeatRowWritePayload) {
-    const response = await apiRequest<unknown>(SEAT_ROWS_PATH, {
-      auth: "required",
-      json: payload,
-      method: "POST",
-    });
-
-    if (!isAdminSeatRow(response)) {
-      throw new Error("Unexpected admin create seat row response.");
-    }
-
-    return response satisfies AdminSeatRow;
-  },
-
-  async deleteSeatRow(seatRowId: string) {
-    await apiRequest<unknown>(`${SEAT_ROWS_PATH}${seatRowId}/`, {
-      auth: "required",
-      method: "DELETE",
-    });
-  },
-
-  async listAllSeats(rowId: string): Promise<AdminSeat[]> {
-    const all = await fetchAllPages<AdminSeat>(SEATS_PATH, isAdminSeat);
-    return all.filter((seat) => seat.row === rowId);
-  },
-
-  async createSeat(payload: AdminSeatWritePayload) {
-    const response = await apiRequest<unknown>(SEATS_PATH, {
-      auth: "required",
-      json: payload,
-      method: "POST",
-    });
-
-    if (!isAdminSeat(response)) {
-      throw new Error("Unexpected admin create seat response.");
-    }
-
-    return response satisfies AdminSeat;
-  },
-
-  async updateSeat(seatId: string, payload: Partial<AdminSeatWritePayload>) {
-    const response = await apiRequest<unknown>(`${SEATS_PATH}${seatId}/`, {
-      auth: "required",
-      json: payload,
-      method: "PATCH",
-    });
-
-    if (!isAdminSeat(response)) {
-      throw new Error("Unexpected admin update seat response.");
-    }
-
-    return response satisfies AdminSeat;
-  },
-
-  async deleteSeat(seatId: string) {
-    await apiRequest<unknown>(`${SEATS_PATH}${seatId}/`, {
-      auth: "required",
-      method: "DELETE",
-    });
-  },
 };
 
 function buildMoviesPath({
@@ -364,82 +210,6 @@ function buildMoviesPath({
 
   const query = searchParams.toString();
   return query ? `${MOVIES_PATH}?${query}` : MOVIES_PATH;
-}
-
-function buildQueryString(params: Record<string, string | number | undefined>) {
-  const searchParams = new URLSearchParams();
-
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined) {
-      searchParams.set(key, String(value));
-    }
-  }
-
-  return searchParams.toString();
-}
-
-async function fetchAllPages<T>(
-  path: string,
-  filter?: (item: unknown) => item is T
-): Promise<T[]> {
-  const first = await apiRequest<PaginatedResponse<unknown>>(path, {
-    auth: "required",
-    method: "GET",
-  });
-
-  const allItems: T[] = [];
-
-  function collectFiltered(items: unknown[]) {
-    for (const item of items) {
-      if (!filter || filter(item)) {
-        allItems.push(item as T);
-      }
-    }
-  }
-
-  collectFiltered(first.results);
-
-  let nextUrl: string | null = first.next;
-
-  while (nextUrl) {
-    const page = await apiRequest<PaginatedResponse<unknown>>(nextUrl, {
-      auth: "required",
-      method: "GET",
-    });
-
-    collectFiltered(page.results);
-    nextUrl = page.next;
-  }
-
-  return allItems;
-}
-
-function isAdminRoom(value: unknown): value is AdminRoom {
-  return (
-    isRecord(value) &&
-    typeof value.id === "string" &&
-    typeof value.name === "string" &&
-    typeof value.capacity === "number"
-  );
-}
-
-function isAdminSeatRow(value: unknown): value is AdminSeatRow {
-  return (
-    isRecord(value) &&
-    typeof value.id === "string" &&
-    typeof value.name === "string" &&
-    typeof value.room === "string"
-  );
-}
-
-function isAdminSeat(value: unknown): value is AdminSeat {
-  return (
-    isRecord(value) &&
-    typeof value.id === "string" &&
-    typeof value.row === "string" &&
-    typeof value.number === "number" &&
-    typeof value.is_accessible === "boolean"
-  );
 }
 
 function isAdminMovieDetail(value: unknown): value is CatalogMovieDetail {
