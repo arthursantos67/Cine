@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useState } from "react";
 
 import { adminApi } from "@/api/admin";
 import type { AdminRoom, AdminSession, CatalogMovieDetail } from "@/types/catalog";
+import { formatCurrency } from "@/utils/formatters";
 import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { AdminConfirmDialog, AdminTable, AdminToolbar } from "@/components/admin";
@@ -162,10 +163,7 @@ export function AdminSessionList() {
         const s = row as unknown as AdminSession;
         return (
           <span className="text-white/80">
-            {Number(s.base_price).toLocaleString("pt-BR", {
-              currency: "BRL",
-              style: "currency",
-            })}
+            {formatCurrency(Number(s.base_price))}
           </span>
         );
       },
