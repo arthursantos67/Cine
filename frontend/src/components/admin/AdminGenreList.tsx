@@ -11,13 +11,8 @@ import { ButtonLink } from "@/components/ui/Button";
 
 export function AdminGenreList() {
   const [genres, setGenres] = useState<AdminGenre[]>([]);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -35,40 +30,22 @@ export function AdminGenreList() {
   const editInputRef = useRef<HTMLInputElement>(null);
   const createInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchPage = useCallback(async (pageNum: number, replace: boolean) => {
-    if (replace) {
-      setLoading(true);
-    } else {
-      setLoadingMore(true);
-    }
+  const fetchGenres = useCallback(async () => {
+    setLoading(true);
     setErrorMessage(null);
-
     try {
-      const result = await adminApi.listGenres({ page: pageNum });
-      setGenres((prev) => (replace ? result.results : [...prev, ...result.results]));
-      setHasMore(result.next !== null);
-      setPage(pageNum);
+      const result = await adminApi.listGenres();
+      setGenres(result.results);
     } catch {
       setErrorMessage("Não foi possível carregar os gêneros. Tente novamente.");
     } finally {
-      if (replace) {
-        setLoading(false);
-      } else {
-        setLoadingMore(false);
-      }
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchPage(1, true);
-  }, [fetchPage]);
-
-  function handleScroll(e: React.UIEvent<HTMLDivElement>) {
-    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-    if (scrollHeight - scrollTop - clientHeight < 120 && hasMore && !loadingMore && !loading) {
-      fetchPage(page + 1, false);
-    }
-  }
+    fetchGenres();
+  }, [fetchGenres]);
 
   useEffect(() => {
     if (editingId) {
@@ -102,7 +79,7 @@ export function AdminGenreList() {
     setEditError(null);
     try {
       const updated = await adminApi.updateGenre(genreId, { name });
-      setGenres((prev) => prev.map((g) => (g.id === genreId ? { ...g, ...updated } : g)));
+      setGenres((prev) => prev.map((g) => (g.id === genreId ? updated : g)));
       cancelEdit();
     } catch (err) {
       if (err instanceof ApiError && err.code === "VALIDATION_FAILED") {
@@ -122,9 +99,8 @@ export function AdminGenreList() {
     setIsDeleting(true);
     try {
       await adminApi.deleteGenre(deleteTarget.id);
+      setGenres((prev) => prev.filter((g) => g.id !== deleteTarget.id));
       setDeleteTarget(null);
-      setGenres([]);
-      fetchPage(1, true);
     } catch {
       setErrorMessage("Não foi possível excluir o gênero. Tente novamente.");
       setDeleteTarget(null);
@@ -141,10 +117,9 @@ export function AdminGenreList() {
     setCreateError(null);
     try {
       const created = await adminApi.createGenre({ name });
+      setGenres((prev) => [...prev, created]);
       setCreateName("");
       setShowCreateInput(false);
-      setGenres([]);
-      fetchPage(1, true);
     } catch (err) {
       if (err instanceof ApiError && err.code === "VALIDATION_FAILED") {
         const details = err.details as Record<string, unknown> | null;
@@ -330,28 +305,15 @@ export function AdminGenreList() {
         </div>
       ) : null}
 
-      {/* Scrollable table container — scroll happens here, not on the page */}
-      <div
-        className="max-h-[600px] overflow-y-auto rounded-[8px]"
-        onScroll={handleScroll}
-        ref={scrollContainerRef}
-      >
-        <AdminTable
-          caption="Lista de gêneros"
-          columns={columns}
-          data={genres as unknown as Record<string, unknown>[]}
-          emptyDescription="Nenhum gênero cadastrado. Clique em 'Novo gênero' para adicionar."
-          emptyTitle="Nenhum gênero cadastrado"
-          keyField="id"
-          loading={loading}
-        />
-
-        {loadingMore ? (
-          <p className="border-t border-white/[0.05] py-3 text-center text-xs text-white/40">
-            Carregando mais gêneros…
-          </p>
-        ) : null}
-      </div>
+      <AdminTable
+        caption="Lista de gêneros"
+        columns={columns}
+        data={genres as unknown as Record<string, unknown>[]}
+        emptyDescription="Nenhum gênero cadastrado. Clique em 'Novo gênero' para adicionar."
+        emptyTitle="Nenhum gênero cadastrado"
+        keyField="id"
+        loading={loading}
+      />
 
       <AdminConfirmDialog
         confirmLabel={isDeleting ? "Excluindo..." : "Excluir"}

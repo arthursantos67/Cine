@@ -23,13 +23,11 @@ type MockOptions = {
   failNextReservation?: boolean;
   isAdmin?: boolean;
   reservationExpiresAt?: string;
-  roomLayoutBlocked?: boolean;
 };
 
 export function createMockApiState(options: MockOptions = {}) {
   let failNextReservation = options.failNextReservation ?? false;
   const isAdmin = options.isAdmin ?? false;
-  const roomLayoutBlocked = options.roomLayoutBlocked ?? false;
   const reservationExpiresAt =
     options.reservationExpiresAt ??
     new Date(fixedNow.getTime() + 10 * 60 * 1000).toISOString();
@@ -74,14 +72,6 @@ export function createMockApiState(options: MockOptions = {}) {
     },
   ];
 
-  const mockSeatRows: MockSeatRow[] = [
-    { id: "row-a", name: "A", room: "room-1" },
-  ];
-  const mockSeats: MockSeat[] = [
-    { id: "seat-a1", is_accessible: false, number: 1, row: "row-a" },
-    { id: "seat-a2", is_accessible: false, number: 2, row: "row-a" },
-  ];
-
   return {
     checkoutPayloads,
     handleRoute: (route: Route) =>
@@ -92,15 +82,10 @@ export function createMockApiState(options: MockOptions = {}) {
         markReservationFailureConsumed: () => {
           failNextReservation = false;
         },
-        mockSeatRows,
-        mockSeats,
         reservationExpiresAt,
         reservations,
-        roomLayoutBlocked,
         seats,
       }),
-    mockSeatRows,
-    mockSeats,
     reservations,
     seats,
   };
@@ -114,29 +99,13 @@ export async function setupMockApi(page: Page, options: MockOptions = {}) {
   return state;
 }
 
-type MockSeatRow = {
-  id: string;
-  name: string;
-  room: string;
-};
-
-type MockSeat = {
-  id: string;
-  is_accessible: boolean;
-  number: number;
-  row: string;
-};
-
 type ApiRouteState = {
   checkoutPayloads: unknown[];
   isAdmin: boolean;
   failNextReservation: () => boolean;
   markReservationFailureConsumed: () => void;
-  mockSeatRows: MockSeatRow[];
-  mockSeats: MockSeat[];
   reservationExpiresAt: string;
   reservations: string[];
-  roomLayoutBlocked: boolean;
   seats: SessionSeat[];
 };
 
@@ -177,143 +146,7 @@ async function handleApiRoute(route: Route, state: ApiRouteState) {
   }
 
   if (method === "GET" && url.pathname === "/api/v1/catalog/rooms/") {
-    return json(route, paginated([mockRoom]));
-  }
-
-  if (method === "POST" && url.pathname === "/api/v1/catalog/rooms/") {
-    const payload = request.postDataJSON() as Partial<typeof mockRoom>;
-    const created = { ...mockRoom, ...payload, id: "room-new" };
-    return json(route, created, 201);
-  }
-
-  if (
-    method === "GET" &&
-    url.pathname === `/api/v1/catalog/rooms/${mockRoom.id}/`
-  ) {
-    return json(route, mockRoom);
-  }
-
-  if (
-    method === "PATCH" &&
-    url.pathname === `/api/v1/catalog/rooms/${mockRoom.id}/`
-  ) {
-    const payload = request.postDataJSON() as Partial<typeof mockRoom>;
-    return json(route, { ...mockRoom, ...payload });
-  }
-
-  if (
-    method === "DELETE" &&
-    url.pathname === `/api/v1/catalog/rooms/${mockRoom.id}/`
-  ) {
-    return json(route, null, 204);
-  }
-
-  if (method === "GET" && url.pathname === "/api/v1/reservation/seat-rows/") {
-    return json(route, paginated(state.mockSeatRows));
-  }
-
-  if (method === "POST" && url.pathname === "/api/v1/reservation/seat-rows/") {
-    if (state.roomLayoutBlocked) {
-      return backendError(route, 400, "VALIDATION_FAILED", {
-        details: {
-          room: "Room seat layout cannot be changed while future sessions exist.",
-        },
-      });
-    }
-    const payload = request.postDataJSON() as { name: string; room: string };
-    const newRow: MockSeatRow = {
-      id: `row-${payload.name.toLowerCase()}`,
-      name: payload.name,
-      room: payload.room,
-    };
-    state.mockSeatRows.push(newRow);
-    return json(route, newRow, 201);
-  }
-
-  const seatRowDeleteMatch = url.pathname.match(
-    /^\/api\/v1\/reservation\/seat-rows\/([^/]+)\/$/
-  );
-  if (method === "DELETE" && seatRowDeleteMatch) {
-    const rowId = seatRowDeleteMatch[1];
-    if (state.roomLayoutBlocked) {
-      return backendError(route, 400, "VALIDATION_FAILED", {
-        details: {
-          room: "Room seat layout cannot be changed while future sessions exist.",
-        },
-      });
-    }
-    const idx = state.mockSeatRows.findIndex((r) => r.id === rowId);
-    if (idx >= 0) state.mockSeatRows.splice(idx, 1);
-    return json(route, null, 204);
-  }
-
-  if (method === "GET" && url.pathname === "/api/v1/reservation/seats/") {
-    return json(route, paginated(state.mockSeats));
-  }
-
-  if (method === "POST" && url.pathname === "/api/v1/reservation/seats/") {
-    if (state.roomLayoutBlocked) {
-      return backendError(route, 400, "VALIDATION_FAILED", {
-        details: {
-          room: "Room seat layout cannot be changed while future sessions exist.",
-        },
-      });
-    }
-    const payload = request.postDataJSON() as {
-      is_accessible?: boolean;
-      number: number;
-      row: string;
-    };
-    const seatsInRow = state.mockSeats.filter((s) => s.row === payload.row);
-    const roomOfRow = state.mockSeatRows.find((r) => r.id === payload.row);
-    if (roomOfRow) {
-      const allRoomSeats = state.mockSeatRows
-        .filter((r) => r.room === roomOfRow.room)
-        .flatMap((r) => state.mockSeats.filter((s) => s.row === r.id));
-      if (allRoomSeats.length >= mockRoom.capacity) {
-        return backendError(route, 400, "VALIDATION_FAILED", {
-          details: {
-            row: "Room capacity cannot be exceeded by adding another seat.",
-          },
-        });
-      }
-    }
-    const newSeat: MockSeat = {
-      id: `seat-${payload.row}-${seatsInRow.length + 1}`,
-      is_accessible: payload.is_accessible ?? false,
-      number: payload.number,
-      row: payload.row,
-    };
-    state.mockSeats.push(newSeat);
-    return json(route, newSeat, 201);
-  }
-
-  const seatPatchMatch = url.pathname.match(
-    /^\/api\/v1\/reservation\/seats\/([^/]+)\/$/
-  );
-  if (method === "PATCH" && seatPatchMatch) {
-    const seatId = seatPatchMatch[1];
-    const payload = request.postDataJSON() as Partial<MockSeat>;
-    const idx = state.mockSeats.findIndex((s) => s.id === seatId);
-    if (idx >= 0) {
-      state.mockSeats[idx] = { ...state.mockSeats[idx], ...payload };
-      return json(route, state.mockSeats[idx]);
-    }
-    return backendError(route, 404, "RESOURCE_NOT_FOUND");
-  }
-
-  if (method === "DELETE" && seatPatchMatch) {
-    const seatId = seatPatchMatch[1];
-    if (state.roomLayoutBlocked) {
-      return backendError(route, 400, "VALIDATION_FAILED", {
-        details: {
-          room: "Room seat layout cannot be changed while future sessions exist.",
-        },
-      });
-    }
-    const idx = state.mockSeats.findIndex((s) => s.id === seatId);
-    if (idx >= 0) state.mockSeats.splice(idx, 1);
-    return json(route, null, 204);
+    return json(route, paginated([{ id: "room-1", name: "Sala 1" }]));
   }
 
   if (method === "GET" && url.pathname === "/api/v1/catalog/movies/") {
@@ -466,15 +299,6 @@ async function handleApiRoute(route: Route, state: ApiRouteState) {
     message: `Unhandled E2E API route: ${method} ${path}`,
   });
 }
-
-const mockRoom = {
-  capacity: 4,
-  description: "",
-  display_name: "Sala 1",
-  experience_type: "vip",
-  id: "room-1",
-  name: "Sala 1",
-};
 
 const movie = {
   duration_minutes: 128,
