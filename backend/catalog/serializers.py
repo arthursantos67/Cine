@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from rest_framework import serializers
 
-from catalog.models import CastMember, Genre, Movie, Room, Session
+from catalog.models import CastMember, Genre, Movie, Room, RoomTypePricing, Session
 from reservations.models import SessionSeat, SessionSeatStatus, Seat
 
 _WEEKEND_WEEKDAYS = {4, 5, 6}  # Friday, Saturday, Sunday
@@ -97,6 +97,13 @@ class RoomSummarySerializer(serializers.ModelSerializer):
             "display_name",
             "description",
         ]
+
+
+class RoomTypePricingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RoomTypePricing
+        fields = ["id", "experience_type", "base_price", "updated_at"]
+        read_only_fields = ["id", "experience_type", "updated_at"]
 
 
 class MovieWriteSerializer(serializers.ModelSerializer):

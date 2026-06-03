@@ -127,7 +127,6 @@ test("adminApi.createRoom posts the room payload", async () => {
       return Response.json(room);
     };
     const created = await adminApi.createRoom({
-      base_price: "40.00",
       capacity: 100,
       experience_type: "vip",
       name: "Sala 1",

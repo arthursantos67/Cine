@@ -69,6 +69,13 @@ export type AdminRoom = CatalogRoomSummary & {
   updated_at?: string;
 };
 
+export type RoomTypePricing = {
+  id: number;
+  experience_type: CatalogRoomExperienceType;
+  base_price: string;
+  updated_at: string;
+};
+
 export type AdminSession = CatalogSession & {
   seat_count?: number;
   has_reservations?: boolean;

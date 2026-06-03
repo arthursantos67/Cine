@@ -96,6 +96,27 @@ class Movie(models.Model):
         return self.title
 
 
+class RoomTypePricing(models.Model):
+    experience_type = models.CharField(
+        max_length=30,
+        choices=RoomExperienceType.choices,
+        unique=True,
+    )
+    base_price = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "room_type_pricing"
+        ordering = ["experience_type"]
+
+    def __str__(self):
+        return f"{self.experience_type}: {self.base_price}"
+
+
 class Room(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100, unique=True)
@@ -148,6 +169,14 @@ class Room(models.Model):
             )
 
     def save(self, *args, **kwargs):
+        if self.experience_type:
+            try:
+                pricing = RoomTypePricing.objects.get(
+                    experience_type=self.experience_type
+                )
+                self.base_price = pricing.base_price
+            except RoomTypePricing.DoesNotExist:
+                pass
         self.full_clean()
         super().save(*args, **kwargs)
 

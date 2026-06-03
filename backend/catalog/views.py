@@ -9,6 +9,8 @@ from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIV
 from rest_framework.response import Response
 
 from cineprime_api.permissions import IsAdminUserOrReadOnly
+from rest_framework.generics import ListAPIView, RetrieveUpdateAPIView
+
 from catalog.models import (
     AudioFormat,
     Genre,
@@ -17,6 +19,7 @@ from catalog.models import (
     ProjectionFormat,
     Room,
     RoomExperienceType,
+    RoomTypePricing,
     Session,
     SessionType,
 )
@@ -25,6 +28,7 @@ from catalog.serializers import (
     MovieReadSerializer,
     MovieWriteSerializer,
     RoomSerializer,
+    RoomTypePricingSerializer,
     SessionReadSerializer,
     SessionWriteSerializer,
 )
@@ -446,3 +450,24 @@ class SessionDetailView(RetrieveUpdateDestroyAPIView):
         response = super().destroy(request, *args, **kwargs)
         invalidate_session_list_cache()
         return response
+
+
+@extend_schema(tags=["Catalog"], summary="List room type pricing")
+class RoomTypePricingListView(ListAPIView):
+    queryset = RoomTypePricing.objects.all()
+    serializer_class = RoomTypePricingSerializer
+    permission_classes = [IsAdminUserOrReadOnly]
+
+
+@extend_schema(tags=["Catalog"], summary="Update room type pricing")
+class RoomTypePricingDetailView(RetrieveUpdateAPIView):
+    queryset = RoomTypePricing.objects.all()
+    serializer_class = RoomTypePricingSerializer
+    permission_classes = [IsAdminUserOrReadOnly]
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        Room.objects.filter(experience_type=instance.experience_type).update(
+            base_price=instance.base_price
+        )
+        invalidate_session_list_cache()

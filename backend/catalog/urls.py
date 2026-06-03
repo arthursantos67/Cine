@@ -7,6 +7,8 @@ from catalog.views import (
     MovieListCreateView,
     RoomDetailView,
     RoomListCreateView,
+    RoomTypePricingDetailView,
+    RoomTypePricingListView,
     SessionDetailView,
     SessionListCreateView,
 )
@@ -18,6 +20,8 @@ urlpatterns = [
     path("movies/<uuid:pk>/", MovieDetailView.as_view(), name="movie-detail"),
     path("rooms/", RoomListCreateView.as_view(), name="room-list-create"),
     path("rooms/<uuid:pk>/", RoomDetailView.as_view(), name="room-detail"),
+    path("room-type-pricing/", RoomTypePricingListView.as_view(), name="room-type-pricing-list"),
+    path("room-type-pricing/<int:pk>/", RoomTypePricingDetailView.as_view(), name="room-type-pricing-detail"),
     path("sessions/", SessionListCreateView.as_view(), name="session-list-create"),
     path("sessions/<uuid:pk>/", SessionDetailView.as_view(), name="session-detail"),
 ]

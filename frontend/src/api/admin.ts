@@ -11,6 +11,7 @@ import type {
   CatalogRoomExperienceType,
   CatalogSessionType,
   MovieStatus,
+  RoomTypePricing,
 } from "@/types/catalog";
 
 import {
@@ -45,12 +46,15 @@ export type AdminGenreWritePayload = {
 };
 
 export type AdminRoomWritePayload = {
-  base_price: string;
   capacity: number;
   description?: string;
   display_name?: string;
   experience_type?: CatalogRoomExperienceType;
   name: string;
+};
+
+export type RoomTypePricingWritePayload = {
+  base_price: string;
 };
 
 export type AdminSeatRowWritePayload = {
@@ -89,6 +93,7 @@ export type AdminGenre = CatalogGenre & {
 const MOVIES_PATH = "/api/v1/catalog/movies/";
 const GENRES_PATH = "/api/v1/catalog/genres/";
 const ROOMS_PATH = "/api/v1/catalog/rooms/";
+const ROOM_TYPE_PRICING_PATH = "/api/v1/catalog/room-type-pricing/";
 const SESSIONS_PATH = "/api/v1/catalog/sessions/";
 const SEAT_ROWS_PATH = "/api/v1/reservation/seat-rows/";
 const SEATS_PATH = "/api/v1/reservation/seats/";
@@ -293,6 +298,39 @@ export const adminApi = {
       auth: "required",
       method: "DELETE",
     });
+  },
+
+  async listRoomTypePricing(): Promise<RoomTypePricing[]> {
+    const response = await apiRequest<unknown>(ROOM_TYPE_PRICING_PATH, {
+      auth: "required",
+      method: "GET",
+    });
+
+    if (!Array.isArray(response) || !response.every(isRoomTypePricing)) {
+      throw new Error("Unexpected room type pricing list response.");
+    }
+
+    return response satisfies RoomTypePricing[];
+  },
+
+  async updateRoomTypePricing(
+    id: number,
+    payload: RoomTypePricingWritePayload
+  ): Promise<RoomTypePricing> {
+    const response = await apiRequest<unknown>(
+      `${ROOM_TYPE_PRICING_PATH}${id}/`,
+      {
+        auth: "required",
+        json: payload,
+        method: "PATCH",
+      }
+    );
+
+    if (!isRoomTypePricing(response)) {
+      throw new Error("Unexpected room type pricing update response.");
+    }
+
+    return response satisfies RoomTypePricing;
   },
 
   async listAllSeatRows(roomId: string): Promise<AdminSeatRow[]> {
@@ -518,6 +556,16 @@ function isAdminRoom(value: unknown): value is AdminRoom {
     typeof value.id === "string" &&
     typeof value.name === "string" &&
     typeof value.capacity === "number"
+  );
+}
+
+function isRoomTypePricing(value: unknown): value is RoomTypePricing {
+  return (
+    isRecord(value) &&
+    typeof value.id === "number" &&
+    typeof value.experience_type === "string" &&
+    typeof value.base_price === "string" &&
+    typeof value.updated_at === "string"
   );
 }
 

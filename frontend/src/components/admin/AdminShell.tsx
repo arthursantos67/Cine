@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import {
   Building2,
   CalendarDays,
+  CircleDollarSign,
   Film,
   Grid3x3,
   LayoutDashboard,
@@ -28,6 +29,7 @@ const navIcons: Record<string, ReactNode> = {
   "/admin/rooms": <Building2 size={16} />,
   "/admin/seat-rows": <Grid3x3 size={16} />,
   "/admin/sessions": <CalendarDays size={16} />,
+  "/admin/pricing": <CircleDollarSign size={16} />,
   "/admin/users": <Users size={16} />,
 };
 
