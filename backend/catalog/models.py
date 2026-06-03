@@ -169,14 +169,13 @@ class Room(models.Model):
             )
 
     def save(self, *args, **kwargs):
-        if self.experience_type:
-            try:
-                pricing = RoomTypePricing.objects.get(
-                    experience_type=self.experience_type
-                )
-                self.base_price = pricing.base_price
-            except RoomTypePricing.DoesNotExist:
-                pass
+        effective_type = self.experience_type or "standard"
+        try:
+            pricing = RoomTypePricing.objects.get(experience_type=effective_type)
+            self.base_price = pricing.base_price
+        except Exception:
+            if not self.base_price:
+                self.base_price = Decimal("25.00")
         self.full_clean()
         super().save(*args, **kwargs)
 

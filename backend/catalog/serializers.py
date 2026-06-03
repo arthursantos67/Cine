@@ -50,7 +50,7 @@ class RoomSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "base_price", "created_at", "updated_at"]
 
     def validate_capacity(self, value):
         if self.instance is None:
