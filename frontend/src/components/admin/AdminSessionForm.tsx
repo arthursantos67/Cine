@@ -50,7 +50,7 @@ function computeSessionPricePreview(
   startTime: string
 ): string | null {
   if (!roomBasePrice || !startTime) return null;
-  const day = new Date(startTime).getDay();
+  const day = new Date(startTime).getUTCDay();
   const multiplier = WEEKEND_DAYS.has(day) ? 1.24 : 1.0;
   return formatCurrency(Number(roomBasePrice) * multiplier);
 }
