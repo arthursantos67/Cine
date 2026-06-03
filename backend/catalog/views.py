@@ -457,6 +457,7 @@ class RoomTypePricingListView(ListAPIView):
     queryset = RoomTypePricing.objects.all()
     serializer_class = RoomTypePricingSerializer
     permission_classes = [IsAdminUserOrReadOnly]
+    pagination_class = None
 
 
 @extend_schema(tags=["Catalog"], summary="Update room type pricing")
