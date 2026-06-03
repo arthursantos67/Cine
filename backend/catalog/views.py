@@ -31,6 +31,7 @@ from catalog.serializers import (
     RoomTypePricingSerializer,
     SessionReadSerializer,
     SessionWriteSerializer,
+    compute_session_price,
 )
 
 MOVIE_LIST_CACHE_VERSION_KEY = "catalog:movies:version"
@@ -471,4 +472,11 @@ class RoomTypePricingDetailView(RetrieveUpdateAPIView):
         Room.objects.filter(experience_type=instance.experience_type).update(
             base_price=instance.base_price
         )
+        sessions = (
+            Session.objects.filter(room__experience_type=instance.experience_type)
+            .select_related("room")
+        )
+        for session in sessions.iterator():
+            new_price = compute_session_price(instance.base_price, session.start_time)
+            Session.objects.filter(pk=session.pk).update(base_price=new_price)
         invalidate_session_list_cache()
