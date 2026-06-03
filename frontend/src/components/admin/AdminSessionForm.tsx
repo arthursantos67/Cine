@@ -42,6 +42,14 @@ const SESSION_TYPE_OPTIONS = [
   { label: "Evento especial", value: "special_event" },
 ];
 
+const SUGGESTED_PRICE_BY_EXPERIENCE: Record<string, string> = {
+  "": "25.00",
+  standard: "25.00",
+  vip: "40.00",
+  premium: "45.00",
+  imax: "60.00",
+};
+
 export function extractSessionFieldErrors(error: unknown): FieldErrors {
   if (!(error instanceof ApiError) || error.code !== "VALIDATION_FAILED") {
     return {};
@@ -166,6 +174,13 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
   const startTimeId = useId();
   const endTimeId = useId();
   const basePriceId = useId();
+
+  useEffect(() => {
+    if (isEditing || !roomId || rooms.length === 0) return;
+    const selectedRoom = rooms.find((r) => r.id === roomId);
+    const experienceType = selectedRoom?.experience_type ?? "";
+    setBasePrice(SUGGESTED_PRICE_BY_EXPERIENCE[experienceType] ?? "25.00");
+  }, [roomId, rooms, isEditing]);
 
   useEffect(() => {
     Promise.all([adminApi.listMovies({ page: 1 }), adminApi.listRooms()])
@@ -357,7 +372,11 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
 
       <FormField
         error={fieldErrors.base_price}
-        hint="Valor inteiro do ingresso para esta sessão (em R$)."
+        hint={
+          isEditing
+            ? "Valor inteiro do ingresso para esta sessão (em R$)."
+            : "Sugerido com base no tipo da sala. Ajuste conforme necessário."
+        }
         label="Preço base (R$)"
         labelFor={basePriceId}
       >
