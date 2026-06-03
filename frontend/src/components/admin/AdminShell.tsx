@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import {
   Building2,
   CalendarDays,
@@ -78,7 +78,15 @@ export function AdminShell({ children }: AdminShellProps) {
   ));
 
   return (
-    <div className="flex min-h-[calc(100vh-var(--header-height))]">
+    <div
+      className="flex min-h-[calc(100vh-var(--header-height))]"
+      style={
+        {
+          "--color-surface": "rgb(255 255 255 / 6%)",
+          "--color-border": "rgb(255 255 255 / 12%)",
+        } as CSSProperties
+      }
+    >
       {/* Sidebar — desktop */}
       <nav
         aria-label="Navegação administrativa"
