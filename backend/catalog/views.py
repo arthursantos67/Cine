@@ -473,7 +473,10 @@ class RoomTypePricingDetailView(RetrieveUpdateAPIView):
             base_price=instance.base_price
         )
         sessions = (
-            Session.objects.filter(room__experience_type=instance.experience_type)
+            Session.objects.filter(
+                room__experience_type=instance.experience_type,
+                start_time__gt=timezone.now(),
+            )
             .select_related("room")
         )
         for session in sessions.iterator():
