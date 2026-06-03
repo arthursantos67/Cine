@@ -21,7 +21,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "created_at")
 
     def validate_email(self, value):
-        return User.objects.normalize_email(value)
+        return value.strip().lower()
 
     def validate_username(self, value):
         value = value.strip()
@@ -40,7 +40,7 @@ class UserLoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, trim_whitespace=False)
 
     def validate_email(self, value):
-        return User.objects.normalize_email(value)
+        return value.strip().lower()
 
     def validate(self, attrs):
         email = attrs["email"]
