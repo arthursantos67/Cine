@@ -628,15 +628,14 @@ class TestCatalogApi:
                 "room": str(room.id),
                 "start_time": "2026-03-23T18:00:00Z",
                 "end_time": "2026-03-23T20:55:00Z",
-                "base_price": "42.50",
             },
             format="json",
         )
 
         assert response.status_code == status.HTTP_201_CREATED
-        assert response.data["base_price"] == "42.50"
+        assert response.data["base_price"] == "25.00"
         assert Session.objects.count() == 1
-        assert Session.objects.get().base_price == Decimal("42.50")
+        assert Session.objects.get().base_price == Decimal("25.00")
 
     def test_create_session_accepts_format_metadata(self, api_client, movie, room):
         response = api_client.post(
@@ -664,7 +663,7 @@ class TestCatalogApi:
         assert session.projection_format == ProjectionFormat.THREE_D
         assert session.session_type == SessionType.PREVIEW
 
-    def test_create_session_requires_base_price(self, api_client, movie, room):
+    def test_create_session_base_price_is_computed_from_room(self, api_client, movie, room):
         response = api_client.post(
             "/api/v1/catalog/sessions/",
             {
@@ -672,39 +671,17 @@ class TestCatalogApi:
                 "room": str(room.id),
                 "start_time": "2026-03-23T18:00:00Z",
                 "end_time": "2026-03-23T20:55:00Z",
+                "base_price": "999.99",
             },
             format="json",
         )
 
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert response.data["error"]["code"] == "VALIDATION_FAILED"
-        assert "base_price" in response.data["error"]["details"]
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.data["base_price"] != "999.99"
+        assert response.data["base_price"] == str(room.base_price)
 
-    @pytest.mark.parametrize("base_price", ["0.00", "-1.00"])
-    def test_create_session_rejects_non_positive_base_price(
-        self,
-        api_client,
-        movie,
-        room,
-        base_price,
-    ):
-        response = api_client.post(
-            "/api/v1/catalog/sessions/",
-            {
-                "movie": str(movie.id),
-                "room": str(room.id),
-                "start_time": "2026-03-23T18:00:00Z",
-                "end_time": "2026-03-23T20:55:00Z",
-                "base_price": base_price,
-            },
-            format="json",
-        )
-
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert response.data["error"]["code"] == "VALIDATION_FAILED"
-        assert "base_price" in response.data["error"]["details"]
-
-    def test_update_session_accepts_base_price(self, api_client, session):
+    def test_update_session_base_price_is_read_only(self, api_client, session):
+        original_price = session.base_price
         response = api_client.patch(
             f"/api/v1/catalog/sessions/{session.id}/",
             {"base_price": "36.75"},
@@ -712,9 +689,9 @@ class TestCatalogApi:
         )
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.data["base_price"] == "36.75"
+        assert response.data["base_price"] != "36.75"
         session.refresh_from_db()
-        assert session.base_price == Decimal("36.75")
+        assert session.base_price == original_price
 
     def test_list_sessions_can_filter_by_movie(self, api_client, genre, room, session):
         other_movie = self.create_movie(title="Other Movie", genre=genre)

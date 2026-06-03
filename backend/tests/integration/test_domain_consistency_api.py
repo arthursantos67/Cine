@@ -159,7 +159,7 @@ def test_session_create_save_time_validation_errors_return_400(
     def raise_on_api_create(self, *args, **kwargs):
         if (
             not Session.objects.filter(pk=self.pk).exists()
-            and str(self.base_price) == "35.00"
+            and self.room.name == "Create Save-Time Session Room"
         ):
             raise DjangoValidationError({"base_price": "Save-time price error."})
 
@@ -174,7 +174,6 @@ def test_session_create_save_time_validation_errors_return_400(
             "room": str(room.id),
             "start_time": (timezone.now() + timedelta(days=1)).isoformat(),
             "end_time": (timezone.now() + timedelta(days=1, hours=2)).isoformat(),
-            "base_price": "35.00",
         },
         format="json",
     )
@@ -195,7 +194,7 @@ def test_session_update_save_time_validation_errors_return_400(
     original_save = Session.save
 
     def raise_on_api_update(self, *args, **kwargs):
-        if self.pk == session.pk and str(self.base_price) == "35.00":
+        if self.pk == session.pk:
             raise DjangoValidationError({"base_price": "Save-time price error."})
 
         return original_save(self, *args, **kwargs)
@@ -204,7 +203,7 @@ def test_session_update_save_time_validation_errors_return_400(
 
     response = admin_client.patch(
         f"/api/v1/catalog/sessions/{session.id}/",
-        {"base_price": "35.00"},
+        {"audio_format": "legendado"},
         format="json",
     )
 
@@ -228,7 +227,6 @@ def test_session_update_save_time_validation_errors_return_400(
             "end_time",
             lambda context: (timezone.now() + timedelta(days=2, hours=2)).isoformat(),
         ),
-        ("base_price", lambda context: "45.00"),
     ],
 )
 def test_reserved_session_sensitive_fields_cannot_be_mutated(
@@ -308,7 +306,7 @@ def test_purchased_ticket_history_is_protected_from_session_price_changes(
         format="json",
     )
 
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.status_code == status.HTTP_200_OK
     session.refresh_from_db()
     ticket.refresh_from_db()
     assert session.base_price == Decimal("30.00")
