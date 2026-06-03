@@ -1,6 +1,7 @@
 import uuid
 
 from django.core.cache import cache
+from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from drf_spectacular.utils import extend_schema
@@ -467,6 +468,7 @@ class RoomTypePricingDetailView(RetrieveUpdateAPIView):
     serializer_class = RoomTypePricingSerializer
     permission_classes = [IsAdminUserOrReadOnly]
 
+    @transaction.atomic
     def perform_update(self, serializer):
         instance = serializer.save()
         Room.objects.filter(experience_type=instance.experience_type).update(
