@@ -1,9 +1,21 @@
+from decimal import Decimal, ROUND_HALF_UP
+
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from rest_framework import serializers
 
 from catalog.models import CastMember, Genre, Movie, Room, Session
 from reservations.models import SessionSeat, SessionSeatStatus, Seat
+
+_WEEKEND_WEEKDAYS = {4, 5, 6}  # Friday, Saturday, Sunday
+
+
+def compute_session_price(room_base_price, start_time):
+    """Return session ticket price: room base_price with 24% surcharge on Fri/Sat/Sun."""
+    price = Decimal(str(room_base_price))
+    if start_time.weekday() in _WEEKEND_WEEKDAYS:
+        price = price * Decimal("1.24")
+    return price.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def raise_serializer_validation_error(exc):
@@ -34,6 +46,7 @@ class RoomSerializer(serializers.ModelSerializer):
             "experience_type",
             "display_name",
             "description",
+            "base_price",
             "created_at",
             "updated_at",
         ]
@@ -211,7 +224,7 @@ class SessionWriteSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "base_price", "created_at", "updated_at"]
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -226,13 +239,7 @@ class SessionWriteSerializer(serializers.ModelSerializer):
             )
 
         if self.instance is not None:
-            protected_session_fields = [
-                "movie",
-                "room",
-                "start_time",
-                "end_time",
-                "base_price",
-            ]
+            protected_session_fields = ["movie", "room", "start_time", "end_time"]
             changed_protected_fields = [
                 field
                 for field in protected_session_fields
@@ -252,7 +259,7 @@ class SessionWriteSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError(
                         {
                             field: (
-                                "Sessions with reserved or purchased seats cannot change movie, room, time, or price."
+                                "Sessions with reserved or purchased seats cannot change movie, room, or time."
                             )
                             for field in changed_protected_fields
                         }
@@ -262,6 +269,12 @@ class SessionWriteSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
+        room = validated_data["room"]
+        start_time = validated_data["start_time"]
+        validated_data["base_price"] = compute_session_price(
+            room.base_price, start_time
+        )
+
         session = Session(**validated_data)
 
         try:
@@ -278,6 +291,11 @@ class SessionWriteSerializer(serializers.ModelSerializer):
         return session
 
     def update(self, instance, validated_data):
+        if "start_time" in validated_data:
+            validated_data["base_price"] = compute_session_price(
+                instance.room.base_price, validated_data["start_time"]
+            )
+
         for field, value in validated_data.items():
             setattr(instance, field, value)
 

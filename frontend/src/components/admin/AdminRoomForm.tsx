@@ -126,6 +126,7 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
   const [experienceType, setExperienceType] = useState<
     CatalogRoomExperienceType
   >((room?.experience_type as CatalogRoomExperienceType) ?? "");
+  const [basePrice, setBasePrice] = useState(room?.base_price ?? "");
   const [displayName, setDisplayName] = useState(room?.display_name ?? "");
   const [description, setDescription] = useState(room?.description ?? "");
 
@@ -135,6 +136,7 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
 
   const nameId = useId();
   const capacityId = useId();
+  const basePriceId = useId();
   const displayNameId = useId();
   const descriptionId = useId();
 
@@ -145,6 +147,7 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
     setIsSubmitting(true);
 
     const payload: AdminRoomWritePayload = {
+      base_price: basePrice,
       capacity: Number(capacity),
       description: description || undefined,
       display_name: displayName || undefined,
@@ -238,6 +241,26 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
           value={experienceType}
         />
       </div>
+
+      <FormField
+        error={fieldErrors.base_price}
+        hint="Preço base do ingresso para esta sala (em R$). Sessões em sextas, sábados e domingos recebem acréscimo automático de 24%."
+        label="Preço base (R$)"
+        labelFor={basePriceId}
+      >
+        <TextInput
+          disabled={isSubmitting}
+          error={fieldErrors.base_price}
+          id={basePriceId}
+          min="0.01"
+          onChange={(e) => setBasePrice(e.target.value)}
+          placeholder="Ex.: 45.00"
+          required
+          step="0.01"
+          type="number"
+          value={basePrice}
+        />
+      </FormField>
 
       <FormField
         error={fieldErrors.display_name}

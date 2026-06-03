@@ -41,6 +41,7 @@ export type CatalogMovieDetail = CatalogMovie & {
 };
 
 export type CatalogRoomSummary = {
+  base_price?: string;
   capacity: number;
   description?: string | null;
   display_name?: string | null;

@@ -45,6 +45,7 @@ export type AdminGenreWritePayload = {
 };
 
 export type AdminRoomWritePayload = {
+  base_price: string;
   capacity: number;
   description?: string;
   display_name?: string;
@@ -65,7 +66,6 @@ export type AdminSeatWritePayload = {
 
 export type AdminSessionWritePayload = {
   audio_format?: CatalogAudioFormat;
-  base_price: string;
   end_time: string;
   movie: string;
   projection_format?: CatalogProjectionFormat;

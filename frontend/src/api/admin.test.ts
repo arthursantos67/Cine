@@ -464,7 +464,6 @@ test("adminApi.createSession posts the session payload", async () => {
       const body = JSON.parse(init?.body as string);
       assert.equal(body.movie, "movie-1");
       assert.equal(body.room, "room-1");
-      assert.equal(body.base_price, "54.00");
       assert.equal(body.audio_format, "legendado");
       assert.equal(body.projection_format, "3d");
       return Response.json(session);
@@ -472,7 +471,6 @@ test("adminApi.createSession posts the session payload", async () => {
 
     const created = await adminApi.createSession({
       audio_format: "legendado",
-      base_price: "54.00",
       end_time: "2026-06-10T22:00:00Z",
       movie: "movie-1",
       projection_format: "3d",
@@ -495,7 +493,6 @@ test("adminApi.createSession rejects unexpected response shape", async () => {
 
     await assert.rejects(
       adminApi.createSession({
-        base_price: "54.00",
         end_time: "2026-06-10T22:00:00Z",
         movie: "movie-1",
         room: "room-1",

@@ -108,6 +108,11 @@ class Room(models.Model):
     )
     display_name = models.CharField(max_length=120, blank=True, default="")
     description = models.TextField(blank=True, default="")
+    base_price = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
