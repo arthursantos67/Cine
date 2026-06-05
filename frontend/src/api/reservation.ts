@@ -61,7 +61,7 @@ async function reserveSeats(sessionId: string, seatIds: string[]) {
     throw new Error("Unexpected temporary reservation response.");
   }
 
-  return response satisfies TemporaryReservationResponse;
+  return normalizeTemporaryReservationResponse(response) satisfies TemporaryReservationResponse;
 }
 
 async function releaseReservations(sessionId: string, sessionSeatIds: string[]) {
@@ -80,7 +80,7 @@ async function releaseReservations(sessionId: string, sessionSeatIds: string[]) 
     throw new Error("Unexpected temporary reservation release response.");
   }
 
-  return response satisfies TemporaryReservationReleaseResponse;
+  return normalizeTemporaryReservationReleaseResponse(response) satisfies TemporaryReservationReleaseResponse;
 }
 
 function buildSessionSeatMapPath(sessionId: string) {
@@ -179,6 +179,30 @@ function normalizeSessionSeatMapItem(
   return {
     ...seat,
     status: normalizeSessionSeatStatus(seat.status),
+  };
+}
+
+function normalizeTemporaryReservationResponse(
+  response: TemporaryReservationResponse
+): TemporaryReservationResponse {
+  return {
+    ...response,
+    seats: response.seats.map((seat) => ({
+      ...seat,
+      status: normalizeSessionSeatStatus(seat.status),
+    })),
+  };
+}
+
+function normalizeTemporaryReservationReleaseResponse(
+  response: TemporaryReservationReleaseResponse
+): TemporaryReservationReleaseResponse {
+  return {
+    ...response,
+    seats: response.seats.map((seat) => ({
+      ...seat,
+      status: normalizeSessionSeatStatus(seat.status),
+    })),
   };
 }
 
