@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import DateTimeRangeField, RangeOperators
 from django.apps import apps
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import F, Func
@@ -173,7 +173,7 @@ class Room(models.Model):
         try:
             pricing = RoomTypePricing.objects.get(experience_type=effective_type)
             self.base_price = pricing.base_price
-        except Exception:
+        except ObjectDoesNotExist:
             if not self.base_price:
                 self.base_price = Decimal("25.00")
         self.full_clean()
