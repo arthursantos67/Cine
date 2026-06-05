@@ -13,6 +13,7 @@ export { AdminShell } from "./AdminShell";
 export { AdminTable } from "./AdminTable";
 export type { AdminTableColumn } from "./AdminTable";
 export { AdminToolbar } from "./AdminToolbar";
+export { AdminUserList } from "./AdminUserList";
 export { AdminEditSessionLoader } from "./AdminEditSessionLoader";
 export { AdminSessionForm, extractSessionFieldErrors } from "./AdminSessionForm";
 export { AdminSessionList } from "./AdminSessionList";

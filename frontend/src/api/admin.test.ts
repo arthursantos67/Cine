@@ -552,3 +552,207 @@ test("adminApi.deleteSession sends a DELETE request", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+// ─── User management fixtures ─────────────────────────────────────────────────
+
+const adminUser = {
+  id: "user-1",
+  email: "admin@cineprime.local",
+  username: "admin",
+  is_staff: true,
+  created_at: "2026-01-01T00:00:00Z",
+};
+
+const regularUser = {
+  id: "user-2",
+  email: "user@cineprime.local",
+  username: "regular",
+  is_staff: false,
+  created_at: "2026-01-02T00:00:00Z",
+};
+
+const paginatedUsers = {
+  count: 2,
+  next: null,
+  previous: null,
+  results: [adminUser, regularUser],
+};
+
+const permissionLog = {
+  actor: "admin@cineprime.local",
+  target: "user@cineprime.local",
+  action: "granted",
+  created_at: "2026-06-01T10:00:00Z",
+};
+
+// ─── adminApi.listUsers ───────────────────────────────────────────────────────
+
+test("adminApi.listUsers fetches the paginated user list", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async (input, init) => {
+      assert.equal(input, "http://localhost:8000/api/v1/users/");
+      assert.equal(init?.method, "GET");
+      return Response.json(paginatedUsers);
+    };
+
+    const response = await adminApi.listUsers();
+
+    assert.equal(response.count, 2);
+    assert.equal(response.results[0].email, "admin@cineprime.local");
+    assert.equal(response.results[1].email, "user@cineprime.local");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("adminApi.listUsers builds search param", async () => {
+  const originalFetch = globalThis.fetch;
+  const requestedUrls: string[] = [];
+
+  try {
+    globalThis.fetch = async (input) => {
+      requestedUrls.push(String(input));
+      return Response.json({ count: 0, next: null, previous: null, results: [] });
+    };
+
+    await adminApi.listUsers({ search: "admin" });
+    await adminApi.listUsers({ page: 2 });
+    await adminApi.listUsers({ search: "user", page: 3 });
+
+    assert.deepEqual(requestedUrls, [
+      "http://localhost:8000/api/v1/users/?search=admin",
+      "http://localhost:8000/api/v1/users/?page=2",
+      "http://localhost:8000/api/v1/users/?search=user&page=3",
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("adminApi.listUsers rejects non-paginated response", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async () => Response.json([]);
+
+    await assert.rejects(
+      adminApi.listUsers(),
+      /Unexpected admin user list response/
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+// ─── adminApi.grantAdmin ──────────────────────────────────────────────────────
+
+test("adminApi.grantAdmin posts to the admin endpoint", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async (input, init) => {
+      assert.equal(input, "http://localhost:8000/api/v1/users/user-2/admin/");
+      assert.equal(init?.method, "POST");
+      return Response.json({ ...regularUser, is_staff: true });
+    };
+
+    const result = await adminApi.grantAdmin("user-2");
+
+    assert.equal(result.is_staff, true);
+    assert.equal(result.id, "user-2");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("adminApi.grantAdmin rejects unexpected response shape", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async () => Response.json({ id: "user-2" });
+
+    await assert.rejects(
+      adminApi.grantAdmin("user-2"),
+      /Unexpected admin grant response/
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+// ─── adminApi.revokeAdmin ─────────────────────────────────────────────────────
+
+test("adminApi.revokeAdmin sends DELETE to the admin endpoint", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async (input, init) => {
+      assert.equal(input, "http://localhost:8000/api/v1/users/user-1/admin/");
+      assert.equal(init?.method, "DELETE");
+      return Response.json({ ...adminUser, is_staff: false });
+    };
+
+    const result = await adminApi.revokeAdmin("user-1");
+
+    assert.equal(result.is_staff, false);
+    assert.equal(result.id, "user-1");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+// ─── adminApi.getUserPermissionLogs ──────────────────────────────────────────
+
+test("adminApi.getUserPermissionLogs fetches log entries", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async (input, init) => {
+      assert.equal(
+        input,
+        "http://localhost:8000/api/v1/users/user-2/admin/logs/"
+      );
+      assert.equal(init?.method, "GET");
+      return Response.json([permissionLog]);
+    };
+
+    const logs = await adminApi.getUserPermissionLogs("user-2");
+
+    assert.equal(logs.length, 1);
+    assert.equal(logs[0].action, "granted");
+    assert.equal(logs[0].actor, "admin@cineprime.local");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("adminApi.getUserPermissionLogs returns empty array when no logs", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async () => Response.json([]);
+
+    const logs = await adminApi.getUserPermissionLogs("user-2");
+
+    assert.equal(logs.length, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("adminApi.getUserPermissionLogs rejects unexpected response shape", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async () => Response.json({ results: [] });
+
+    await assert.rejects(
+      adminApi.getUserPermissionLogs("user-2"),
+      /Unexpected admin permission logs response/
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

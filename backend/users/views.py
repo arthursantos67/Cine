@@ -20,7 +20,9 @@ from cineprime_api.throttling import LoginRateThrottle
 from reservations.models import Ticket
 from users.models import AdminPermissionLog, User
 from users.serializers import (
+    AdminPermissionLogSerializer,
     UserLoginSerializer,
+    UserListSerializer,
     UserRegistrationSerializer,
     UserTicketSerializer,
 )
@@ -274,3 +276,59 @@ class AdminGrantView(APIView):
             "username": user.username,
             "is_staff": user.is_staff,
         }
+
+
+@extend_schema_view(
+    get=extend_schema(
+        tags=["Admin"],
+        summary="List users",
+        description="Return a paginated list of all users. Supports search by email or username.",
+        parameters=[
+            OpenApiParameter(
+                name="search",
+                required=False,
+                location=OpenApiParameter.QUERY,
+                description="Filter by email or username (case-insensitive partial match).",
+            )
+        ],
+    )
+)
+class UserListView(ListAPIView):
+    permission_classes = [IsAdminUser]
+    serializer_class = UserListSerializer
+
+    def get_queryset(self):
+        qs = User.objects.all()
+        search = self.request.query_params.get("search", "").strip()
+        if search:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(email__icontains=search) | Q(username__icontains=search)
+            )
+        return qs
+
+
+@extend_schema_view(
+    get=extend_schema(
+        tags=["Admin"],
+        summary="List permission audit log for a user",
+        description="Return the admin permission change history for a specific user.",
+        responses={
+            200: AdminPermissionLogSerializer(many=True),
+            403: OpenApiResponse(description="Admin access required."),
+            404: OpenApiResponse(description="User not found."),
+        },
+    )
+)
+class UserPermissionLogsView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, user_id, *args, **kwargs):
+        try:
+            user = User.objects.get(pk=user_id)
+        except (User.DoesNotExist, ValueError):
+            raise NotFound("User not found.")
+
+        logs = AdminPermissionLog.objects.filter(target=user).select_related("actor")
+        serializer = AdminPermissionLogSerializer(logs, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
