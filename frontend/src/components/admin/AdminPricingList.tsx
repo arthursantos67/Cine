@@ -96,7 +96,7 @@ export function AdminPricingList() {
           {pricing.map((entry) => {
             const isEditing = edit?.id === entry.id;
             const label = EXPERIENCE_LABELS[entry.experience_type] ?? entry.experience_type;
-            const weekendPrice = Number(entry.base_price) * 1.24;
+            const weekendPrice = Math.round(Number(entry.base_price) * 1.24 * 100) / 100;
 
             return (
               <div
