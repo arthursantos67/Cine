@@ -1,6 +1,7 @@
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import migrations, models
+from django.utils import timezone
 import django.core.validators
 
 SEED_PRICES = {
@@ -44,7 +45,7 @@ def sync_rooms_from_type_pricing(apps, schema_editor):
 def recalculate_session_prices(apps, schema_editor):
     Session = apps.get_model("catalog", "Session")
 
-    for session in Session.objects.select_related("room").iterator():
+    for session in Session.objects.filter(start_time__gte=timezone.now()).select_related("room").iterator():
         session.base_price = _compute_session_price(
             session.room.base_price, session.start_time
         )
