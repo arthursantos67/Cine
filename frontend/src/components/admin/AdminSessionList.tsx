@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useState } from "react";
 
 import { adminApi } from "@/api/admin";
 import type { AdminRoom, AdminSession, CatalogMovieDetail } from "@/types/catalog";
+import { formatCurrency } from "@/utils/formatters";
 import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { AdminConfirmDialog, AdminTable, AdminToolbar } from "@/components/admin";
@@ -162,10 +163,7 @@ export function AdminSessionList() {
         const s = row as unknown as AdminSession;
         return (
           <span className="text-white/80">
-            {Number(s.base_price).toLocaleString("pt-BR", {
-              currency: "BRL",
-              style: "currency",
-            })}
+            {formatCurrency(Number(s.base_price))}
           </span>
         );
       },
@@ -257,7 +255,7 @@ export function AdminSessionList() {
             Data
           </label>
           <input
-            className="min-h-9 rounded-control border border-border bg-surface px-3 py-2 text-sm text-white outline-none transition focus:border-brand focus:shadow-focus"
+            className="min-h-9 rounded-control border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none transition focus:border-brand focus:shadow-focus"
             id={dateFilterId}
             onChange={(e) => setDateFilter(e.target.value)}
             type="date"
@@ -273,7 +271,7 @@ export function AdminSessionList() {
             Filme
           </label>
           <select
-            className="min-h-9 rounded-control border border-border bg-surface px-3 py-2 text-sm text-white outline-none transition focus:border-brand focus:shadow-focus"
+            className="min-h-9 rounded-control border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none transition focus:border-brand focus:shadow-focus"
             id={movieFilterId}
             onChange={(e) => setMovieFilter(e.target.value)}
             value={movieFilter}
@@ -295,7 +293,7 @@ export function AdminSessionList() {
             Sala
           </label>
           <select
-            className="min-h-9 rounded-control border border-border bg-surface px-3 py-2 text-sm text-white outline-none transition focus:border-brand focus:shadow-focus"
+            className="min-h-9 rounded-control border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none transition focus:border-brand focus:shadow-focus"
             id={roomFilterId}
             onChange={(e) => setRoomFilter(e.target.value)}
             value={roomFilter}

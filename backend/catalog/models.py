@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import DateTimeRangeField, RangeOperators
 from django.apps import apps
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import F, Func
@@ -96,6 +96,27 @@ class Movie(models.Model):
         return self.title
 
 
+class RoomTypePricing(models.Model):
+    experience_type = models.CharField(
+        max_length=30,
+        choices=RoomExperienceType.choices,
+        unique=True,
+    )
+    base_price = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "room_type_pricing"
+        ordering = ["experience_type"]
+
+    def __str__(self):
+        return f"{self.experience_type}: {self.base_price}"
+
+
 class Room(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100, unique=True)
@@ -108,6 +129,11 @@ class Room(models.Model):
     )
     display_name = models.CharField(max_length=120, blank=True, default="")
     description = models.TextField(blank=True, default="")
+    base_price = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -143,6 +169,13 @@ class Room(models.Model):
             )
 
     def save(self, *args, **kwargs):
+        effective_type = self.experience_type or "standard"
+        try:
+            pricing = RoomTypePricing.objects.get(experience_type=effective_type)
+            self.base_price = pricing.base_price
+        except ObjectDoesNotExist:
+            if not self.base_price:
+                self.base_price = Decimal("25.00")
         self.full_clean()
         super().save(*args, **kwargs)
 

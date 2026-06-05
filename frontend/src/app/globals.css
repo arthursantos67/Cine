@@ -92,25 +92,7 @@
      This lets legacy CSS and Tailwind utilities that reference var(--color-*)
      automatically get the correct contrast on white backgrounds without
      needing per-component overrides. */
-  .panel,
-  .movie-detail__synopsis,
-  .movie-detail__sessions,
-  .movie-detail__metadata > div,
-  .seat-map-section,
-  .seat-map-scroll,
-  .checkout-steps,
-  .order-summary,
-  .ticket-types__panel,
-  .ticket-types__footer,
-  .checkout-review__panel,
-  .confirmation-tickets,
-  .my-tickets__toolbar,
-  .ticket-card,
-  .my-ticket,
-  .state-message-empty,
-  .state-message-loading,
-  .state-message-success,
-  .state-message-error {
+  .panel {
     --color-text: #17202a;
     --color-muted: #566273;
     --color-surface-muted: #eef2f7;

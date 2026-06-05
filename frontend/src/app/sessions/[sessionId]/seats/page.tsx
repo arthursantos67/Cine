@@ -15,7 +15,6 @@ export default async function SeatSelectionPage({
 
   return (
     <PageSection
-      description="Consulte a disposição da sala, veja os estados dos assentos e navegue pelo mapa com teclado ou toque."
       eyebrow="Sessão"
       title="Mapa de assentos"
     >

@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import {
   Building2,
   CalendarDays,
+  CircleDollarSign,
   Film,
   Grid3x3,
   LayoutDashboard,
@@ -28,6 +29,7 @@ const navIcons: Record<string, ReactNode> = {
   "/admin/rooms": <Building2 size={16} />,
   "/admin/seat-rows": <Grid3x3 size={16} />,
   "/admin/sessions": <CalendarDays size={16} />,
+  "/admin/pricing": <CircleDollarSign size={16} />,
   "/admin/users": <Users size={16} />,
 };
 
@@ -76,7 +78,15 @@ export function AdminShell({ children }: AdminShellProps) {
   ));
 
   return (
-    <div className="flex min-h-[calc(100vh-var(--header-height))]">
+    <div
+      className="flex min-h-[calc(100vh-var(--header-height))]"
+      style={
+        {
+          "--color-surface": "rgb(255 255 255 / 6%)",
+          "--color-border": "rgb(255 255 255 / 12%)",
+        } as CSSProperties
+      }
+    >
       {/* Sidebar — desktop */}
       <nav
         aria-label="Navegação administrativa"

@@ -70,13 +70,11 @@ test("extractSessionFieldErrors extracts field errors from VALIDATION_FAILED", (
   const error = new ApiError("Validation failed", 400, {
     code: "VALIDATION_FAILED",
     details: {
-      base_price: ["Este campo é obrigatório."],
       end_time: ["O horário de fim deve ser após o início."],
       movie: ["Selecione um filme válido."],
     },
   });
   const result = extractSessionFieldErrors(error);
-  assert.equal(result.base_price, "Este campo é obrigatório.");
   assert.equal(result.end_time, "O horário de fim deve ser após o início.");
   assert.equal(result.movie, "Selecione um filme válido.");
 });
@@ -151,12 +149,10 @@ test("adminApi.createSession includes all metadata fields", async () => {
       assert.equal(body.audio_format, "legendado");
       assert.equal(body.projection_format, "3d");
       assert.equal(body.session_type, "preview");
-      assert.equal(body.base_price, "54.00");
       return Response.json(session);
     };
     await adminApi.createSession({
       audio_format: "legendado",
-      base_price: "54.00",
       end_time: "2026-06-10T22:00:00Z",
       movie: "movie-1",
       projection_format: "3d",

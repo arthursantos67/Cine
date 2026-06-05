@@ -158,7 +158,11 @@ export function SeatMap({ sessionId }: SeatMapProps) {
     return (
       <StateMessage
         action={
-          <button className="button button-ghost" onClick={handleRetry} type="button">
+          <button
+            className="inline-flex min-h-10 items-center justify-center rounded-md border border-error/45 bg-transparent px-3.5 text-sm font-extrabold leading-none text-text transition hover:bg-error/15"
+            onClick={handleRetry}
+            type="button"
+          >
             Tentar novamente
           </button>
         }
@@ -389,10 +393,6 @@ export function SeatMapLayout({
     <section aria-labelledby="mapa-assentos" className="seat-map-section">
       <div className="seat-map-section__header">
         <h2 id="mapa-assentos">Mapa de assentos</h2>
-        <p>
-          Visitantes podem consultar a sala. Para reservar ou liberar assentos,
-          entre na sua conta.
-        </p>
         <p className="sr-only" id="mapa-assentos-instrucoes">
           Em telas estreitas, role horizontalmente para acessar todos os
           assentos. Use Tab para chegar aos assentos e Enter ou Espaço para

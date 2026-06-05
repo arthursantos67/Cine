@@ -1,6 +1,7 @@
 import uuid
 
 from django.core.cache import cache
+from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from drf_spectacular.utils import extend_schema
@@ -9,6 +10,8 @@ from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIV
 from rest_framework.response import Response
 
 from cineprime_api.permissions import IsAdminUserOrReadOnly
+from rest_framework.generics import ListAPIView, RetrieveUpdateAPIView
+
 from catalog.models import (
     AudioFormat,
     Genre,
@@ -17,6 +20,7 @@ from catalog.models import (
     ProjectionFormat,
     Room,
     RoomExperienceType,
+    RoomTypePricing,
     Session,
     SessionType,
 )
@@ -25,8 +29,10 @@ from catalog.serializers import (
     MovieReadSerializer,
     MovieWriteSerializer,
     RoomSerializer,
+    RoomTypePricingSerializer,
     SessionReadSerializer,
     SessionWriteSerializer,
+    compute_session_price,
 )
 
 MOVIE_LIST_CACHE_VERSION_KEY = "catalog:movies:version"
@@ -446,3 +452,36 @@ class SessionDetailView(RetrieveUpdateDestroyAPIView):
         response = super().destroy(request, *args, **kwargs)
         invalidate_session_list_cache()
         return response
+
+
+@extend_schema(tags=["Catalog"], summary="List room type pricing")
+class RoomTypePricingListView(ListAPIView):
+    queryset = RoomTypePricing.objects.all()
+    serializer_class = RoomTypePricingSerializer
+    permission_classes = [IsAdminUserOrReadOnly]
+    pagination_class = None
+
+
+@extend_schema(tags=["Catalog"], summary="Update room type pricing")
+class RoomTypePricingDetailView(RetrieveUpdateAPIView):
+    queryset = RoomTypePricing.objects.all()
+    serializer_class = RoomTypePricingSerializer
+    permission_classes = [IsAdminUserOrReadOnly]
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        Room.objects.filter(experience_type=instance.experience_type).update(
+            base_price=instance.base_price
+        )
+        sessions = (
+            Session.objects.filter(
+                room__experience_type=instance.experience_type,
+                start_time__gt=timezone.now(),
+            )
+            .select_related("room")
+        )
+        for session in sessions.iterator():
+            new_price = compute_session_price(instance.base_price, session.start_time)
+            Session.objects.filter(pk=session.pk).update(base_price=new_price)
+        invalidate_session_list_cache()

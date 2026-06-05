@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { StateMessage } from "@/components/ui/StateMessage";
+import { cn } from "@/components/ui/classNames";
 import type { TicketFilterType, UserTicket } from "@/types/ticket";
 
 import { TicketCard as SharedTicketCard } from "./TicketCard";
@@ -33,23 +34,36 @@ export function MyTicketsContent({
   tickets,
 }: MyTicketsContentProps) {
   return (
-    <section aria-labelledby="meus-ingressos" className="my-tickets">
-      <div className="my-tickets__toolbar">
+    <section aria-labelledby="meus-ingressos" className="my-tickets grid gap-4">
+      <div className="my-tickets__toolbar grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 rounded-card border border-white/10 bg-[linear-gradient(180deg,rgb(255_255_255_/_5%),rgb(255_255_255_/_2%))] p-5 text-text shadow-[0_18px_54px_rgb(0_0_0_/_18%)] max-lg:grid-cols-1">
         <div>
-          <h2 id="meus-ingressos">Ingressos da sua conta</h2>
-          <p>{filterDescriptionLabels[activeFilter ?? "all"]}</p>
+          <h2
+            className="m-0 text-[21px] leading-tight text-white"
+            id="meus-ingressos"
+          >
+            Ingressos da sua conta
+          </h2>
+          <p className="m-0 mt-1.5 leading-6 text-text/65">
+            {filterDescriptionLabels[activeFilter ?? "all"]}
+          </p>
         </div>
 
-        <nav aria-label="Filtros de ingressos" className="my-tickets__filters">
+        <nav
+          aria-label="Filtros de ingressos"
+          className="my-tickets__filters flex flex-wrap items-center justify-end gap-2 max-lg:justify-start"
+        >
           {filterOptions.map((option) => {
             const isActive = option.value === activeFilter;
 
             return (
               <Link
                 aria-current={isActive ? "page" : undefined}
-                className={`button ${
-                  isActive ? "button-secondary" : "button-ghost"
-                }`}
+                className={cn(
+                  "inline-flex min-h-10 items-center justify-center rounded-md border px-3.5 text-sm font-extrabold leading-none transition",
+                  isActive
+                    ? "border-accent bg-cinema-gold-soft text-[#3a2b00] hover:bg-accent"
+                    : "border-white/15 bg-transparent text-text hover:bg-white/10"
+                )}
                 href={option.href}
                 key={option.label}
               >
@@ -70,7 +84,11 @@ export function MyTicketsContent({
         <StateMessage
           action={
             onRetry ? (
-              <button className="button button-primary" onClick={onRetry} type="button">
+              <button
+                className="inline-flex min-h-10 items-center justify-center rounded-md border border-brand bg-brand px-3.5 text-sm font-extrabold leading-none text-white transition hover:bg-brand-strong"
+                onClick={onRetry}
+                type="button"
+              >
                 Tentar novamente
               </button>
             ) : null
@@ -89,7 +107,7 @@ export function MyTicketsContent({
       ) : null}
 
       {status === "success" && tickets.length > 0 ? (
-        <div className="my-tickets__list" role="list">
+        <div className="my-tickets__list grid gap-3" role="list">
           {tickets.map((ticket) => (
             <div key={ticket.ticket_id} role="listitem">
               <TicketCard ticket={ticket} />

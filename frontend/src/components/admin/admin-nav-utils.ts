@@ -9,6 +9,7 @@ export const ADMIN_NAV_LINKS: AdminNavLink[] = [
   { href: "/admin/genres", label: "Gêneros" },
   { href: "/admin/rooms", label: "Salas" },
   { href: "/admin/sessions", label: "Sessões" },
+  { href: "/admin/pricing", label: "Preços" },
   { href: "/admin/users", label: "Administradores" },
 ];
 

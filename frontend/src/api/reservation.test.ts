@@ -71,6 +71,30 @@ test("reservationApi fetches a public session seat map", async () => {
   }
 });
 
+test("reservationApi normalizes legacy lowercase seat statuses", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async () =>
+      Response.json([
+        {
+          is_accessible: false,
+          number: 7,
+          row: "B",
+          seat_id: "seat-1",
+          session_seat_id: "session-seat-1",
+          status: "available",
+        },
+      ]);
+
+    const response = await reservationApi.getSeatMap("session-1");
+
+    assert.equal(response[0].status, "AVAILABLE");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("reservationApi submits seat_ids to the authenticated temporary reservation endpoint", async () => {
   const originalFetch = globalThis.fetch;
 

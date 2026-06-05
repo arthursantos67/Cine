@@ -62,7 +62,10 @@ export function PurchaseFlowGuard({ children }: PurchaseFlowGuardProps) {
   return (
     <StateMessage
       action={
-        <Link className="button button-primary" href={recoveryPath}>
+        <Link
+          className="inline-flex min-h-10 items-center justify-center rounded-md border border-brand bg-brand px-3.5 text-sm font-extrabold leading-none text-white transition hover:bg-brand-strong"
+          href={recoveryPath}
+        >
           {reservation.expiredSessionId
             ? "Escolher assentos"
             : "Voltar ao catálogo"}

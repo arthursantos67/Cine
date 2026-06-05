@@ -13,7 +13,7 @@ class UserManager(BaseUserManager):
         if not username:
             raise ValueError("The username field is required.")
 
-        email = self.normalize_email(email)
+        email = email.strip().lower()
         user = self.model(email=email, username=username, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
@@ -60,7 +60,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         ordering = ["-created_at"]
 
     def save(self, *args, **kwargs):
-        self.email = self.__class__.objects.normalize_email(self.email)
+        self.email = self.email.strip().lower()
         super().save(*args, **kwargs)
 
     def __str__(self):

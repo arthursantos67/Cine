@@ -5,6 +5,7 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { adminApi, type AdminSessionWritePayload } from "@/api/admin";
 import { ApiError } from "@/api/client";
+import { formatCurrency } from "@/utils/formatters";
 import type {
   AdminRoom,
   AdminSession,
@@ -41,6 +42,18 @@ const SESSION_TYPE_OPTIONS = [
   { label: "Pré-estreia", value: "preview" },
   { label: "Evento especial", value: "special_event" },
 ];
+
+const WEEKEND_DAYS = new Set([0, 5, 6]); // Sun, Fri, Sat
+
+function computeSessionPricePreview(
+  roomBasePrice: string,
+  startTime: string
+): string | null {
+  if (!roomBasePrice || !startTime) return null;
+  const day = new Date(startTime).getUTCDay();
+  const multiplier = WEEKEND_DAYS.has(day) ? 1.24 : 1.0;
+  return formatCurrency(Number(roomBasePrice) * multiplier);
+}
 
 export function extractSessionFieldErrors(error: unknown): FieldErrors {
   if (!(error instanceof ApiError) || error.code !== "VALIDATION_FAILED") {
@@ -140,7 +153,6 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
   const [endTime, setEndTime] = useState(
     session ? toLocalDateTimeInput(session.end_time) : ""
   );
-  const [basePrice, setBasePrice] = useState(session?.base_price ?? "");
   const [audioFormat, setAudioFormat] = useState<CatalogAudioFormat>(
     (session?.audio_format as CatalogAudioFormat) ?? ""
   );
@@ -165,7 +177,6 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
   const roomSelectId = useId();
   const startTimeId = useId();
   const endTimeId = useId();
-  const basePriceId = useId();
 
   useEffect(() => {
     Promise.all([adminApi.listMovies({ page: 1 }), adminApi.listRooms()])
@@ -188,7 +199,6 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
 
     const payload: AdminSessionWritePayload = {
       audio_format: audioFormat || undefined,
-      base_price: basePrice,
       end_time: toISOString(endTime),
       movie: movieId,
       projection_format: projectionFormat || undefined,
@@ -355,25 +365,33 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
         </FormField>
       </div>
 
-      <FormField
-        error={fieldErrors.base_price}
-        hint="Valor inteiro do ingresso para esta sessão (em R$)."
-        label="Preço base (R$)"
-        labelFor={basePriceId}
-      >
-        <TextInput
-          disabled={formDisabled || locked}
-          error={fieldErrors.base_price}
-          id={basePriceId}
-          min="0.01"
-          onChange={(e) => setBasePrice(e.target.value)}
-          placeholder="Ex.: 54.00"
-          required
-          step="0.01"
-          type="number"
-          value={basePrice}
-        />
-      </FormField>
+      {(() => {
+        const selectedRoom = rooms.find((r) => r.id === roomId);
+        const preview =
+          selectedRoom?.base_price
+            ? computeSessionPricePreview(selectedRoom.base_price, startTime)
+            : null;
+        return (
+          <div className="grid gap-1.5">
+            <span className="text-sm font-extrabold text-white">
+              Preço do ingresso
+            </span>
+            <p className="text-xs text-white/40">
+              Calculado automaticamente a partir do preço base da sala com
+              acréscimo de 24% em sextas, sábados e domingos.
+            </p>
+            {preview ? (
+              <p className="inline-flex w-fit items-center rounded-md border border-brand/50 bg-brand/20 px-3 py-1.5 text-base font-extrabold text-white">
+                {preview}
+              </p>
+            ) : (
+              <p className="text-sm text-white/40">
+                Selecione a sala e o horário para ver o valor calculado.
+              </p>
+            )}
+          </div>
+        );
+      })()}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Select

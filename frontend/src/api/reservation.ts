@@ -44,7 +44,7 @@ async function getSeatMap(sessionId: string) {
     throw new Error("Unexpected reservation seat map response.");
   }
 
-  return response satisfies SessionSeatMapResponse;
+  return response.map(normalizeSessionSeatMapItem) satisfies SessionSeatMapResponse;
 }
 
 async function reserveSeats(sessionId: string, seatIds: string[]) {
@@ -61,7 +61,7 @@ async function reserveSeats(sessionId: string, seatIds: string[]) {
     throw new Error("Unexpected temporary reservation response.");
   }
 
-  return response satisfies TemporaryReservationResponse;
+  return normalizeTemporaryReservationResponse(response) satisfies TemporaryReservationResponse;
 }
 
 async function releaseReservations(sessionId: string, sessionSeatIds: string[]) {
@@ -80,7 +80,7 @@ async function releaseReservations(sessionId: string, sessionSeatIds: string[]) 
     throw new Error("Unexpected temporary reservation release response.");
   }
 
-  return response satisfies TemporaryReservationReleaseResponse;
+  return normalizeTemporaryReservationReleaseResponse(response) satisfies TemporaryReservationReleaseResponse;
 }
 
 function buildSessionSeatMapPath(sessionId: string) {
@@ -163,7 +163,51 @@ function isTemporaryReservationReleaseSeat(
 }
 
 function isSessionSeatStatus(value: unknown): value is SessionSeatStatus {
-  return value === "AVAILABLE" || value === "RESERVED" || value === "PURCHASED";
+  return (
+    value === "AVAILABLE" ||
+    value === "RESERVED" ||
+    value === "PURCHASED" ||
+    value === "available" ||
+    value === "reserved" ||
+    value === "purchased"
+  );
+}
+
+function normalizeSessionSeatMapItem(
+  seat: SessionSeatMapItem
+): SessionSeatMapItem {
+  return {
+    ...seat,
+    status: normalizeSessionSeatStatus(seat.status),
+  };
+}
+
+function normalizeTemporaryReservationResponse(
+  response: TemporaryReservationResponse
+): TemporaryReservationResponse {
+  return {
+    ...response,
+    seats: response.seats.map((seat) => ({
+      ...seat,
+      status: normalizeSessionSeatStatus(seat.status),
+    })),
+  };
+}
+
+function normalizeTemporaryReservationReleaseResponse(
+  response: TemporaryReservationReleaseResponse
+): TemporaryReservationReleaseResponse {
+  return {
+    ...response,
+    seats: response.seats.map((seat) => ({
+      ...seat,
+      status: normalizeSessionSeatStatus(seat.status),
+    })),
+  };
+}
+
+function normalizeSessionSeatStatus(status: SessionSeatStatus) {
+  return status.toUpperCase() as SessionSeatStatus;
 }
 
 function optionalBoolean(value: unknown) {

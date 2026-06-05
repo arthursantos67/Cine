@@ -97,7 +97,14 @@ function isPaymentMethod(value: unknown): value is PaymentMethod {
 }
 
 function isSessionSeatStatus(value: unknown): value is SessionSeatStatus {
-  return value === "AVAILABLE" || value === "RESERVED" || value === "PURCHASED";
+  return (
+    value === "AVAILABLE" ||
+    value === "RESERVED" ||
+    value === "PURCHASED" ||
+    value === "available" ||
+    value === "reserved" ||
+    value === "purchased"
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

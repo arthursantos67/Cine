@@ -113,6 +113,7 @@ class TestCatalogModels:
             experience_type=RoomExperienceType.VIP,
             display_name="Sala VIP",
             description="Poltronas reclinaveis e atendimento premium.",
+            base_price=Decimal("25.00"),
         )
 
         room.full_clean()
