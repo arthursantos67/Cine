@@ -135,10 +135,10 @@ export function MovieDetailView({ onRetry, state }: MovieDetailViewProps) {
 }
 
 function MovieDetailSuccess({ movie }: { movie: CatalogMovieDetail }) {
-  const ageRating = movie.age_rating
+  const ageRatingLabel = movie.age_rating
     ? movie.age_rating === "L"
-      ? "L"
-      : movie.age_rating
+      ? "Livre"
+      : `${movie.age_rating} anos`
     : null;
   const genres = formatMovieGenres(movie.genres);
   const duration = formatMovieDuration(movie.duration_minutes);
@@ -176,8 +176,8 @@ function MovieDetailSuccess({ movie }: { movie: CatalogMovieDetail }) {
         </div>
 
         <div className="movie-detail__metadata" aria-label="Informações do filme">
-          {ageRating ? (
-            <span className="movie-detail__rating">{ageRating}</span>
+          {ageRatingLabel ? (
+            <span className="movie-detail__rating">{ageRatingLabel}</span>
           ) : null}
           <span>{duration}</span>
           <span aria-hidden="true">·</span>
