@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django.utils import timezone
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -298,10 +299,9 @@ class UserListView(ListAPIView):
     serializer_class = UserListSerializer
 
     def get_queryset(self):
-        qs = User.objects.all()
+        qs = User.objects.order_by("created_at")
         search = self.request.query_params.get("search", "").strip()
         if search:
-            from django.db.models import Q
             qs = qs.filter(
                 Q(email__icontains=search) | Q(username__icontains=search)
             )
