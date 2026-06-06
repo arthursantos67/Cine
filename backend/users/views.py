@@ -329,6 +329,11 @@ class UserPermissionLogsView(APIView):
         except (User.DoesNotExist, ValueError):
             raise NotFound("User not found.")
 
-        logs = AdminPermissionLog.objects.filter(target=user).select_related("actor")
+        logs = (
+            AdminPermissionLog.objects
+            .filter(target=user)
+            .select_related("actor")
+            .order_by("-created_at")[:50]
+        )
         serializer = AdminPermissionLogSerializer(logs, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
