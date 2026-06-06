@@ -63,9 +63,12 @@ function AuditPanel({ logs, onClose, username }: AuditPanelProps) {
 export function AdminUserList() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [isActing, setIsActing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -79,23 +82,34 @@ export function AdminUserList() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
+  const fetchPage = useCallback(async (pageNum: number, replace: boolean) => {
+    if (replace) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
     setErrorMessage(null);
     try {
-      const result = await adminApi.listUsers({ search: search || undefined });
-      setUsers(result.results);
+      const result = await adminApi.listUsers({ page: pageNum, search: search || undefined });
+      setUsers((prev) => (replace ? result.results : [...prev, ...result.results]));
+      setHasMore(result.next !== null);
       setTotalCount(result.count);
+      setPage(pageNum);
     } catch {
       setErrorMessage("Não foi possível carregar os usuários. Tente novamente.");
     } finally {
-      setLoading(false);
+      if (replace) {
+        setLoading(false);
+      } else {
+        setLoadingMore(false);
+      }
     }
   }, [search]);
 
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+    setUsers([]);
+    fetchPage(1, true);
+  }, [fetchPage]);
 
   async function openAuditPanel(user: AdminUser) {
     setAuditUser(user);
@@ -251,10 +265,16 @@ export function AdminUserList() {
         loading={loading}
       />
 
-      {!loading && totalCount > users.length ? (
-        <p className="text-xs text-white/40">
-          Mostrando {users.length} de {totalCount} usuários.
-        </p>
+      {hasMore ? (
+        <div className="flex justify-center">
+          <Button
+            disabled={loadingMore}
+            onClick={() => fetchPage(page + 1, false)}
+            variant="ghost"
+          >
+            {loadingMore ? "Carregando..." : "Carregar mais"}
+          </Button>
+        </div>
       ) : null}
 
       {auditUser ? (
