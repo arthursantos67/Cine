@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -165,7 +167,6 @@ def test_permission_logs_empty_for_untouched_user(admin_user, regular_user):
 
 @pytest.mark.django_db
 def test_permission_logs_returns_404_for_nonexistent_user(admin_user):
-    import uuid
     client = auth_client(admin_user)
 
     response = client.get(f"/api/v1/users/{uuid.uuid4()}/admin/logs/")
