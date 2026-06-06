@@ -118,6 +118,8 @@ export function AdminUserList() {
     try {
       const logs = await adminApi.getUserPermissionLogs(user.id);
       setAuditLogs(logs);
+    } catch {
+      setActionError("Não foi possível carregar o histórico. Tente novamente.");
     } finally {
       setAuditLoading(false);
     }
