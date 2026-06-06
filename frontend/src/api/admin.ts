@@ -90,6 +90,22 @@ export type AdminGenre = CatalogGenre & {
   updated_at?: string;
 };
 
+export type AdminUser = {
+  id: string;
+  email: string;
+  username: string;
+  is_staff: boolean;
+  created_at: string;
+};
+
+export type AdminPermissionLogEntry = {
+  actor: string;
+  target: string;
+  action: "granted" | "revoked";
+  created_at: string;
+};
+
+const USERS_PATH = "/api/v1/users/";
 const MOVIES_PATH = "/api/v1/catalog/movies/";
 const GENRES_PATH = "/api/v1/catalog/genres/";
 const ROOMS_PATH = "/api/v1/catalog/rooms/";
@@ -99,6 +115,59 @@ const SEAT_ROWS_PATH = "/api/v1/reservation/seat-rows/";
 const SEATS_PATH = "/api/v1/reservation/seats/";
 
 export const adminApi = {
+  async listUsers(params: { page?: number; search?: string } = {}) {
+    const query = buildQueryString(params);
+    const response = await apiRequest<unknown>(
+      query ? `${USERS_PATH}?${query}` : USERS_PATH,
+      { auth: "required", method: "GET" }
+    );
+
+    if (!isPaginatedResponse<AdminUser>(response)) {
+      throw new Error("Unexpected admin user list response.");
+    }
+
+    return response satisfies PaginatedResponse<AdminUser>;
+  },
+
+  async grantAdmin(userId: string) {
+    const response = await apiRequest<unknown>(
+      `${USERS_PATH}${userId}/admin/`,
+      { auth: "required", method: "POST" }
+    );
+
+    if (!isAdminUser(response)) {
+      throw new Error("Unexpected admin grant response.");
+    }
+
+    return response satisfies AdminUser;
+  },
+
+  async revokeAdmin(userId: string) {
+    const response = await apiRequest<unknown>(
+      `${USERS_PATH}${userId}/admin/`,
+      { auth: "required", method: "DELETE" }
+    );
+
+    if (!isAdminUser(response)) {
+      throw new Error("Unexpected admin revoke response.");
+    }
+
+    return response satisfies AdminUser;
+  },
+
+  async getUserPermissionLogs(userId: string) {
+    const response = await apiRequest<unknown>(
+      `${USERS_PATH}${userId}/admin/logs/`,
+      { auth: "required", method: "GET" }
+    );
+
+    if (!Array.isArray(response) || !response.every(isAdminPermissionLogEntry)) {
+      throw new Error("Unexpected admin permission logs response.");
+    }
+
+    return response satisfies AdminPermissionLogEntry[];
+  },
+
   async getSummary(): Promise<AdminSummary> {
     const today = new Date().toISOString().split("T")[0];
 
@@ -644,4 +713,25 @@ function buildSessionsQuery({ date, movie, page, room }: ListSessionsParams) {
   if (page !== undefined) searchParams.set("page", String(page));
 
   return searchParams.toString();
+}
+
+function isAdminUser(value: unknown): value is AdminUser {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.email === "string" &&
+    typeof value.username === "string" &&
+    typeof value.is_staff === "boolean" &&
+    typeof value.created_at === "string"
+  );
+}
+
+function isAdminPermissionLogEntry(value: unknown): value is AdminPermissionLogEntry {
+  return (
+    isRecord(value) &&
+    typeof value.actor === "string" &&
+    typeof value.target === "string" &&
+    (value.action === "granted" || value.action === "revoked") &&
+    typeof value.created_at === "string"
+  );
 }

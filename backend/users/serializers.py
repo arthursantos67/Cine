@@ -148,6 +148,13 @@ class UserTicketSerializer(serializers.ModelSerializer):
         }
 
 
+class UserListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ("id", "email", "username", "is_staff", "created_at")
+        read_only_fields = fields
+
+
 class AdminPermissionLogSerializer(serializers.ModelSerializer):
     actor = serializers.EmailField(source="actor.email", read_only=True)
     target = serializers.EmailField(source="target.email", read_only=True)
