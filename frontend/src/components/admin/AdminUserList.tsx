@@ -41,8 +41,8 @@ function AuditPanel({ logs, onClose, username }: AuditPanelProps) {
         <p className="text-sm text-white/40">Nenhuma alteração registrada.</p>
       ) : (
         <ul className="space-y-2">
-          {logs.map((entry, i) => (
-            <li className="flex flex-wrap items-center gap-2 text-sm" key={i}>
+          {logs.map((entry) => (
+            <li className="flex flex-wrap items-center gap-2 text-sm" key={`${entry.created_at}-${entry.action}`}>
               <Badge size="sm" tone={entry.action === "granted" ? "success" : "danger"}>
                 {entry.action === "granted" ? "Promovido" : "Rebaixado"}
               </Badge>
