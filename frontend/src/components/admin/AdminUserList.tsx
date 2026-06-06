@@ -69,6 +69,7 @@ export function AdminUserList() {
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [isActing, setIsActing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
   const [auditUser, setAuditUser] = useState<AdminUser | null>(null);
   const [auditLogs, setAuditLogs] = useState<AdminPermissionLogEntry[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
@@ -84,6 +85,7 @@ export function AdminUserList() {
     try {
       const result = await adminApi.listUsers({ search: search || undefined });
       setUsers(result.results);
+      setTotalCount(result.count);
     } catch {
       setErrorMessage("Não foi possível carregar os usuários. Tente novamente.");
     } finally {
@@ -108,6 +110,7 @@ export function AdminUserList() {
   }
 
   const adminCount = users.filter((u) => u.is_staff).length;
+  const allUsersLoaded = totalCount <= users.length;
 
   function requestAction(user: AdminUser, action: PermissionAction) {
     setActionError(null);
@@ -174,7 +177,7 @@ export function AdminUserList() {
       label: "",
       className: "text-right",
       render: (row) => {
-        const isLastAdmin = row.is_staff && adminCount <= 1;
+        const isLastAdmin = row.is_staff && allUsersLoaded && adminCount <= 1;
         return (
           <div className="flex items-center justify-end gap-2">
             <button
@@ -247,6 +250,12 @@ export function AdminUserList() {
         keyField="id"
         loading={loading}
       />
+
+      {!loading && totalCount > users.length ? (
+        <p className="text-xs text-white/40">
+          Mostrando {users.length} de {totalCount} usuários.
+        </p>
+      ) : null}
 
       {auditUser ? (
         auditLoading ? (
