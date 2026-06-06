@@ -721,7 +721,8 @@ function isAdminUser(value: unknown): value is AdminUser {
     typeof value.id === "string" &&
     typeof value.email === "string" &&
     typeof value.username === "string" &&
-    typeof value.is_staff === "boolean"
+    typeof value.is_staff === "boolean" &&
+    typeof value.created_at === "string"
   );
 }
 
