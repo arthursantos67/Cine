@@ -129,6 +129,116 @@ test("em_breve movie detail shows coming-soon notice and hides session selector"
   assert.doesNotMatch(html, /Selecionar sessão/);
 });
 
+test("em_breve movie detail shows interest count when data is available", () => {
+  const comingSoonMovie: CatalogMovieDetail = {
+    ...movie,
+    id: "movie-upcoming",
+    release_date: "2026-08-01",
+    status: "em_breve",
+    title: "Ainda Por Vir",
+  };
+
+  const html = renderToStaticMarkup(
+    createElement(MovieDetailView, {
+      interestState: {
+        data: { count: 42, user_interested: false },
+        status: "success",
+      },
+      isAuthenticated: false,
+      state: { movie: comingSoonMovie, status: "success" },
+    })
+  );
+
+  assert.match(html, /42 pessoas interessadas/);
+  assert.match(html, /Entre para demonstrar interesse/);
+  assert.doesNotMatch(html, /Tenho interesse/);
+});
+
+test("em_breve movie detail shows interest toggle for authenticated user", () => {
+  const comingSoonMovie: CatalogMovieDetail = {
+    ...movie,
+    id: "movie-upcoming",
+    release_date: "2026-08-01",
+    status: "em_breve",
+    title: "Ainda Por Vir",
+  };
+
+  const htmlNotInterested = renderToStaticMarkup(
+    createElement(MovieDetailView, {
+      interestState: {
+        data: { count: 5, user_interested: false },
+        status: "success",
+      },
+      isAuthenticated: true,
+      state: { movie: comingSoonMovie, status: "success" },
+    })
+  );
+
+  assert.match(htmlNotInterested, /Tenho interesse/);
+  assert.doesNotMatch(htmlNotInterested, /Remover interesse/);
+
+  const htmlInterested = renderToStaticMarkup(
+    createElement(MovieDetailView, {
+      interestState: {
+        data: { count: 6, user_interested: true },
+        status: "success",
+      },
+      isAuthenticated: true,
+      state: { movie: comingSoonMovie, status: "success" },
+    })
+  );
+
+  assert.match(htmlInterested, /Remover interesse/);
+  assert.doesNotMatch(htmlInterested, /Tenho interesse/);
+});
+
+test("em_breve movie detail shows error message when interest update fails", () => {
+  const comingSoonMovie: CatalogMovieDetail = {
+    ...movie,
+    id: "movie-upcoming",
+    release_date: "2026-08-01",
+    status: "em_breve",
+    title: "Ainda Por Vir",
+  };
+
+  const html = renderToStaticMarkup(
+    createElement(MovieDetailView, {
+      interestState: {
+        data: { count: 3, user_interested: false },
+        status: "error",
+      },
+      isAuthenticated: true,
+      state: { movie: comingSoonMovie, status: "success" },
+    })
+  );
+
+  assert.match(html, /Não foi possível atualizar seu interesse/);
+});
+
+test("em_breve movie detail hides count text when count is zero", () => {
+  const comingSoonMovie: CatalogMovieDetail = {
+    ...movie,
+    id: "movie-upcoming",
+    release_date: "2026-08-01",
+    status: "em_breve",
+    title: "Ainda Por Vir",
+  };
+
+  const html = renderToStaticMarkup(
+    createElement(MovieDetailView, {
+      interestState: {
+        data: { count: 0, user_interested: null },
+        status: "success",
+      },
+      isAuthenticated: false,
+      state: { movie: comingSoonMovie, status: "success" },
+    })
+  );
+
+  assert.doesNotMatch(html, /0 pessoas interessadas/);
+  assert.match(html, /Entre para demonstrar interesse/);
+});
+
 test("em_cartaz movie detail still shows session selector", () => {
   const html = renderToStaticMarkup(
     createElement(MovieDetailView, {

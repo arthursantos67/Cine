@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays, ChevronLeft, ChevronRight, HelpCircle } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Heart, HelpCircle, LogIn } from "lucide-react";
 import {
   type ChangeEvent,
   useCallback,
@@ -13,9 +13,11 @@ import {
 
 import { ApiError, getApiErrorUserMessage } from "@/api/client";
 import { catalogApi } from "@/api/catalog";
+import { interestApi } from "@/api/interest";
 import { ResponsiveImage } from "@/components/ui/ResponsiveImage";
 import { StateMessage } from "@/components/ui/StateMessage";
-import type { CatalogMovieDetail, CatalogSession } from "@/types/catalog";
+import { useAuth } from "@/contexts/AuthContext";
+import type { CatalogMovieDetail, CatalogSession, MovieInterestStatus } from "@/types/catalog";
 import { useI18n } from "@/i18n";
 
 import {
@@ -37,6 +39,7 @@ import {
 
 type MovieDetailStatus = "error" | "loading" | "not-found" | "success";
 type SessionListStatus = "error" | "loading" | "success";
+type InterestStatus = "error" | "idle" | "loading" | "success";
 
 export type MovieDetailState = {
   errorMessage?: string;
@@ -50,11 +53,19 @@ type SessionListState = {
   status: SessionListStatus;
 };
 
+type InterestState = {
+  data?: MovieInterestStatus;
+  status: InterestStatus;
+};
+
 type MovieDetailProps = {
   movieId: string;
 };
 
 type MovieDetailViewProps = {
+  interestState?: InterestState;
+  isAuthenticated?: boolean;
+  onInterestToggle?: () => void;
   onRetry?: () => void;
   state: MovieDetailState;
 };
@@ -65,7 +76,9 @@ const loadingState: MovieDetailState = {
 
 export function MovieDetail({ movieId }: MovieDetailProps) {
   const { locale } = useI18n();
+  const { isAuthenticated } = useAuth();
   const [state, setState] = useState<MovieDetailState>(loadingState);
+  const [interestState, setInterestState] = useState<InterestState>({ status: "idle" });
 
   const loadMovie = useCallback(async () => {
     const trimmedMovieId = movieId.trim();
@@ -93,19 +106,67 @@ export function MovieDetail({ movieId }: MovieDetailProps) {
     }
   }, [locale, movieId]);
 
+  const loadInterest = useCallback(async (movie: CatalogMovieDetail) => {
+    if (movie.status !== "em_breve") return;
+
+    setInterestState({ status: "loading" });
+
+    try {
+      const data = await interestApi.getMovieInterest(movie.id);
+      setInterestState({ data, status: "success" });
+    } catch {
+      setInterestState({ status: "error" });
+    }
+  }, []);
+
   useEffect(() => {
     void loadMovie();
   }, [loadMovie]);
 
+  useEffect(() => {
+    if (state.status === "success" && state.movie) {
+      void loadInterest(state.movie);
+    }
+  }, [state.status, state.movie, loadInterest]);
+
+  const handleInterestToggle = useCallback(async () => {
+    if (!state.movie) return;
+
+    const movieId = state.movie.id;
+    const currentlyInterested = interestState.data?.user_interested === true;
+
+    try {
+      if (currentlyInterested) {
+        await interestApi.unmarkMovieInterest(movieId);
+        const data = await interestApi.getMovieInterest(movieId);
+        setInterestState({ data, status: "success" });
+      } else {
+        const data = await interestApi.markMovieInterest(movieId);
+        setInterestState({ data, status: "success" });
+      }
+    } catch {
+      setInterestState((prev) => ({ ...prev, status: "error" }));
+    }
+  }, [state.movie, interestState.data]);
+
   return (
     <MovieDetailView
+      interestState={interestState}
+      isAuthenticated={isAuthenticated}
+      onInterestToggle={() => void handleInterestToggle()}
       onRetry={() => void loadMovie()}
       state={state}
     />
   );
 }
 
-export function MovieDetailView({ onRetry, state }: MovieDetailViewProps) {
+export function MovieDetailView({
+  interestState,
+  isAuthenticated,
+  onInterestToggle,
+  onRetry,
+  state,
+}: MovieDetailViewProps) {
   const { t } = useI18n();
 
   if (state.status === "loading") {
@@ -134,10 +195,27 @@ export function MovieDetailView({ onRetry, state }: MovieDetailViewProps) {
     return <MovieDetailNotFoundState />;
   }
 
-  return <MovieDetailSuccess movie={state.movie} />;
+  return (
+    <MovieDetailSuccess
+      interestState={interestState}
+      isAuthenticated={isAuthenticated}
+      movie={state.movie}
+      onInterestToggle={onInterestToggle}
+    />
+  );
 }
 
-function MovieDetailSuccess({ movie }: { movie: CatalogMovieDetail }) {
+function MovieDetailSuccess({
+  interestState,
+  isAuthenticated,
+  movie,
+  onInterestToggle,
+}: {
+  interestState?: InterestState;
+  isAuthenticated?: boolean;
+  movie: CatalogMovieDetail;
+  onInterestToggle?: () => void;
+}) {
   const { locale, t } = useI18n();
   const ageRatingLabel = movie.age_rating
     ? movie.age_rating === "L"
@@ -215,7 +293,11 @@ function MovieDetailSuccess({ movie }: { movie: CatalogMovieDetail }) {
         </section>
 
         {movie.status === "em_breve" ? (
-          <MovieComingSoonNotice />
+          <MovieComingSoonSection
+            interestState={interestState}
+            isAuthenticated={isAuthenticated}
+            onInterestToggle={onInterestToggle}
+          />
         ) : (
           <MovieSessionSelector movieId={movie.id} />
         )}
@@ -224,13 +306,60 @@ function MovieDetailSuccess({ movie }: { movie: CatalogMovieDetail }) {
   );
 }
 
-function MovieComingSoonNotice() {
+function MovieComingSoonSection({
+  interestState,
+  isAuthenticated,
+  onInterestToggle,
+}: {
+  interestState?: InterestState;
+  isAuthenticated?: boolean;
+  onInterestToggle?: () => void;
+}) {
   const { t } = useI18n();
+  const interested = interestState?.data?.user_interested === true;
+  const count = interestState?.data?.count ?? 0;
 
   return (
-    <StateMessage title={t("movie.comingSoonTitle")}>
-      {t("movie.comingSoonDescription")}
-    </StateMessage>
+    <section aria-labelledby="coming-soon-heading" className="movie-coming-soon">
+      <StateMessage title={t("movie.comingSoonTitle")}>
+        {t("movie.comingSoonDescription")}
+      </StateMessage>
+
+      <div className="movie-coming-soon__interest">
+        {count > 0 && (
+          <p className="movie-coming-soon__count" aria-live="polite">
+            {t("movie.interestedCount", { count })}
+          </p>
+        )}
+
+        {interestState?.status === "error" && (
+          <p className="movie-coming-soon__error" role="alert">
+            {t("movie.interestError")}
+          </p>
+        )}
+
+        {isAuthenticated ? (
+          <button
+            aria-pressed={interested}
+            className={`button ${interested ? "button-ghost" : "button-primary"}`}
+            onClick={onInterestToggle}
+            type="button"
+          >
+            <Heart
+              aria-hidden="true"
+              fill={interested ? "currentColor" : "none"}
+              size={16}
+            />
+            {interested ? t("movie.interestRemove") : t("movie.interestCta")}
+          </button>
+        ) : (
+          <p className="movie-coming-soon__sign-in">
+            <LogIn aria-hidden="true" size={16} />
+            {t("movie.interestSignIn")}
+          </p>
+        )}
+      </div>
+    </section>
   );
 }
 
