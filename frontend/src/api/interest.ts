@@ -17,48 +17,36 @@ function isMovieInterestStatus(value: unknown): value is MovieInterestStatus {
 }
 
 export const interestApi = {
-  getMovieInterest(movieId: string) {
-    return getMovieInterest(movieId);
+  async getMovieInterest(movieId: string): Promise<MovieInterestStatus> {
+    const response = await apiRequest<unknown>(interestPath(movieId), {
+      auth: "optional",
+      method: "GET",
+    });
+
+    if (!isMovieInterestStatus(response)) {
+      throw new Error("Unexpected movie interest response.");
+    }
+
+    return response;
   },
 
-  markMovieInterest(movieId: string) {
-    return markMovieInterest(movieId);
+  async markMovieInterest(movieId: string): Promise<MovieInterestStatus> {
+    const response = await apiRequest<unknown>(interestPath(movieId), {
+      auth: "required",
+      method: "POST",
+    });
+
+    if (!isMovieInterestStatus(response)) {
+      throw new Error("Unexpected movie interest response.");
+    }
+
+    return response;
   },
 
-  unmarkMovieInterest(movieId: string) {
-    return unmarkMovieInterest(movieId);
+  async unmarkMovieInterest(movieId: string): Promise<void> {
+    await apiRequest<void>(interestPath(movieId), {
+      auth: "required",
+      method: "DELETE",
+    });
   },
 };
-
-async function getMovieInterest(movieId: string): Promise<MovieInterestStatus> {
-  const response = await apiRequest<unknown>(interestPath(movieId), {
-    auth: "optional",
-    method: "GET",
-  });
-
-  if (!isMovieInterestStatus(response)) {
-    throw new Error("Unexpected movie interest response.");
-  }
-
-  return response;
-}
-
-async function markMovieInterest(movieId: string): Promise<MovieInterestStatus> {
-  const response = await apiRequest<unknown>(interestPath(movieId), {
-    auth: "required",
-    method: "POST",
-  });
-
-  if (!isMovieInterestStatus(response)) {
-    throw new Error("Unexpected movie interest response.");
-  }
-
-  return response;
-}
-
-async function unmarkMovieInterest(movieId: string): Promise<void> {
-  await apiRequest<void>(interestPath(movieId), {
-    auth: "required",
-    method: "DELETE",
-  });
-}

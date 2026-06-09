@@ -1,4 +1,4 @@
-from itertools import count
+from itertools import count as itertools_count
 
 import pytest
 from rest_framework import status
@@ -7,7 +7,7 @@ from rest_framework.test import APIClient
 from catalog.models import Movie, MovieInterest
 from users.models import User
 
-_ip_counter = count(1)
+_ip_counter = itertools_count(1)
 
 
 @pytest.mark.django_db
@@ -111,9 +111,24 @@ class TestMovieInterestApi:
 
         response = client_a.post(self._url(movie))
 
-        assert response.status_code == status.HTTP_201_CREATED
+        assert response.status_code == status.HTTP_200_OK
         assert response.data["count"] == 1
         assert MovieInterest.objects.filter(movie=movie).count() == 1
+
+    def test_post_rejects_non_coming_soon_movie(self, client_a):
+        em_cartaz = Movie.objects.create(
+            title="Em Cartaz",
+            synopsis="Já está em cartaz.",
+            duration_minutes=100,
+            release_date="2025-01-01",
+            poster_url="https://example.com/poster.jpg",
+            status="em_cartaz",
+        )
+
+        response = client_a.post(self._url(em_cartaz))
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["error"]["code"] == "MOVIE_NOT_COMING_SOON"
 
     def test_post_requires_authentication(self, anon_client, movie):
         response = anon_client.post(self._url(movie))

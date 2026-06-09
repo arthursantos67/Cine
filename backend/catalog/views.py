@@ -508,7 +508,10 @@ class RoomTypePricingDetailView(RetrieveUpdateAPIView):
     summary="Get interest count and toggle interest for a movie",
 )
 class MovieInterestView(APIView):
-    permission_classes = []
+    def get_permissions(self):
+        if self.request.method in ("POST", "DELETE"):
+            return [IsAuthenticated()]
+        return []
 
     def _get_movie(self, movie_pk):
         return get_object_or_404(Movie, pk=movie_pk)
@@ -532,22 +535,17 @@ class MovieInterestView(APIView):
         return Response(data)
 
     def post(self, request, movie_pk):
-        if not request.user or not request.user.is_authenticated:
-            return Response(
-                {"error": {"code": "NOT_AUTHENTICATED", "message": "Authentication required.", "status": 401, "details": None}},
-                status=http_status.HTTP_401_UNAUTHORIZED,
-            )
         movie = self._get_movie(movie_pk)
-        MovieInterest.objects.get_or_create(movie=movie, user=request.user)
+        if movie.status != MovieStatus.EM_BREVE:
+            return Response(
+                {"error": {"code": "MOVIE_NOT_COMING_SOON", "message": "Interest can only be registered for coming-soon movies.", "status": 400, "details": None}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+        _, created = MovieInterest.objects.get_or_create(movie=movie, user=request.user)
         data = self._interest_response(movie, request.user)
-        return Response(data, status=http_status.HTTP_201_CREATED)
+        return Response(data, status=http_status.HTTP_201_CREATED if created else http_status.HTTP_200_OK)
 
     def delete(self, request, movie_pk):
-        if not request.user or not request.user.is_authenticated:
-            return Response(
-                {"error": {"code": "NOT_AUTHENTICATED", "message": "Authentication required.", "status": 401, "details": None}},
-                status=http_status.HTTP_401_UNAUTHORIZED,
-            )
         movie = self._get_movie(movie_pk)
         MovieInterest.objects.filter(movie=movie, user=request.user).delete()
         return Response(status=http_status.HTTP_204_NO_CONTENT)

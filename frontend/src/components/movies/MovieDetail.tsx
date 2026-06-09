@@ -65,6 +65,7 @@ type MovieDetailProps = {
 type MovieDetailViewProps = {
   interestState?: InterestState;
   isAuthenticated?: boolean;
+  isInterestToggling?: boolean;
   onInterestToggle?: () => void;
   onRetry?: () => void;
   state: MovieDetailState;
@@ -79,6 +80,7 @@ export function MovieDetail({ movieId }: MovieDetailProps) {
   const { isAuthenticated } = useAuth();
   const [state, setState] = useState<MovieDetailState>(loadingState);
   const [interestState, setInterestState] = useState<InterestState>({ status: "idle" });
+  const [isToggling, setIsToggling] = useState(false);
 
   const loadMovie = useCallback(async () => {
     const trimmedMovieId = movieId.trim();
@@ -127,14 +129,15 @@ export function MovieDetail({ movieId }: MovieDetailProps) {
     if (state.status === "success" && state.movie) {
       void loadInterest(state.movie);
     }
-  }, [state.status, state.movie, loadInterest]);
+  }, [state.status, state.movie, loadInterest, isAuthenticated]);
 
   const handleInterestToggle = useCallback(async () => {
-    if (!state.movie) return;
+    if (!state.movie || isToggling) return;
 
     const movieId = state.movie.id;
     const currentlyInterested = interestState.data?.user_interested === true;
 
+    setIsToggling(true);
     try {
       if (currentlyInterested) {
         await interestApi.unmarkMovieInterest(movieId);
@@ -146,13 +149,16 @@ export function MovieDetail({ movieId }: MovieDetailProps) {
       }
     } catch {
       setInterestState((prev) => ({ ...prev, status: "error" }));
+    } finally {
+      setIsToggling(false);
     }
-  }, [state.movie, interestState.data]);
+  }, [state.movie, interestState.data, isToggling]);
 
   return (
     <MovieDetailView
       interestState={interestState}
       isAuthenticated={isAuthenticated}
+      isInterestToggling={isToggling}
       onInterestToggle={() => void handleInterestToggle()}
       onRetry={() => void loadMovie()}
       state={state}
@@ -163,6 +169,7 @@ export function MovieDetail({ movieId }: MovieDetailProps) {
 export function MovieDetailView({
   interestState,
   isAuthenticated,
+  isInterestToggling,
   onInterestToggle,
   onRetry,
   state,
@@ -199,6 +206,7 @@ export function MovieDetailView({
     <MovieDetailSuccess
       interestState={interestState}
       isAuthenticated={isAuthenticated}
+      isInterestToggling={isInterestToggling}
       movie={state.movie}
       onInterestToggle={onInterestToggle}
     />
@@ -208,11 +216,13 @@ export function MovieDetailView({
 function MovieDetailSuccess({
   interestState,
   isAuthenticated,
+  isInterestToggling,
   movie,
   onInterestToggle,
 }: {
   interestState?: InterestState;
   isAuthenticated?: boolean;
+  isInterestToggling?: boolean;
   movie: CatalogMovieDetail;
   onInterestToggle?: () => void;
 }) {
@@ -296,6 +306,7 @@ function MovieDetailSuccess({
           <MovieComingSoonSection
             interestState={interestState}
             isAuthenticated={isAuthenticated}
+            isInterestToggling={isInterestToggling}
             onInterestToggle={onInterestToggle}
           />
         ) : (
@@ -309,10 +320,12 @@ function MovieDetailSuccess({
 function MovieComingSoonSection({
   interestState,
   isAuthenticated,
+  isInterestToggling,
   onInterestToggle,
 }: {
   interestState?: InterestState;
   isAuthenticated?: boolean;
+  isInterestToggling?: boolean;
   onInterestToggle?: () => void;
 }) {
   const { t } = useI18n();
@@ -342,6 +355,7 @@ function MovieComingSoonSection({
           <button
             aria-pressed={interested}
             className={`button ${interested ? "button-ghost" : "button-primary"}`}
+            disabled={isInterestToggling || interestState?.status === "loading"}
             onClick={onInterestToggle}
             type="button"
           >
@@ -353,10 +367,10 @@ function MovieComingSoonSection({
             {interested ? t("movie.interestRemove") : t("movie.interestCta")}
           </button>
         ) : (
-          <p className="movie-coming-soon__sign-in">
+          <Link className="movie-coming-soon__sign-in" href="/login">
             <LogIn aria-hidden="true" size={16} />
             {t("movie.interestSignIn")}
-          </p>
+          </Link>
         )}
       </div>
     </section>
