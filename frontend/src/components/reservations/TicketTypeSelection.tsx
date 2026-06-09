@@ -5,13 +5,14 @@ import { useMemo, useState } from "react";
 
 import { cn } from "@/components/ui/classNames";
 import { useReservation } from "@/contexts/ReservationContext";
+import { useI18n } from "@/i18n";
 import type { ReservedSeat, TicketType } from "@/types/reservation";
 import { formatCurrency } from "@/utils/formatters";
 
 import {
   buildTicketTypeSelectionRows,
   calculateTicketTypeSubtotal,
-  ticketTypeOptions,
+  getTicketTypeOptions,
 } from "./ticket-type-selection";
 
 type TicketTypeSelectionFormProps = {
@@ -42,7 +43,9 @@ export function TicketTypeSelectionForm({
   reservedSeats,
   ticketTypes,
 }: TicketTypeSelectionFormProps) {
+  const { locale, t } = useI18n();
   const [voucherCode, setVoucherCode] = useState("");
+  const ticketTypeOptions = useMemo(() => getTicketTypeOptions(locale), [locale]);
   const rows = useMemo(
     () => buildTicketTypeSelectionRows(reservedSeats, ticketTypes),
     [reservedSeats, ticketTypes]
@@ -61,15 +64,14 @@ export function TicketTypeSelectionForm({
               className="m-0 text-[21px] leading-tight text-white"
               id="ticket-types-heading"
             >
-              Ingressos por assento
+            {t("ticketTypes.perSeatTitle")}
             </h2>
             <p className="m-0 mt-1.5 leading-6 text-text/65">
-              Escolha inteira ou meia-entrada para cada lugar reservado antes de
-              avançar ao pagamento.
+              {t("ticketTypes.perSeatDescription")}
             </p>
           </div>
           <strong className="inline-flex min-h-[38px] items-center whitespace-nowrap rounded-md border border-brand/50 bg-brand/20 px-3 py-1.5 text-xl text-white">
-            {formatCurrency(subtotal)}
+            {formatCurrency(subtotal, locale)}
           </strong>
         </div>
 
@@ -82,13 +84,16 @@ export function TicketTypeSelectionForm({
             >
               <legend className="mb-2.5 grid gap-0.5 p-0">
                 <span className="text-[13px] font-extrabold text-text/65">
-                  Assento
+                  {t("tickets.seat")}
                 </span>
                 <strong className="text-lg leading-tight text-white">
                   {row.seatLabel}
                 </strong>
                 <small className="text-[13px] font-extrabold text-text/65">
-                  Fileira {row.seat.row}, assento {row.seat.number}
+                  {t("ticketTypes.seatDetail", {
+                    number: row.seat.number,
+                    row: row.seat.row,
+                  })}
                 </small>
               </legend>
 
@@ -127,7 +132,7 @@ export function TicketTypeSelectionForm({
                         </small>
                       </span>
                       <b className="whitespace-nowrap text-[15px] text-white">
-                        {formatCurrency(optionPrice)}
+                        {formatCurrency(optionPrice, locale)}
                       </b>
                     </label>
                   );
@@ -148,17 +153,17 @@ export function TicketTypeSelectionForm({
               className="m-0 text-[21px] leading-tight text-white"
               id="voucher-heading"
             >
-              Cupom
+              {t("ticketTypes.voucher")}
             </h2>
             <p className="m-0 mt-1.5 leading-6 text-text/65" id="voucher-helper">
-              O cupom não altera o subtotal nesta versão.
+              {t("ticketTypes.voucherHelp")}
             </p>
           </div>
         </div>
 
         <label className="ticket-types__voucher grid gap-2">
           <span className="text-[13px] font-extrabold text-text/65">
-            Código promocional
+            {t("ticketTypes.voucherCode")}
           </span>
           <input
             aria-describedby="voucher-helper"
@@ -166,7 +171,7 @@ export function TicketTypeSelectionForm({
             className="min-h-[46px] w-full rounded-md border border-white/10 bg-black/35 px-3 py-2.5 text-text placeholder:text-text/45"
             name="voucher"
             onChange={(event) => setVoucherCode(event.target.value)}
-            placeholder="Digite o cupom"
+            placeholder={t("ticketTypes.voucherPlaceholder")}
             type="text"
             value={voucherCode}
           />
@@ -179,14 +184,14 @@ export function TicketTypeSelectionForm({
             Subtotal
           </span>
           <strong className="text-[22px] leading-tight text-white">
-            {formatCurrency(subtotal)}
+            {formatCurrency(subtotal, locale)}
           </strong>
         </div>
         <Link
           className="ticket-types__continue inline-flex min-h-10 items-center justify-center rounded-md border border-brand bg-brand px-3.5 text-sm font-extrabold leading-none text-white transition hover:bg-brand-strong max-lg:w-full"
           href="/checkout"
         >
-          Continuar para pagamento
+          {t("ticketTypes.continueToPayment")}
         </Link>
       </div>
     </div>

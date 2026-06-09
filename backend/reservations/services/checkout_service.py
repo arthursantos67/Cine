@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 
+from cineprime_api.localization import DEFAULT_LOCALE, get_translation_value, normalize_locale
 from cineprime_api.logging_context import get_correlation_id
 from reservations.locks import SeatLockManager
 from reservations.models import SessionSeat, SessionSeatStatus, Ticket
@@ -43,7 +44,8 @@ class CheckoutService:
         self.lock_manager = SeatLockManager()
 
     @transaction.atomic
-    def execute(self, *, seats, payment_method, user, submitted_total=None):
+    def execute(self, *, seats, payment_method, user, submitted_total=None, locale=None):
+        locale = normalize_locale(locale) or DEFAULT_LOCALE
         ordered_session_seat_ids = sorted(
             {seat["session_seat_id"] for seat in seats},
             key=str,
@@ -128,6 +130,7 @@ class CheckoutService:
                 user_id=str(user.id),
                 ticket_ids=ticket_ids,
                 correlation_id=correlation_id,
+                locale=locale,
             )
         )
 
@@ -158,7 +161,12 @@ class CheckoutService:
                     "payment_method": ticket.payment_method,
                     "movie": {
                         "id": str(ticket.session_seat.session.movie_id),
-                        "title": ticket.session_seat.session.movie.title,
+                        "title": get_translation_value(
+                            fallback_value=ticket.session_seat.session.movie.title,
+                            field="title",
+                            locale=locale,
+                            translations=ticket.session_seat.session.movie.translations,
+                        ),
                     },
                     "session": {
                         "id": str(ticket.session_seat.session_id),
@@ -167,7 +175,15 @@ class CheckoutService:
                     },
                     "room": {
                         "id": str(ticket.session_seat.session.room_id),
-                        "name": ticket.session_seat.session.room.name,
+                        "name": get_translation_value(
+                            fallback_value=(
+                                ticket.session_seat.session.room.display_name
+                                or ticket.session_seat.session.room.name
+                            ),
+                            field="display_name",
+                            locale=locale,
+                            translations=ticket.session_seat.session.room.translations,
+                        ),
                     },
                     "seat": {
                         "id": str(ticket.session_seat.seat_id),
@@ -191,11 +207,11 @@ class CheckoutService:
             )
 
     @staticmethod
-    def _enqueue_ticket_confirmation_email(*, user_id, ticket_ids, correlation_id):
+    def _enqueue_ticket_confirmation_email(*, user_id, ticket_ids, correlation_id, locale):
         from reservations.tasks import send_ticket_confirmation_email_task
 
         apply_async_kwargs = {
-            "args": [user_id, ticket_ids],
+            "args": [user_id, ticket_ids, locale],
         }
 
         if correlation_id:

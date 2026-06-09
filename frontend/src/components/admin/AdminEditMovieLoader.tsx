@@ -7,8 +7,10 @@ import type { CatalogMovieDetail } from "@/types/catalog";
 import { AdminMovieForm } from "./AdminMovieForm";
 import { AdminToolbar } from "./AdminToolbar";
 import { ButtonLink } from "@/components/ui/Button";
+import { useI18n } from "@/i18n";
 
 export function AdminEditMovieLoader({ movieId }: { movieId: string }) {
+  const { t } = useI18n();
   const [movie, setMovie] = useState<CatalogMovieDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -17,9 +19,9 @@ export function AdminEditMovieLoader({ movieId }: { movieId: string }) {
     adminApi
       .getMovie(movieId)
       .then(setMovie)
-      .catch(() => setError("Filme não encontrado ou você não tem permissão para editá-lo."))
+      .catch(() => setError(t("admin.movie.notFoundOrDenied")))
       .finally(() => setLoading(false));
-  }, [movieId]);
+  }, [movieId, t]);
 
   if (loading) {
     return (
@@ -27,10 +29,10 @@ export function AdminEditMovieLoader({ movieId }: { movieId: string }) {
         <AdminToolbar
           actions={
             <ButtonLink href="/admin/movies" size="sm" variant="ghost">
-              Voltar
+              {t("admin.back")}
             </ButtonLink>
           }
-          title="Editar filme"
+          title={t("admin.movie.edit")}
         />
         <div className="grid gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -47,13 +49,13 @@ export function AdminEditMovieLoader({ movieId }: { movieId: string }) {
         <AdminToolbar
           actions={
             <ButtonLink href="/admin/movies" size="sm" variant="ghost">
-              Voltar
+              {t("admin.back")}
             </ButtonLink>
           }
-          title="Editar filme"
+          title={t("admin.movie.edit")}
         />
         <p className="text-sm font-bold text-error" role="alert">
-          {error ?? "Filme não encontrado."}
+          {error ?? t("admin.movie.notFound")}
         </p>
       </div>
     );
@@ -64,10 +66,10 @@ export function AdminEditMovieLoader({ movieId }: { movieId: string }) {
       <AdminToolbar
         actions={
           <ButtonLink href="/admin/movies" size="sm" variant="ghost">
-            Voltar
+            {t("admin.back")}
           </ButtonLink>
         }
-        title={`Editar: ${movie.title}`}
+        title={t("admin.editPrefix", { name: movie.title })}
       />
       <AdminMovieForm movie={movie} />
     </div>

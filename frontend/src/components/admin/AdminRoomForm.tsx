@@ -4,10 +4,11 @@ import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
 
 import { adminApi, type AdminRoomWritePayload } from "@/api/admin";
-import { ApiError } from "@/api/client";
+import { ApiError, getApiErrorUserMessage } from "@/api/client";
 import type { AdminRoom, CatalogRoomExperienceType } from "@/types/catalog";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
+import { useI18n } from "@/i18n";
 
 type FieldErrors = Partial<
   Record<keyof AdminRoomWritePayload | "non_field_errors", string>
@@ -16,13 +17,6 @@ type FieldErrors = Partial<
 type AdminRoomFormProps = {
   room?: AdminRoom;
 };
-
-const EXPERIENCE_OPTIONS = [
-  { label: "Standard", value: "standard" },
-  { label: "VIP", value: "vip" },
-  { label: "Premium", value: "premium" },
-  { label: "IMAX", value: "imax" },
-];
 
 export function extractRoomFieldErrors(error: unknown): FieldErrors {
   if (!(error instanceof ApiError) || error.code !== "VALIDATION_FAILED") {
@@ -117,6 +111,7 @@ function Textarea({
 
 export function AdminRoomForm({ room }: AdminRoomFormProps) {
   const router = useRouter();
+  const { locale, t } = useI18n();
   const isEditing = room !== undefined;
 
   const [name, setName] = useState(room?.name ?? "");
@@ -128,6 +123,18 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
   >((room?.experience_type as CatalogRoomExperienceType) ?? "");
   const [displayName, setDisplayName] = useState(room?.display_name ?? "");
   const [description, setDescription] = useState(room?.description ?? "");
+  const [ptDisplayName, setPtDisplayName] = useState(
+    room?.translations?.["pt-BR"]?.display_name ?? ""
+  );
+  const [ptDescription, setPtDescription] = useState(
+    room?.translations?.["pt-BR"]?.description ?? ""
+  );
+  const [englishDisplayName, setEnglishDisplayName] = useState(
+    room?.translations?.["en-US"]?.display_name ?? ""
+  );
+  const [englishDescription, setEnglishDescription] = useState(
+    room?.translations?.["en-US"]?.description ?? ""
+  );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -137,6 +144,17 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
   const capacityId = useId();
   const displayNameId = useId();
   const descriptionId = useId();
+  const ptDisplayNameId = useId();
+  const ptDescriptionId = useId();
+  const englishDisplayNameId = useId();
+  const englishDescriptionId = useId();
+
+  const experienceOptions = [
+    { label: t("domain.roomExperience.standard"), value: "standard" },
+    { label: t("domain.roomExperience.vip"), value: "vip" },
+    { label: t("domain.roomExperience.premium"), value: "premium" },
+    { label: t("domain.roomExperience.imax"), value: "imax" },
+  ];
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -150,6 +168,16 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
       display_name: displayName || undefined,
       experience_type: experienceType || undefined,
       name,
+      translations: {
+        "pt-BR": {
+          description: ptDescription,
+          display_name: ptDisplayName,
+        },
+        "en-US": {
+          description: englishDescription,
+          display_name: englishDisplayName,
+        },
+      },
     };
 
     try {
@@ -164,11 +192,9 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
       const errors = extractRoomFieldErrors(err);
       if (Object.keys(errors).length > 0) {
         setFieldErrors(errors);
-        setGlobalError("Corrija os erros indicados e tente novamente.");
-      } else if (err instanceof ApiError) {
-        setGlobalError(`Erro: ${err.message}`);
+        setGlobalError(t("admin.error.fixFields"));
       } else {
-        setGlobalError("Não foi possível salvar a sala. Tente novamente.");
+        setGlobalError(getApiErrorUserMessage(err, locale));
       }
     } finally {
       setIsSubmitting(false);
@@ -194,13 +220,13 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
         </p>
       ) : null}
 
-      <FormField error={fieldErrors.name} label="Nome da sala" labelFor={nameId}>
+      <FormField error={fieldErrors.name} label={t("admin.room.name")} labelFor={nameId}>
         <TextInput
           disabled={isSubmitting}
           error={fieldErrors.name}
           id={nameId}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Ex.: Sala 1"
+          placeholder={t("admin.room.namePlaceholder")}
           required
           value={name}
         />
@@ -209,8 +235,8 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
       <div className="grid gap-4 sm:grid-cols-2">
         <FormField
           error={fieldErrors.capacity}
-          hint="Máximo de assentos que a sala comporta."
-          label="Capacidade"
+          hint={t("admin.room.capacityHint")}
+          label={t("admin.room.capacity")}
           labelFor={capacityId}
         >
           <TextInput
@@ -219,7 +245,7 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
             id={capacityId}
             min={1}
             onChange={(e) => setCapacity(e.target.value)}
-            placeholder="Ex.: 100"
+            placeholder={t("admin.room.capacityPlaceholder")}
             required
             type="number"
             value={capacity}
@@ -229,20 +255,20 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
         <Select
           disabled={isSubmitting}
           error={fieldErrors.experience_type}
-          label="Tipo de experiência"
+          label={t("admin.room.experienceType")}
           onChange={(e) =>
             setExperienceType(e.target.value as CatalogRoomExperienceType)
           }
-          options={EXPERIENCE_OPTIONS}
-          placeholder="Não especificado"
+          options={experienceOptions}
+          placeholder={t("common.notSpecified")}
           value={experienceType}
         />
       </div>
 
       <FormField
         error={fieldErrors.display_name}
-        hint="Nome público exibido nas sessões e no checkout."
-        label="Nome de exibição (opcional)"
+        hint={t("admin.room.displayNameHint")}
+        label={t("admin.room.displayName")}
         labelFor={displayNameId}
       >
         <TextInput
@@ -250,14 +276,14 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
           error={fieldErrors.display_name}
           id={displayNameId}
           onChange={(e) => setDisplayName(e.target.value)}
-          placeholder="Ex.: Sala VIP Prime"
+          placeholder={t("admin.room.displayNamePlaceholder")}
           value={displayName}
         />
       </FormField>
 
       <FormField
         error={fieldErrors.description}
-        label="Descrição (opcional)"
+        label={t("admin.room.description")}
         labelFor={descriptionId}
       >
         <Textarea
@@ -265,10 +291,72 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
           error={fieldErrors.description}
           id={descriptionId}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Descreva os diferenciais desta sala..."
+          placeholder={t("admin.room.descriptionPlaceholder")}
           value={description}
         />
       </FormField>
+
+      <fieldset className="grid gap-4 rounded-[8px] border border-white/[0.08] p-4">
+        <legend className="px-1 text-sm font-extrabold text-white">
+          {t("admin.room.translations")}
+        </legend>
+        <FormField
+          error={fieldErrors.translations}
+          label={t("admin.room.translationPtDisplayName")}
+          labelFor={ptDisplayNameId}
+        >
+          <TextInput
+            disabled={isSubmitting}
+            error={fieldErrors.translations}
+            id={ptDisplayNameId}
+            onChange={(e) => setPtDisplayName(e.target.value)}
+            placeholder={t("admin.room.displayNamePlaceholder")}
+            value={ptDisplayName}
+          />
+        </FormField>
+        <FormField
+          error={fieldErrors.translations}
+          label={t("admin.room.translationPtDescription")}
+          labelFor={ptDescriptionId}
+        >
+          <Textarea
+            disabled={isSubmitting}
+            error={fieldErrors.translations}
+            id={ptDescriptionId}
+            onChange={(e) => setPtDescription(e.target.value)}
+            placeholder={t("admin.room.descriptionPlaceholder")}
+            value={ptDescription}
+          />
+        </FormField>
+        <FormField
+          error={fieldErrors.translations}
+          label={t("admin.room.translationEnDisplayName")}
+          labelFor={englishDisplayNameId}
+        >
+          <TextInput
+            disabled={isSubmitting}
+            error={fieldErrors.translations}
+            id={englishDisplayNameId}
+            onChange={(e) => setEnglishDisplayName(e.target.value)}
+            placeholder={t("admin.room.translationEnDisplayNamePlaceholder")}
+            value={englishDisplayName}
+          />
+        </FormField>
+        <FormField
+          error={fieldErrors.translations}
+          label={t("admin.room.translationEnDescription")}
+          labelFor={englishDescriptionId}
+        >
+          <Textarea
+            disabled={isSubmitting}
+            error={fieldErrors.translations}
+            id={englishDescriptionId}
+            onChange={(e) => setEnglishDescription(e.target.value)}
+            placeholder={t("admin.room.translationEnDescriptionPlaceholder")}
+            value={englishDescription}
+          />
+        </FormField>
+      </fieldset>
 
       <div className="flex justify-end gap-2 border-t border-white/[0.07] pt-4">
         <Button
@@ -277,10 +365,10 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
           type="button"
           variant="ghost"
         >
-          Cancelar
+          {t("admin.cancel")}
         </Button>
         <Button isLoading={isSubmitting} type="submit" variant="primary">
-          {isEditing ? "Salvar alterações" : "Criar sala"}
+          {isEditing ? t("admin.saveChanges") : t("admin.room.create")}
         </Button>
       </div>
     </form>

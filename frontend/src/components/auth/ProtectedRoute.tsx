@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { buildLoginRedirectUrl } from "@/api/client";
 import { StateMessage } from "@/components/ui/StateMessage";
 import { useAuth } from "@/contexts/AuthContext";
+import { useI18n } from "@/i18n";
 import {
   getBrowserCurrentPath,
   getProtectedRouteDecision,
@@ -19,6 +20,7 @@ type ProtectedRouteProps = {
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const router = useRouter();
   const { isAuthenticated, status } = useAuth();
+  const { t } = useI18n();
   const decision = getProtectedRouteDecision({ isAuthenticated, status });
 
   useEffect(() => {
@@ -32,8 +34,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   return (
-    <StateMessage tone="loading" title="Verificando acesso">
-      Aguarde enquanto confirmamos sua sessão.
+    <StateMessage tone="loading" title={t("auth.checkingAccess")}>
+      {t("auth.checkingAccessDescription")}
     </StateMessage>
   );
 }

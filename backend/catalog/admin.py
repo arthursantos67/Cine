@@ -20,14 +20,22 @@ class CastMemberInline(admin.TabularInline):
 
 @admin.register(Movie)
 class MovieAdmin(admin.ModelAdmin):
-    list_display = ("title", "age_rating", "director", "duration_minutes", "status", "release_date", "created_at")
+    list_display = (
+        "title",
+        "age_rating",
+        "director",
+        "duration_minutes",
+        "status",
+        "release_date",
+        "created_at",
+    )
     list_filter = ("status", "age_rating")
     search_fields = ("title", "director")
     filter_horizontal = ("genres",)
     inlines = [CastMemberInline]
     fieldsets = (
         (None, {
-            "fields": ("title", "synopsis", "poster_url"),
+            "fields": ("title", "synopsis", "poster_url", "translations"),
         }),
         ("Informações do filme", {
             "fields": ("genres", "duration_minutes", "release_date", "age_rating", "director"),

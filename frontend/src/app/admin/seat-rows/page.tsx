@@ -1,17 +1,20 @@
 import { AdminEmptyState, AdminToolbar } from "@/components/admin";
 import { ButtonLink } from "@/components/ui/Button";
+import { getServerLocale, getTranslator } from "@/i18n/server";
 
-export default function AdminSeatRowsPage() {
+export default async function AdminSeatRowsPage() {
+  const t = getTranslator(await getServerLocale());
+
   return (
     <div className="grid gap-6">
-      <AdminToolbar title="Fileiras e Assentos" />
+      <AdminToolbar title={t("admin.seats")} />
       <AdminEmptyState
-        description="O gerenciamento de fileiras e assentos é feito através do editor de layout de cada sala."
-        title="Acesse via Salas"
+        description={t("admin.seats.emptyDescription")}
+        title={t("admin.seats.emptyTitle")}
       />
       <div className="flex justify-start">
         <ButtonLink href="/admin/rooms" size="sm" variant="primary">
-          Ir para Salas
+          {t("admin.seats.goToRooms")}
         </ButtonLink>
       </div>
     </div>

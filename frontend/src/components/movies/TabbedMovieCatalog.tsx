@@ -7,6 +7,7 @@ import type { MovieSectionState } from "@/app/HomeCatalog";
 import { Button } from "@/components/ui/Button";
 import { StateMessage } from "@/components/ui/StateMessage";
 import { cn } from "@/components/ui/classNames";
+import { useI18n } from "@/i18n";
 
 import { MovieCarousel } from "./MovieCarousel";
 
@@ -23,19 +24,19 @@ type TabbedMovieCatalogProps = {
 const TABS = [
   {
     value: "em_cartaz" as CatalogTab,
-    label: "Em cartaz",
-    emptyTitle: "Nenhum filme em cartaz",
-    emptyDescription: "Ainda não há filmes em cartaz no catálogo.",
-    loadingLabel: "Carregando filmes em cartaz...",
-    errorTitle: "Em cartaz indisponível",
+    labelKey: "domain.movieStatus.em_cartaz",
+    emptyTitleKey: "catalog.nowShowingEmptyTitle",
+    emptyDescriptionKey: "catalog.nowShowingEmptyDescription",
+    loadingLabelKey: "catalog.nowShowingLoading",
+    errorTitleKey: "catalog.nowShowingErrorTitle",
   },
   {
     value: "pre_venda" as CatalogTab,
-    label: "Pré-venda",
-    emptyTitle: "Nenhum filme em pré-venda",
-    emptyDescription: "Ainda não há filmes em pré-venda no catálogo.",
-    loadingLabel: "Carregando filmes em pré-venda...",
-    errorTitle: "Pré-venda indisponível",
+    labelKey: "domain.movieStatus.pre_venda",
+    emptyTitleKey: "catalog.preSaleEmptyTitle",
+    emptyDescriptionKey: "catalog.preSaleEmptyDescription",
+    loadingLabelKey: "catalog.preSaleLoading",
+    errorTitleKey: "catalog.preSaleErrorTitle",
   },
 ] as const;
 
@@ -46,6 +47,7 @@ export function TabbedMovieCatalog({
   onRetryPreSale,
   preSale,
 }: TabbedMovieCatalogProps) {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<CatalogTab>("em_cartaz");
   const uid = useId();
 
@@ -72,11 +74,11 @@ export function TabbedMovieCatalog({
   }
 
   return (
-    <section aria-label="Programação" className="grid gap-0.5">
+    <section aria-label={t("catalog.schedule")} className="grid gap-0.5">
       {/* Tab list + location */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div
-          aria-label="Seções de programação"
+          aria-label={t("catalog.scheduleSections")}
           className="flex items-center"
           role="tablist"
         >
@@ -105,7 +107,7 @@ export function TabbedMovieCatalog({
                 tabIndex={isSelected ? 0 : -1}
                 type="button"
               >
-                {tab.label}
+                {t(tab.labelKey)}
               </button>
             </Fragment>
           );
@@ -132,19 +134,19 @@ export function TabbedMovieCatalog({
               <CatalogErrorState
                 message={
                   section.errorMessage ??
-                  "Não conseguimos carregar esta seção agora. Verifique sua conexão e tente novamente."
+                  t("catalog.sectionLoadError")
                 }
                 onRetry={onRetry}
-                title={tab.errorTitle}
+                title={t(tab.errorTitleKey)}
               />
             ) : (
               <MovieCarousel
-                emptyDescription={tab.emptyDescription}
-                emptyTitle={tab.emptyTitle}
+                emptyDescription={t(tab.emptyDescriptionKey)}
+                emptyTitle={t(tab.emptyTitleKey)}
                 isLoading={section.status === "loading"}
-                loadingLabel={tab.loadingLabel}
+                loadingLabel={t(tab.loadingLabelKey)}
                 movies={section.movies}
-                title={tab.label}
+                title={t(tab.labelKey)}
                 titleVisible={false}
               />
             )}
@@ -173,12 +175,14 @@ function CatalogErrorState({
   onRetry?: () => void;
   title: string;
 }) {
+  const { t } = useI18n();
+
   return (
     <StateMessage
       action={
         onRetry ? (
           <Button onClick={onRetry} variant="ghost">
-            Tentar novamente
+            {t("common.tryAgain")}
           </Button>
         ) : undefined
       }

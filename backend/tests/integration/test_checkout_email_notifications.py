@@ -163,16 +163,61 @@ def test_ticket_confirmation_email_should_render_multiple_tickets_correctly():
         tickets=tickets,
     )
 
-    assert email_payload["subject"] == "Ticket confirmation - 2 ticket(s)"
+    assert email_payload["subject"] == "Confirmação de ingressos - 2 ingressos"
     assert "Email Checkout Movie" in email_payload["body"]
-    assert "Room: Email Checkout Room" in email_payload["body"]
-    assert "Seat: A1" in email_payload["body"]
-    assert "Seat: A2" in email_payload["body"]
+    assert "Sala: Email Checkout Room" in email_payload["body"]
+    assert "Assento: A1" in email_payload["body"]
+    assert "Assento: A2" in email_payload["body"]
 
     for ticket in tickets:
         assert ticket.ticket_code in email_payload["body"]
 
     session_start_date = timezone.localtime(context["session"].start_time).strftime(
-        "%Y-%m-%d"
+        "%d/%m/%Y"
     )
     assert session_start_date in email_payload["body"]
+
+
+@pytest.mark.django_db
+def test_ticket_confirmation_email_should_render_selected_english_locale():
+    context = _build_checkout_context(seat_numbers=(1,), reserved=True)
+    context["session"].movie.translations = {
+        "en-US": {"title": "Localized Email Movie"}
+    }
+    context["session"].movie.save(update_fields=["translations"])
+    context["session"].room.display_name = "Sala de Email"
+    context["session"].room.translations = {
+        "en-US": {"display_name": "Email Room"}
+    }
+    context["session"].room.save(update_fields=["display_name", "translations"])
+
+    service = CheckoutService()
+
+    with patch.object(CheckoutService, "_release_redis_locks"):
+        service.execute(
+            seats=_checkout_seat_payload(context["session_seats"]),
+            payment_method="pix",
+            user=context["user"],
+            locale="en-US",
+        )
+
+    tickets = list(
+        Ticket.objects.select_related(
+            "session_seat__session__movie",
+            "session_seat__session__room",
+            "session_seat__seat__row",
+        )
+        .filter(user=context["user"])
+        .order_by("created_at")
+    )
+
+    email_payload = build_ticket_confirmation_email(
+        user=context["user"],
+        tickets=tickets,
+        locale="en-US",
+    )
+
+    assert email_payload["subject"] == "Ticket confirmation - 1 ticket"
+    assert "Movie: Localized Email Movie" in email_payload["body"]
+    assert "Room: Email Room" in email_payload["body"]
+    assert "Seat: A1" in email_payload["body"]

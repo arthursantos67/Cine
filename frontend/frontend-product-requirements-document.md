@@ -835,9 +835,21 @@ The `/confirmation` page may render tickets stored in memory immediately after c
 
 ### NFR-06 Localization
 
-- User-facing UI text must be in Brazilian Portuguese.
-- Dates, times, and currency values must use Brazilian formats.
-- This PRD is written in English, but the product UI remains localized for pt-BR users.
+- Supported locales are `pt-BR` and `en-US`; `pt-BR` is the fallback locale.
+- Users must be able to switch language from the UI. The selected language is
+  persisted with the `cineprime_locale` cookie and applied to `<html lang>`,
+  metadata, route content, accessible labels, API requests, and formatting.
+- The frontend sends the selected locale with `Accept-Language`. Catalog APIs
+  may also accept a `locale` query parameter, which takes precedence over the
+  header.
+- User-facing UI text, navigation, forms, states, admin screens, checkout,
+  tickets, accessibility text, and backend error-code messages must come from
+  locale dictionaries with field-level fallback to `pt-BR`.
+- Dates, times, currency values, enum labels, payment labels, ticket type
+  labels, session metadata labels, and pluralized strings must follow the active
+  locale.
+- Catalog admin screens manage translated movie title/synopsis, genre names,
+  and room display name/description through the backend `translations` object.
 
 ---
 

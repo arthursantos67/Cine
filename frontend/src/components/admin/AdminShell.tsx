@@ -19,6 +19,7 @@ import {
   ADMIN_NAV_LINKS,
   isAdminNavItemActive,
 } from "./admin-nav-utils";
+import { useI18n } from "@/i18n";
 
 export { isAdminNavItemActive } from "./admin-nav-utils";
 
@@ -67,13 +68,14 @@ type AdminShellProps = {
 
 export function AdminShell({ children }: AdminShellProps) {
   const pathname = usePathname();
+  const { t } = useI18n();
 
   const navItems = ADMIN_NAV_LINKS.map((item) => (
     <AdminNavItem
       active={isAdminNavItemActive(pathname, item.href)}
       href={item.href}
       key={item.href}
-      label={item.label}
+      label={getAdminNavLabel(item.href, item.label, t)}
     />
   ));
 
@@ -89,7 +91,7 @@ export function AdminShell({ children }: AdminShellProps) {
     >
       {/* Sidebar — desktop */}
       <nav
-        aria-label="Navegação administrativa"
+        aria-label={t("admin.navA11y")}
         className={cn(
           "hidden lg:flex shrink-0 flex-col gap-1 w-56 border-r border-white/[0.07]",
           "px-3 py-4 sticky top-[var(--header-height)] self-start",
@@ -105,7 +107,7 @@ export function AdminShell({ children }: AdminShellProps) {
       {/* Top nav — mobile/tablet */}
       <div className="flex flex-col flex-1 min-w-0">
         <nav
-          aria-label="Navegação administrativa"
+          aria-label={t("admin.navA11y")}
           className={cn(
             "lg:hidden flex overflow-x-auto gap-1 border-b border-white/[0.07]",
             "px-3 py-2 [scrollbar-width:none] shrink-0"
@@ -118,4 +120,24 @@ export function AdminShell({ children }: AdminShellProps) {
       </div>
     </div>
   );
+}
+
+function getAdminNavLabel(
+  href: string,
+  fallback: string,
+  t: (key: string) => string
+) {
+  const labelKeys: Record<string, string> = {
+    "/admin": "admin.dashboard.title",
+    "/admin/genres": "admin.genres",
+    "/admin/movies": "admin.movies",
+    "/admin/pricing": "admin.pricing",
+    "/admin/rooms": "admin.rooms",
+    "/admin/seat-rows": "admin.seats",
+    "/admin/sessions": "admin.sessions",
+    "/admin/users": "admin.users",
+  };
+
+  const key = labelKeys[href];
+  return key ? t(key) : fallback;
 }

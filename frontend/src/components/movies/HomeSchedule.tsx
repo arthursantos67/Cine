@@ -10,6 +10,7 @@ import { cn } from "@/components/ui/classNames";
 import { ResponsiveImage } from "@/components/ui/ResponsiveImage";
 import { StateMessage } from "@/components/ui/StateMessage";
 import type { CatalogSession } from "@/types/catalog";
+import { useI18n } from "@/i18n";
 
 import { MovieCarousel } from "./MovieCarousel";
 import {
@@ -48,8 +49,8 @@ export type HomeScheduleProps = {
 };
 
 const SCHEDULE_TABS = [
-  { value: "em_cartaz" as ScheduleTab, label: "Em cartaz" },
-  { value: "em_breve" as ScheduleTab, label: "Em breve" },
+  { value: "em_cartaz" as ScheduleTab, labelKey: "domain.movieStatus.em_cartaz" },
+  { value: "em_breve" as ScheduleTab, labelKey: "domain.movieStatus.em_breve" },
 ] as const;
 
 export function HomeSchedule({
@@ -57,11 +58,15 @@ export function HomeSchedule({
   onRetryUpcoming,
   upcoming,
 }: HomeScheduleProps) {
+  const { locale, t } = useI18n();
   const [activeTab, setActiveTab] = useState<ScheduleTab>("em_cartaz");
   const uid = useId();
   const calendarInputRef = useRef<HTMLInputElement>(null);
 
-  const dateOptions = useMemo(() => buildSessionDateOptions(new Date()), []);
+  const dateOptions = useMemo(
+    () => buildSessionDateOptions(new Date(), 7, locale),
+    [locale]
+  );
   const [selectedDate, setSelectedDate] = useState(dateOptions[0]?.value ?? "");
   const [scheduleState, setScheduleState] = useState<SessionScheduleState>({
     sessions: [],
@@ -69,6 +74,8 @@ export function HomeSchedule({
   });
 
   const loadSessions = useCallback(async (date: string) => {
+    void locale;
+
     if (!date) {
       setScheduleState({ sessions: [], status: "success" });
       return;
@@ -81,13 +88,12 @@ export function HomeSchedule({
       setScheduleState({ sessions: response.results, status: "success" });
     } catch {
       setScheduleState({
-        errorMessage:
-          "Não conseguimos carregar a programação agora. Verifique sua conexão e tente novamente.",
+        errorMessage: undefined,
         sessions: [],
         status: "error",
       });
     }
-  }, []);
+  }, [locale]);
 
   useEffect(() => {
     void loadSessions(selectedDate);
@@ -126,11 +132,11 @@ export function HomeSchedule({
   }
 
   return (
-    <section aria-label="Horários" className="grid gap-5">
+    <section aria-label={t("schedule.times")} className="grid gap-5">
       {/* Header: tabs + cinema name — sem título visível */}
       <div className="flex flex-wrap items-center gap-y-2">
         <div
-          aria-label="Seções de horários"
+          aria-label={t("schedule.sections")}
           className="flex items-center"
           role="tablist"
         >
@@ -159,7 +165,7 @@ export function HomeSchedule({
                   tabIndex={isSelected ? 0 : -1}
                   type="button"
                 >
-                  {tab.label}
+                  {t(tab.labelKey)}
                 </button>
               </Fragment>
             );
@@ -179,9 +185,9 @@ export function HomeSchedule({
       >
         <div className="grid gap-4">
           {/* Date carousel */}
-          <div aria-label="Selecionar data" className="flex items-stretch gap-1" role="group">
+          <div aria-label={t("schedule.selectDate")} className="flex items-stretch gap-1" role="group">
             <button
-              aria-label="Data anterior"
+              aria-label={t("schedule.previousDate")}
               className="flex items-center justify-center rounded-control border border-border px-2 text-muted transition duration-150 hover:border-brand hover:text-text active:scale-[0.92] focus-visible:outline-none focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
               disabled={!canGoPrev}
               onClick={goToPrevDate}
@@ -218,7 +224,7 @@ export function HomeSchedule({
             </div>
 
             <button
-              aria-label="Próxima data"
+              aria-label={t("schedule.nextDate")}
               className="flex items-center justify-center rounded-control border border-border px-2 text-muted transition duration-150 hover:border-brand hover:text-text active:scale-[0.92] focus-visible:outline-none focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
               disabled={!canGoNext}
               onClick={goToNextDate}
@@ -229,7 +235,7 @@ export function HomeSchedule({
 
             <div className="relative">
               <button
-                aria-label="Abrir calendário"
+                aria-label={t("schedule.openCalendar")}
                 className="flex h-full items-center justify-center rounded-control border border-border px-2 text-muted transition duration-150 hover:border-brand hover:text-text active:scale-[0.92] focus-visible:outline-none focus-visible:shadow-focus"
                 onClick={() => calendarInputRef.current?.showPicker?.()}
                 type="button"
@@ -271,24 +277,24 @@ export function HomeSchedule({
             action={
               onRetryUpcoming ? (
                 <Button onClick={onRetryUpcoming} variant="ghost">
-                  Tentar novamente
+                  {t("common.tryAgain")}
                 </Button>
               ) : undefined
             }
-            title="Em breve indisponível"
+            title={t("catalog.upcomingErrorTitle")}
             tone="error"
           >
             {upcoming.errorMessage ??
-              "Não conseguimos carregar esta seção agora. Verifique sua conexão e tente novamente."}
+              t("catalog.sectionLoadError")}
           </StateMessage>
         ) : (
           <MovieCarousel
-            emptyDescription="Ainda não há filmes em breve no catálogo."
-            emptyTitle="Nenhum filme em breve"
+            emptyDescription={t("catalog.upcomingEmptyDescription")}
+            emptyTitle={t("catalog.upcomingEmptyTitle")}
             isLoading={upcoming.status === "loading"}
-            loadingLabel="Carregando filmes em breve..."
+            loadingLabel={t("catalog.upcomingLoading")}
             movies={upcoming.movies}
-            title="Em breve"
+            title={t("domain.movieStatus.em_breve")}
             titleVisible={false}
           />
         )}
@@ -306,10 +312,14 @@ export function SessionSchedule({
   onRetry: () => void;
   state: SessionScheduleState;
 }) {
+  const { locale, t } = useI18n();
+
   if (state.status === "loading") {
     return (
-      <StateMessage title="Carregando programação" tone="loading">
-        Buscando sessões para {formatSessionFullDate(date)}.
+      <StateMessage title={t("schedule.loadingTitle")} tone="loading">
+        {t("schedule.loadingDescription", {
+          date: formatSessionFullDate(date, locale),
+        })}
       </StateMessage>
     );
   }
@@ -319,14 +329,14 @@ export function SessionSchedule({
       <StateMessage
         action={
           <Button onClick={onRetry} variant="ghost">
-            Tentar novamente
+            {t("common.tryAgain")}
           </Button>
         }
-        title="Programação indisponível"
+        title={t("schedule.errorTitle")}
         tone="error"
       >
         {state.errorMessage ??
-          "Não conseguimos carregar a programação agora. Tente novamente em instantes."}
+          t("schedule.errorDescription")}
       </StateMessage>
     );
   }
@@ -338,14 +348,16 @@ export function SessionSchedule({
 
   if (movieGroups.length === 0) {
     return (
-      <StateMessage title="Nenhuma sessão nesta data">
-        Não há sessões disponíveis para {formatSessionFullDate(date)}. Escolha outra data.
+      <StateMessage title={t("schedule.emptyTitle")}>
+        {t("schedule.emptyDescription", {
+          date: formatSessionFullDate(date, locale),
+        })}
       </StateMessage>
     );
   }
 
   return (
-    <div aria-label="Programação do dia">
+    <div aria-label={t("schedule.daySchedule")}>
       {movieGroups.map((group) => (
         <MovieScheduleEntry date={date} group={group} key={group.movie.id} />
       ))}
@@ -354,8 +366,9 @@ export function SessionSchedule({
 }
 
 function MovieScheduleEntry({ date, group }: { date: string; group: MovieSessionGroup }) {
+  const { locale, t } = useI18n();
   const allSessions = group.roomGroups.flatMap((rg) => rg.sessions);
-  const experienceGroups = groupSessionsByExperienceType(allSessions);
+  const experienceGroups = groupSessionsByExperienceType(allSessions, locale);
 
   return (
     <article className="flex gap-5 border-b border-white/10 py-8 first:pt-0 last:border-b-0 last:pb-0">
@@ -366,7 +379,7 @@ function MovieScheduleEntry({ date, group }: { date: string; group: MovieSession
         tabIndex={-1}
       >
         <ResponsiveImage
-          alt={`Poster de ${group.movie.title}`}
+          alt={t("movie.posterAlt", { title: group.movie.title })}
           className="h-52 w-[8.5rem] rounded-control object-cover"
           height={312}
           loading="lazy"
@@ -391,26 +404,26 @@ function MovieScheduleEntry({ date, group }: { date: string; group: MovieSession
                 {group.movie.age_rating}
               </span>
             )}
-            <span>{formatMovieDuration(group.movie.duration_minutes)}</span>
+            <span>{formatMovieDuration(group.movie.duration_minutes, locale)}</span>
             <span aria-hidden="true">·</span>
-            <span>{formatMovieGenres(group.movie.genres)}</span>
+            <span>{formatMovieGenres(group.movie.genres, locale)}</span>
           </div>
           {group.movie.director && (
             <p className="text-sm text-muted">
-              <span className="font-semibold text-text">Direção:</span>{" "}
+              <span className="font-semibold text-text">{t("movie.director")}:</span>{" "}
               {group.movie.director}
             </p>
           )}
           {group.movie.cast && group.movie.cast.length > 0 && (
             <p className="text-sm text-muted">
-              <span className="font-semibold text-text">Elenco:</span>{" "}
+              <span className="font-semibold text-text">{t("movie.cast")}:</span>{" "}
               {group.movie.cast.slice(0, 3).join(", ")}
             </p>
           )}
         </div>
 
         <p className="text-sm font-extrabold capitalize text-text">
-          {formatScheduleDateHeading(date)}
+          {formatScheduleDateHeading(date, new Date(), locale)}
         </p>
 
         <div className="grid gap-4">
@@ -424,9 +437,10 @@ function MovieScheduleEntry({ date, group }: { date: string; group: MovieSession
 }
 
 function ExperienceGroupEntry({ group }: { group: ExperienceSessionGroup }) {
+  const { locale, t } = useI18n();
   const repSession = group.sessions[0];
-  const allBadges = repSession ? getSessionBadges(repSession) : [];
-  const expLabel = getRoomExperienceLabel(repSession?.room.experience_type);
+  const allBadges = repSession ? getSessionBadges(repSession, locale) : [];
+  const expLabel = getRoomExperienceLabel(repSession?.room.experience_type, locale);
   const headerBadges = allBadges.filter((b) => b.label !== expLabel);
 
   return (
@@ -438,18 +452,25 @@ function ExperienceGroupEntry({ group }: { group: ExperienceSessionGroup }) {
       </div>
       <div className="flex flex-wrap gap-2">
         {group.sessions.map((session) => {
-          const badges = getSessionBadges(session);
+          const badges = getSessionBadges(session, locale);
           const badgeText = badges.map((b) => b.label).join(", ");
-          const badgeDescription = badgeText ? `, formatos ${badgeText}` : "";
+          const badgeDescription = badgeText
+            ? t("schedule.badgeDescription", { badges: badgeText })
+            : "";
 
           return (
             <Link
-              aria-label={`Selecionar sessão das ${formatSessionTime(session.start_time)}, sala ${session.room.name}${badgeDescription}, valor ${formatSessionPrice(session.base_price)}`}
+              aria-label={t("schedule.selectSession", {
+                badges: badgeDescription,
+                price: formatSessionPrice(session.base_price, locale),
+                room: session.room.name,
+                time: formatSessionTime(session.start_time, locale),
+              })}
               className="flex min-w-[4.5rem] items-center justify-center rounded-control bg-brand px-4 py-3 font-extrabold text-white transition duration-150 hover:opacity-90 active:scale-[0.97] active:opacity-80 focus-visible:outline-none focus-visible:shadow-focus"
               href={getSessionSeatsHref(session.id)}
               key={session.id}
             >
-              {formatSessionTime(session.start_time)}
+              {formatSessionTime(session.start_time, locale)}
             </Link>
           );
         })}

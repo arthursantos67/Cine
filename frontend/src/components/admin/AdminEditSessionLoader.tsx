@@ -7,8 +7,10 @@ import type { AdminSession } from "@/types/catalog";
 import { ButtonLink } from "@/components/ui/Button";
 import { AdminSessionForm } from "./AdminSessionForm";
 import { AdminToolbar } from "./AdminToolbar";
+import { useI18n } from "@/i18n";
 
 export function AdminEditSessionLoader({ sessionId }: { sessionId: string }) {
+  const { formatDateTime, t } = useI18n();
   const [session, setSession] = useState<AdminSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -17,13 +19,9 @@ export function AdminEditSessionLoader({ sessionId }: { sessionId: string }) {
     adminApi
       .getSession(sessionId)
       .then(setSession)
-      .catch(() =>
-        setError(
-          "Sessão não encontrada ou você não tem permissão para editá-la."
-        )
-      )
+      .catch(() => setError(t("admin.session.notFoundOrDenied")))
       .finally(() => setLoading(false));
-  }, [sessionId]);
+  }, [sessionId, t]);
 
   if (loading) {
     return (
@@ -31,10 +29,10 @@ export function AdminEditSessionLoader({ sessionId }: { sessionId: string }) {
         <AdminToolbar
           actions={
             <ButtonLink href="/admin/sessions" size="sm" variant="ghost">
-              Voltar
+              {t("admin.back")}
             </ButtonLink>
           }
-          title="Editar sessão"
+          title={t("admin.session.edit")}
         />
         <div className="grid max-w-2xl gap-4">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -54,13 +52,13 @@ export function AdminEditSessionLoader({ sessionId }: { sessionId: string }) {
         <AdminToolbar
           actions={
             <ButtonLink href="/admin/sessions" size="sm" variant="ghost">
-              Voltar
+              {t("admin.back")}
             </ButtonLink>
           }
-          title="Editar sessão"
+          title={t("admin.session.edit")}
         />
         <p className="text-sm font-bold text-error" role="alert">
-          {error ?? "Sessão não encontrada."}
+          {error ?? t("admin.session.notFound")}
         </p>
       </div>
     );
@@ -71,22 +69,14 @@ export function AdminEditSessionLoader({ sessionId }: { sessionId: string }) {
       <AdminToolbar
         actions={
           <ButtonLink href="/admin/sessions" size="sm" variant="ghost">
-            Voltar
+            {t("admin.back")}
           </ButtonLink>
         }
-        title={`Editar: ${session.movie.title} — ${formatDate(session.start_time)}`}
+        title={t("admin.editPrefix", {
+          name: `${session.movie.title} - ${formatDateTime(session.start_time)}`,
+        })}
       />
       <AdminSessionForm session={session} />
     </div>
   );
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
 }

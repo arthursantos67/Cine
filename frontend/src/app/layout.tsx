@@ -3,35 +3,47 @@ import type { Metadata } from "next";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ReservationProvider } from "@/contexts/ReservationContext";
+import { I18nProvider } from "@/i18n";
+import { getServerLocale, getTranslator } from "@/i18n/server";
 
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "CinePrime",
-  description: "Frontend web para compra de ingressos do CinePrime.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getServerLocale();
+  const t = getTranslator(locale);
 
-export default function RootLayout({
+  return {
+    title: "CinePrime",
+    description: t("metadata.description"),
+  };
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getServerLocale();
+  const t = getTranslator(locale);
+
   return (
-    <html lang="pt-BR">
+    <html lang={locale}>
       <body>
-        <AuthProvider>
-          <ReservationProvider>
-            <div className="app-shell">
-              <a className="skip-link" href="#conteudo">
-                Pular para o conteúdo
-              </a>
-              <AppHeader />
-              <main className="main-content" id="conteudo" tabIndex={-1}>
-                <div className="shell-container">{children}</div>
-              </main>
-            </div>
-          </ReservationProvider>
-        </AuthProvider>
+        <I18nProvider initialLocale={locale}>
+          <AuthProvider>
+            <ReservationProvider>
+              <div className="app-shell">
+                <a className="skip-link" href="#conteudo">
+                  {t("layout.skipContent")}
+                </a>
+                <AppHeader />
+                <main className="main-content" id="conteudo" tabIndex={-1}>
+                  <div className="shell-container">{children}</div>
+                </main>
+              </div>
+            </ReservationProvider>
+          </AuthProvider>
+        </I18nProvider>
       </body>
     </html>
   );

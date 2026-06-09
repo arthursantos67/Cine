@@ -1,17 +1,20 @@
 import { AdminSessionForm } from "@/components/admin/AdminSessionForm";
 import { AdminToolbar } from "@/components/admin";
 import { ButtonLink } from "@/components/ui/Button";
+import { getServerLocale, getTranslator } from "@/i18n/server";
 
-export default function AdminNewSessionPage() {
+export default async function AdminNewSessionPage() {
+  const t = getTranslator(await getServerLocale());
+
   return (
     <div className="grid gap-6">
       <AdminToolbar
         actions={
           <ButtonLink href="/admin/sessions" size="sm" variant="ghost">
-            Voltar
+            {t("admin.back")}
           </ButtonLink>
         }
-        title="Nova sessão"
+        title={t("admin.session.new")}
       />
       <AdminSessionForm />
     </div>

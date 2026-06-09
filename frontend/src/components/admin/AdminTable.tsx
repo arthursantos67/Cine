@@ -1,6 +1,9 @@
+"use client";
+
 import React, { type ReactNode } from "react";
 
 import { cn } from "@/components/ui/classNames";
+import { useI18n } from "@/i18n";
 import { AdminEmptyState } from "./AdminEmptyState";
 
 export type AdminTableColumn<T> = {
@@ -37,12 +40,19 @@ export function AdminTable<T extends Record<string, unknown>>({
   columns,
   data,
   emptyDescription,
-  emptyTitle = "Nenhum item encontrado",
+  emptyTitle,
   keyField,
   loading = false,
 }: AdminTableProps<T>) {
+  const { t } = useI18n();
+
   if (!loading && data.length === 0) {
-    return <AdminEmptyState description={emptyDescription} title={emptyTitle} />;
+    return (
+      <AdminEmptyState
+        description={emptyDescription}
+        title={emptyTitle ?? t("admin.table.emptyTitle")}
+      />
+    );
   }
 
   return (

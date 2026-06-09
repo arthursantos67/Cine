@@ -9,14 +9,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { AdminConfirmDialog, AdminTable, AdminToolbar } from "@/components/admin";
 import type { AdminTableColumn } from "@/components/admin";
-
-const EXPERIENCE_LABELS: Record<CatalogRoomExperienceType, string> = {
-  "": "—",
-  imax: "IMAX",
-  premium: "Premium",
-  standard: "Standard",
-  vip: "VIP",
-};
+import { useI18n } from "@/i18n";
 
 const EXPERIENCE_TONES: Record<
   CatalogRoomExperienceType,
@@ -30,6 +23,7 @@ const EXPERIENCE_TONES: Record<
 };
 
 export function AdminRoomList() {
+  const { t } = useI18n();
   const [rooms, setRooms] = useState<AdminRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -43,11 +37,11 @@ export function AdminRoomList() {
       const result = await adminApi.listRooms();
       setRooms(result.results);
     } catch {
-      setErrorMessage("Não foi possível carregar as salas. Tente novamente.");
+      setErrorMessage(t("admin.room.loadError"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchRooms();
@@ -61,7 +55,7 @@ export function AdminRoomList() {
       setDeleteTarget(null);
       fetchRooms();
     } catch {
-      setErrorMessage("Não foi possível excluir a sala. Tente novamente.");
+      setErrorMessage(t("admin.room.deleteError"));
       setDeleteTarget(null);
     } finally {
       setIsDeleting(false);
@@ -71,7 +65,7 @@ export function AdminRoomList() {
   const columns: AdminTableColumn<Record<string, unknown>>[] = [
     {
       key: "name",
-      label: "Nome",
+      label: t("admin.room.name"),
       render: (row) => {
         const room = row as unknown as AdminRoom;
         return (
@@ -87,30 +81,30 @@ export function AdminRoomList() {
     {
       className: "hidden sm:table-cell",
       key: "capacity",
-      label: "Capacidade",
+      label: t("admin.room.capacity"),
       render: (row) => {
         const room = row as unknown as AdminRoom;
-        return `${room.capacity} lugares`;
+        return t("admin.room.capacityPlaces", { count: room.capacity });
       },
     },
     {
       className: "hidden md:table-cell",
       key: "experience_type",
-      label: "Experiência",
+      label: t("admin.room.experience"),
       render: (row) => {
         const room = row as unknown as AdminRoom;
         const expType = (room.experience_type ?? "") as CatalogRoomExperienceType;
         if (!expType) return <span className="text-white/40">—</span>;
         return (
           <Badge size="sm" tone={EXPERIENCE_TONES[expType]}>
-            {EXPERIENCE_LABELS[expType]}
+            {t(`domain.roomExperience.${expType}`)}
           </Badge>
         );
       },
     },
     {
       key: "actions",
-      label: "Ações",
+      label: t("admin.actions"),
       render: (row) => {
         const room = row as unknown as AdminRoom;
         return (
@@ -120,21 +114,21 @@ export function AdminRoomList() {
               size="sm"
               variant="secondary"
             >
-              Layout
+              {t("admin.layout")}
             </ButtonLink>
             <ButtonLink
               href={`/admin/rooms/${room.id}/edit`}
               size="sm"
               variant="ghost"
             >
-              Editar
+              {t("admin.edit")}
             </ButtonLink>
             <Button
               onClick={() => setDeleteTarget(room)}
               size="sm"
               variant="danger"
             >
-              Excluir
+              {t("admin.delete")}
             </Button>
           </div>
         );
@@ -147,10 +141,10 @@ export function AdminRoomList() {
       <AdminToolbar
         actions={
           <ButtonLink href="/admin/rooms/new" size="sm" variant="primary">
-            Nova sala
+            {t("admin.room.new")}
           </ButtonLink>
         }
-        title="Salas"
+        title={t("admin.rooms")}
       />
 
       {errorMessage ? (
@@ -160,22 +154,22 @@ export function AdminRoomList() {
       ) : null}
 
       <AdminTable
-        caption="Lista de salas"
+        caption={t("admin.room.listCaption")}
         columns={columns}
         data={rooms as unknown as Record<string, unknown>[]}
-        emptyDescription="Nenhuma sala cadastrada. Clique em 'Nova sala' para criar uma."
-        emptyTitle="Nenhuma sala cadastrada"
+        emptyDescription={t("admin.room.noneDescription")}
+        emptyTitle={t("admin.room.noneTitle")}
         keyField="id"
         loading={loading}
       />
 
       <AdminConfirmDialog
-        confirmLabel={isDeleting ? "Excluindo..." : "Excluir"}
-        description={`Tem certeza que deseja excluir a sala "${deleteTarget?.name}"? Esta ação não pode ser desfeita.`}
+        confirmLabel={isDeleting ? t("admin.deleting") : t("admin.delete")}
+        description={t("admin.room.deleteDescription", { name: deleteTarget?.name ?? "" })}
         isOpen={deleteTarget !== null}
         onCancel={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
-        title="Excluir sala"
+        title={t("admin.room.delete")}
         tone="danger"
       />
     </div>

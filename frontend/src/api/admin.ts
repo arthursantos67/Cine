@@ -7,9 +7,12 @@ import type {
   CatalogGenre,
   CatalogMovieAgeRating,
   CatalogMovieDetail,
+  CatalogMovieTranslations,
   CatalogProjectionFormat,
   CatalogRoomExperienceType,
+  CatalogRoomTranslations,
   CatalogSessionType,
+  CatalogGenreTranslations,
   MovieStatus,
   RoomTypePricing,
 } from "@/types/catalog";
@@ -39,10 +42,12 @@ export type AdminMovieWritePayload = {
   status: MovieStatus;
   synopsis: string;
   title: string;
+  translations?: CatalogMovieTranslations;
 };
 
 export type AdminGenreWritePayload = {
   name: string;
+  translations?: CatalogGenreTranslations;
 };
 
 export type AdminRoomWritePayload = {
@@ -51,6 +56,7 @@ export type AdminRoomWritePayload = {
   display_name?: string;
   experience_type?: CatalogRoomExperienceType;
   name: string;
+  translations?: CatalogRoomTranslations;
 };
 
 export type RoomTypePricingWritePayload = {
@@ -258,9 +264,12 @@ export const adminApi = {
     });
   },
 
-  async listGenres(params: { page?: number } = {}) {
-    const query = params.page !== undefined ? `?page=${params.page}` : "";
-    const response = await apiRequest<unknown>(`${GENRES_PATH}${query}`, {
+  async listGenres(params: { page?: number; search?: string } = {}) {
+    const searchParams = new URLSearchParams();
+    if (params.page !== undefined) searchParams.set("page", String(params.page));
+    if (params.search) searchParams.set("search", params.search);
+    const query = searchParams.toString();
+    const response = await apiRequest<unknown>(query ? `${GENRES_PATH}?${query}` : GENRES_PATH, {
       auth: "required",
       method: "GET",
     });

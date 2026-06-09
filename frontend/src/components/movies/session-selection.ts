@@ -1,13 +1,12 @@
 import type {
-  CatalogAudioFormat,
   CatalogMovie,
-  CatalogProjectionFormat,
   CatalogRoomExperienceType,
   CatalogRoomSummary,
   CatalogSession,
-  CatalogSessionType,
 } from "@/types/catalog";
-import { formatCurrency, ptBrLocale } from "@/utils/formatters";
+import { DEFAULT_LOCALE, type Locale, resolveLocale } from "@/i18n/locales";
+import { messages } from "@/i18n/messages";
+import { formatCurrency } from "@/utils/formatters";
 
 export const sessionTimeZone = "America/Fortaleza";
 
@@ -27,40 +26,10 @@ export type SessionBadge = {
   label: string;
 };
 
-const roomExperienceLabels: Record<
-  Exclude<CatalogRoomExperienceType, "">,
-  string
-> = {
-  imax: "IMAX",
-  premium: "Premium",
-  standard: "Tradicional",
-  vip: "VIP",
-};
-
-const audioFormatLabels: Record<Exclude<CatalogAudioFormat, "">, string> = {
-  dublado: "Dublado",
-  legendado: "Legendado",
-  original: "Original",
-};
-
-const projectionFormatLabels: Record<
-  Exclude<CatalogProjectionFormat, "">,
-  string
-> = {
-  "2d": "2D",
-  "3d": "3D",
-  imax: "IMAX",
-};
-
-const sessionTypeLabels: Record<Exclude<CatalogSessionType, "">, string> = {
-  preview: "Pré-estreia",
-  regular: "Regular",
-  special_event: "Evento",
-};
-
 export function buildSessionDateOptions(
   startDate: Date,
-  dayCount = 7
+  dayCount = 7,
+  locale: Locale | string = DEFAULT_LOCALE
 ): SessionDateOption[] {
   const startDateValue = formatDateForSessionQuery(startDate);
 
@@ -68,9 +37,9 @@ export function buildSessionDateOptions(
     const value = addDaysToDateValue(startDateValue, offset);
 
     return {
-      label: formatSessionDateLabel(value),
+      label: formatSessionDateLabel(value, locale),
       value,
-      weekday: formatSessionWeekday(value),
+      weekday: formatSessionWeekday(value, locale),
     };
   });
 }
@@ -86,43 +55,58 @@ export function formatDateForSessionQuery(date: Date) {
   return `${getDatePart(parts, "year")}-${getDatePart(parts, "month")}-${getDatePart(parts, "day")}`;
 }
 
-export function formatSessionDateLabel(dateValue: string) {
-  return new Intl.DateTimeFormat(ptBrLocale, {
+export function formatSessionDateLabel(
+  dateValue: string,
+  locale: Locale | string = DEFAULT_LOCALE
+) {
+  return new Intl.DateTimeFormat(resolveLocale(locale), {
     day: "2-digit",
     month: "2-digit",
     timeZone: "UTC",
   }).format(parseSessionDateValue(dateValue));
 }
 
-export function formatSessionFullDate(dateValue: string) {
-  return new Intl.DateTimeFormat(ptBrLocale, {
+export function formatSessionFullDate(
+  dateValue: string,
+  locale: Locale | string = DEFAULT_LOCALE
+) {
+  return new Intl.DateTimeFormat(resolveLocale(locale), {
     dateStyle: "long",
     timeZone: "UTC",
   }).format(parseSessionDateValue(dateValue));
 }
 
-export function formatSessionTime(value: string) {
-  return new Intl.DateTimeFormat(ptBrLocale, {
+export function formatSessionTime(
+  value: string,
+  locale: Locale | string = DEFAULT_LOCALE
+) {
+  return new Intl.DateTimeFormat(resolveLocale(locale), {
     hour: "2-digit",
     minute: "2-digit",
     timeZone: sessionTimeZone,
   }).format(new Date(value));
 }
 
-export function formatSessionPrice(value: string) {
-  return formatCurrency(Number(value));
+export function formatSessionPrice(
+  value: string,
+  locale: Locale | string = DEFAULT_LOCALE
+) {
+  return formatCurrency(Number(value), locale);
 }
 
 export function getRoomDisplayName(room: CatalogRoomSummary) {
   return room.display_name?.trim() || room.name;
 }
 
-export function getSessionBadges(session: CatalogSession): SessionBadge[] {
+export function getSessionBadges(
+  session: CatalogSession,
+  locale: Locale | string = DEFAULT_LOCALE
+): SessionBadge[] {
   const labels = [
-    getMetadataLabel(session.room.experience_type, roomExperienceLabels),
-    getMetadataLabel(session.projection_format, projectionFormatLabels),
-    getMetadataLabel(session.audio_format, audioFormatLabels),
-    getMetadataLabel(session.session_type, sessionTypeLabels),
+    getMetadataLabel("roomExperience", session.room.experience_type, locale),
+    getMetadataLabel("projection", session.projection_format, locale),
+    getMetadataLabel("audio", session.audio_format, locale),
+    getMetadataLabel("sessionType", session.session_type, locale),
   ];
   const uniqueLabels = labels.filter(
     (label, index): label is string =>
@@ -189,10 +173,7 @@ function compareSessionsByRoomAndTime(
   first: CatalogSession,
   second: CatalogSession
 ) {
-  const roomComparison = getRoomDisplayName(first.room).localeCompare(
-    getRoomDisplayName(second.room),
-    ptBrLocale
-  );
+  const roomComparison = getRoomDisplayName(first.room).localeCompare(getRoomDisplayName(second.room));
 
   if (roomComparison !== 0) {
     return roomComparison;
@@ -203,19 +184,12 @@ function compareSessionsByRoomAndTime(
   );
 }
 
-const roomExperienceGroupLabels: Record<CatalogRoomExperienceType, string> = {
-  "": "Sala",
-  imax: "IMAX",
-  premium: "Premium",
-  standard: "Sala Tradicional",
-  vip: "VIP",
-};
-
 export function getRoomExperienceLabel(
-  type: CatalogRoomExperienceType | null | undefined
+  type: CatalogRoomExperienceType | null | undefined,
+  locale: Locale | string = DEFAULT_LOCALE
 ): string {
   if (!type) return "";
-  return roomExperienceLabels[type] ?? "";
+  return getMetadataLabel("roomExperience", type, locale) ?? "";
 }
 
 export type ExperienceSessionGroup = {
@@ -225,7 +199,8 @@ export type ExperienceSessionGroup = {
 };
 
 export function groupSessionsByExperienceType(
-  sessions: CatalogSession[]
+  sessions: CatalogSession[],
+  locale: Locale | string = DEFAULT_LOCALE
 ): ExperienceSessionGroup[] {
   const groups = new Map<string, ExperienceSessionGroup>();
 
@@ -241,30 +216,34 @@ export function groupSessionsByExperienceType(
     } else {
       groups.set(expType, {
         experienceType: expType,
-        label: roomExperienceGroupLabels[expType] ?? "Sala",
+        label:
+          expType === "standard"
+            ? t(locale, "domain.roomExperience.standardGroup")
+            : getRoomExperienceLabel(expType, locale) || t(locale, "session.roomFallback"),
         sessions: [session],
       });
     }
   }
 
   return Array.from(groups.values()).sort((a, b) =>
-    a.label.localeCompare(b.label, ptBrLocale)
+    a.label.localeCompare(b.label, resolveLocale(locale))
   );
 }
 
 export function formatScheduleDateHeading(
   dateValue: string,
-  today: Date = new Date()
+  today: Date = new Date(),
+  locale: Locale | string = DEFAULT_LOCALE
 ): string {
   const todayValue = formatDateForSessionQuery(today);
   const tomorrowDate = new Date(today);
   tomorrowDate.setDate(today.getDate() + 1);
   const tomorrowValue = formatDateForSessionQuery(tomorrowDate);
 
-  if (dateValue === todayValue) return "Hoje";
-  if (dateValue === tomorrowValue) return "Amanhã";
+  if (dateValue === todayValue) return t(locale, "session.today");
+  if (dateValue === tomorrowValue) return t(locale, "session.tomorrow");
 
-  return new Intl.DateTimeFormat(ptBrLocale, {
+  return new Intl.DateTimeFormat(resolveLocale(locale), {
     day: "numeric",
     month: "long",
     timeZone: "UTC",
@@ -278,8 +257,11 @@ function addDaysToDateValue(dateValue: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
-function formatSessionWeekday(dateValue: string) {
-  const weekday = new Intl.DateTimeFormat(ptBrLocale, {
+function formatSessionWeekday(
+  dateValue: string,
+  locale: Locale | string = DEFAULT_LOCALE
+) {
+  const weekday = new Intl.DateTimeFormat(resolveLocale(locale), {
     timeZone: "UTC",
     weekday: "short",
   }).format(parseSessionDateValue(dateValue));
@@ -303,13 +285,19 @@ function parseDateParts(dateValue: string) {
   return dateValue.split("-").map(Number) as [number, number, number];
 }
 
-function getMetadataLabel<T extends string>(
-  value: T | null | undefined,
-  labels: Partial<Record<Exclude<T, "">, string>>
+function getMetadataLabel(
+  domain: "audio" | "projection" | "roomExperience" | "sessionType",
+  value: string | null | undefined,
+  locale: Locale | string
 ) {
   if (!value) {
     return null;
   }
 
-  return labels[value as Exclude<T, "">] ?? null;
+  return t(locale, `domain.${domain}.${value}`) ?? null;
+}
+
+function t(locale: Locale | string, key: string) {
+  const resolvedLocale = resolveLocale(locale);
+  return messages[resolvedLocale][key] ?? messages[DEFAULT_LOCALE][key] ?? key;
 }

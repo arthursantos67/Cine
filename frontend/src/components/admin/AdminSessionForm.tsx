@@ -4,8 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { adminApi, type AdminSessionWritePayload } from "@/api/admin";
-import { ApiError } from "@/api/client";
-import { formatCurrency } from "@/utils/formatters";
+import { ApiError, getApiErrorUserMessage } from "@/api/client";
 import type {
   AdminRoom,
   AdminSession,
@@ -16,6 +15,7 @@ import type {
 } from "@/types/catalog";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
+import { useI18n } from "@/i18n";
 
 type FieldErrors = Partial<
   Record<keyof AdminSessionWritePayload | "non_field_errors", string>
@@ -25,29 +25,12 @@ type AdminSessionFormProps = {
   session?: AdminSession;
 };
 
-const AUDIO_FORMAT_OPTIONS = [
-  { label: "Original", value: "original" },
-  { label: "Legendado", value: "legendado" },
-  { label: "Dublado", value: "dublado" },
-];
-
-const PROJECTION_FORMAT_OPTIONS = [
-  { label: "2D", value: "2d" },
-  { label: "3D", value: "3d" },
-  { label: "IMAX", value: "imax" },
-];
-
-const SESSION_TYPE_OPTIONS = [
-  { label: "Regular", value: "regular" },
-  { label: "Pré-estreia", value: "preview" },
-  { label: "Evento especial", value: "special_event" },
-];
-
 const WEEKEND_DAYS = new Set([0, 5, 6]); // Sun, Fri, Sat
 
 function computeSessionPricePreview(
   roomBasePrice: string,
-  startTime: string
+  startTime: string,
+  formatCurrency: (value: number) => string
 ): string | null {
   if (!roomBasePrice || !startTime) return null;
   const day = new Date(startTime).getUTCDay();
@@ -142,6 +125,7 @@ function isProtected(session?: AdminSession): boolean {
 
 export function AdminSessionForm({ session }: AdminSessionFormProps) {
   const router = useRouter();
+  const { formatCurrency, locale, t } = useI18n();
   const isEditing = session !== undefined;
   const locked = isProtected(session);
 
@@ -178,6 +162,22 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
   const startTimeId = useId();
   const endTimeId = useId();
 
+  const audioFormatOptions = [
+    { label: t("domain.audio.original"), value: "original" },
+    { label: t("domain.audio.legendado"), value: "legendado" },
+    { label: t("domain.audio.dublado"), value: "dublado" },
+  ];
+  const projectionFormatOptions = [
+    { label: t("domain.projection.2d"), value: "2d" },
+    { label: t("domain.projection.3d"), value: "3d" },
+    { label: t("domain.projection.imax"), value: "imax" },
+  ];
+  const sessionTypeOptions = [
+    { label: t("domain.sessionType.regular"), value: "regular" },
+    { label: t("domain.sessionType.preview"), value: "preview" },
+    { label: t("domain.sessionType.special_event"), value: "special_event" },
+  ];
+
   useEffect(() => {
     Promise.all([adminApi.listMovies({ page: 1 }), adminApi.listRooms()])
       .then(([moviesRes, roomsRes]) => {
@@ -185,10 +185,10 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
         setRooms(roomsRes.results);
       })
       .catch(() => {
-        setGlobalError("Não foi possível carregar filmes e salas.");
+        setGlobalError(t("admin.session.formLoadError"));
       })
       .finally(() => setLoadingOptions(false));
-  }, []);
+  }, [t]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -217,10 +217,10 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
       router.refresh();
     } catch (err) {
       if (isConflictError(err)) {
-        const msg =
-          err instanceof ApiError ? err.message : String(err);
         setConflictError(
-          `Conflito de horário: ${msg}. Escolha outro horário ou sala para esta sessão.`
+          t("admin.session.conflictDescription", {
+            message: getApiErrorUserMessage(err, locale),
+          })
         );
         return;
       }
@@ -228,11 +228,9 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
       const errors = extractSessionFieldErrors(err);
       if (Object.keys(errors).length > 0) {
         setFieldErrors(errors);
-        setGlobalError("Corrija os erros indicados e tente novamente.");
-      } else if (err instanceof ApiError) {
-        setGlobalError(`Erro: ${err.message}`);
+        setGlobalError(t("admin.error.fixFields"));
       } else {
-        setGlobalError("Não foi possível salvar a sessão. Tente novamente.");
+        setGlobalError(getApiErrorUserMessage(err, locale));
       }
     } finally {
       setIsSubmitting(false);
@@ -273,7 +271,7 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
           role="alert"
         >
           <p className="text-sm font-bold text-[#fbbf24]">
-            Conflito de agenda detectado
+            {t("admin.session.conflictTitle")}
           </p>
           <p className="mt-1 text-sm text-[#fcd34d]/80">{conflictError}</p>
         </div>
@@ -282,12 +280,10 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
       {locked ? (
         <div className="rounded-[8px] border border-white/10 bg-white/[0.04] px-4 py-3">
           <p className="text-sm font-bold text-white/70">
-            Sessão com reservas ou compras ativas
+            {t("admin.session.lockedTitle")}
           </p>
           <p className="mt-1 text-xs text-white/40">
-            Filme, sala, horários e preço não podem ser alterados pois esta
-            sessão já possui assentos reservados ou comprados. Você pode
-            atualizar apenas os metadados opcionais (formato, áudio, tipo).
+            {t("admin.session.lockedDescription")}
           </p>
         </div>
       ) : null}
@@ -295,12 +291,10 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
       {!isEditing ? (
         <div className="rounded-[8px] border border-brand/20 bg-brand/5 px-4 py-3">
           <p className="text-sm font-bold text-brand/80">
-            Geração automática de assentos
+            {t("admin.session.autoSeatsTitle")}
           </p>
           <p className="mt-1 text-xs text-white/50">
-            Ao criar esta sessão, os assentos serão gerados automaticamente com
-            base no layout atual da sala selecionada. Alterações futuras no
-            layout da sala não afetarão sessões já criadas.
+            {t("admin.session.autoSeatsDescription")}
           </p>
         </div>
       ) : null}
@@ -309,10 +303,14 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
         disabled={formDisabled || locked}
         error={fieldErrors.movie}
         id={movieSelectId}
-        label="Filme"
+        label={t("admin.session.movie")}
         onChange={(e) => setMovieId(e.target.value)}
         options={movieOptions}
-        placeholder={loadingOptions ? "Carregando..." : "Selecione um filme"}
+        placeholder={
+          loadingOptions
+            ? t("common.loadingEllipsis")
+            : t("admin.session.moviePlaceholder")
+        }
         required
         value={movieId}
       />
@@ -321,10 +319,14 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
         disabled={formDisabled || locked}
         error={fieldErrors.room}
         id={roomSelectId}
-        label="Sala"
+        label={t("admin.session.room")}
         onChange={(e) => setRoomId(e.target.value)}
         options={roomOptions}
-        placeholder={loadingOptions ? "Carregando..." : "Selecione uma sala"}
+        placeholder={
+          loadingOptions
+            ? t("common.loadingEllipsis")
+            : t("admin.session.roomPlaceholder")
+        }
         required
         value={roomId}
       />
@@ -332,8 +334,8 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
       <div className="grid gap-4 sm:grid-cols-2">
         <FormField
           error={fieldErrors.start_time}
-          hint="Data e hora de início da sessão."
-          label="Início"
+          hint={t("admin.session.startHint")}
+          label={t("admin.session.start")}
           labelFor={startTimeId}
         >
           <TextInput
@@ -349,8 +351,8 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
 
         <FormField
           error={fieldErrors.end_time}
-          hint="Data e hora de término."
-          label="Fim"
+          hint={t("admin.session.endHint")}
+          label={t("admin.session.end")}
           labelFor={endTimeId}
         >
           <TextInput
@@ -369,16 +371,15 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
         const selectedRoom = rooms.find((r) => r.id === roomId);
         const preview =
           selectedRoom?.base_price
-            ? computeSessionPricePreview(selectedRoom.base_price, startTime)
+            ? computeSessionPricePreview(selectedRoom.base_price, startTime, formatCurrency)
             : null;
         return (
           <div className="grid gap-1.5">
             <span className="text-sm font-extrabold text-white">
-              Preço do ingresso
+              {t("admin.session.calculatedPrice")}
             </span>
             <p className="text-xs text-white/40">
-              Calculado automaticamente a partir do preço base da sala com
-              acréscimo de 24% em sextas, sábados e domingos.
+              {t("admin.session.calculatedPriceHelp")}
             </p>
             {preview ? (
               <p className="inline-flex w-fit items-center rounded-md border border-brand/50 bg-brand/20 px-3 py-1.5 text-base font-extrabold text-white">
@@ -386,7 +387,7 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
               </p>
             ) : (
               <p className="text-sm text-white/40">
-                Selecione a sala e o horário para ver o valor calculado.
+                {t("admin.session.selectPriceHelp")}
               </p>
             )}
           </div>
@@ -397,32 +398,32 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
         <Select
           disabled={formDisabled}
           error={fieldErrors.audio_format}
-          label="Formato de áudio"
+          label={t("admin.session.audioFormat")}
           onChange={(e) => setAudioFormat(e.target.value as CatalogAudioFormat)}
-          options={AUDIO_FORMAT_OPTIONS}
-          placeholder="Não especificado"
+          options={audioFormatOptions}
+          placeholder={t("common.notSpecified")}
           value={audioFormat}
         />
 
         <Select
           disabled={formDisabled}
           error={fieldErrors.projection_format}
-          label="Projeção"
+          label={t("admin.session.projection")}
           onChange={(e) =>
             setProjectionFormat(e.target.value as CatalogProjectionFormat)
           }
-          options={PROJECTION_FORMAT_OPTIONS}
-          placeholder="Não especificado"
+          options={projectionFormatOptions}
+          placeholder={t("common.notSpecified")}
           value={projectionFormat}
         />
 
         <Select
           disabled={formDisabled}
           error={fieldErrors.session_type}
-          label="Tipo de sessão"
+          label={t("admin.session.type")}
           onChange={(e) => setSessionType(e.target.value as CatalogSessionType)}
-          options={SESSION_TYPE_OPTIONS}
-          placeholder="Não especificado"
+          options={sessionTypeOptions}
+          placeholder={t("common.notSpecified")}
           value={sessionType}
         />
       </div>
@@ -434,10 +435,10 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
           type="button"
           variant="ghost"
         >
-          Cancelar
+          {t("admin.cancel")}
         </Button>
         <Button isLoading={isSubmitting} type="submit" variant="primary">
-          {isEditing ? "Salvar alterações" : "Criar sessão"}
+          {isEditing ? t("admin.saveChanges") : t("admin.session.create")}
         </Button>
       </div>
     </form>

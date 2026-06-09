@@ -16,7 +16,33 @@ export type CatalogSessionType = "" | "regular" | "preview" | "special_event";
 export type CatalogGenre = {
   id: string;
   name: string;
+  translations?: CatalogGenreTranslations;
 };
+
+export type CatalogTranslationLocale =
+  | "pt-BR"
+  | "en-US"
+  | "es-ES"
+  | "fr-FR"
+  | "de-DE"
+  | "it-IT"
+  | "zh-CN"
+  | "ja-JP";
+
+export type CatalogGenreTranslations = Partial<
+  Record<CatalogTranslationLocale, { name?: string }>
+>;
+
+export type CatalogMovieTranslations = Partial<
+  Record<CatalogTranslationLocale, { synopsis?: string; title?: string }>
+>;
+
+export type CatalogRoomTranslations = Partial<
+  Record<
+    CatalogTranslationLocale,
+    { description?: string; display_name?: string }
+  >
+>;
 
 export type CatalogMovieAgeRating = "" | "L" | "10" | "12" | "14" | "16" | "18";
 
@@ -32,6 +58,7 @@ export type CatalogMovie = {
   release_date?: string | null;
   status: MovieStatus;
   title: string;
+  translations?: CatalogMovieTranslations;
 };
 
 export type CatalogMovieDetail = CatalogMovie & {
@@ -48,6 +75,7 @@ export type CatalogRoomSummary = {
   experience_type?: CatalogRoomExperienceType | null;
   id: string;
   name: string;
+  translations?: CatalogRoomTranslations;
 };
 
 export type CatalogSession = {

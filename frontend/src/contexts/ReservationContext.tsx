@@ -29,6 +29,7 @@ import type {
   ReservedSeat,
   TicketType,
 } from "@/types/reservation";
+import { useI18n } from "@/i18n";
 
 type ReservationContextValue = ReservationState & {
   addSeats: (
@@ -50,6 +51,7 @@ export const RESERVATION_EXPIRED_MESSAGE =
   "Sua reserva temporária expirou. Os assentos foram liberados; escolha seus lugares novamente para continuar a compra.";
 
 export function ReservationProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   const [state, setState] = useState<ReservationState>(initialReservationState);
 
   const addSeats = useCallback(
@@ -104,10 +106,10 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const expireReservation = useCallback(
-    (message = RESERVATION_EXPIRED_MESSAGE) => {
+    (message = t("reservation.expired")) => {
       setState((currentState) => getExpiredReservationState(currentState, message));
     },
-    []
+    [t]
   );
 
   useEffect(() => {

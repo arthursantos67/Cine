@@ -9,12 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { ButtonLink } from "@/components/ui/Button";
 import { AdminConfirmDialog, AdminTable, AdminToolbar } from "@/components/admin";
 import type { AdminTableColumn } from "@/components/admin";
-
-const STATUS_LABELS: Record<MovieStatus, string> = {
-  em_cartaz: "Em cartaz",
-  pre_venda: "Pré-venda",
-  em_breve: "Em breve",
-};
+import { useI18n } from "@/i18n";
 
 const STATUS_TONES: Record<MovieStatus, "success" | "info" | "neutral"> = {
   em_cartaz: "success",
@@ -23,6 +18,7 @@ const STATUS_TONES: Record<MovieStatus, "success" | "info" | "neutral"> = {
 };
 
 export function AdminMovieList() {
+  const { formatDate, t } = useI18n();
   const [movies, setMovies] = useState<CatalogMovieDetail[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -62,7 +58,7 @@ export function AdminMovieList() {
         setHasMore(result.next !== null);
         setPage(pageNum);
       } catch {
-        setErrorMessage("Não foi possível carregar os filmes. Tente novamente.");
+        setErrorMessage(t("admin.movie.loadError"));
       } finally {
         if (replace) {
           setLoading(false);
@@ -71,7 +67,7 @@ export function AdminMovieList() {
         }
       }
     },
-    [search, statusFilter]
+    [search, statusFilter, t]
   );
 
   // Reset and fetch page 1 whenever filters change.
@@ -100,7 +96,7 @@ export function AdminMovieList() {
       setMovies([]);
       fetchPage(1, true);
     } catch {
-      setErrorMessage("Não foi possível excluir o filme. Tente novamente.");
+      setErrorMessage(t("admin.movie.deleteError"));
       setDeleteTarget(null);
     } finally {
       setIsDeleting(false);
@@ -111,7 +107,7 @@ export function AdminMovieList() {
     {
       className: "w-14",
       key: "poster",
-      label: "Poster",
+      label: t("admin.movie.poster"),
       render: (row) => {
         const movie = row as unknown as CatalogMovieDetail;
         return movie.poster_url ? (
@@ -128,7 +124,7 @@ export function AdminMovieList() {
     },
     {
       key: "title",
-      label: "Título",
+      label: t("admin.movie.titleField"),
       render: (row) => {
         const movie = row as unknown as CatalogMovieDetail;
         return (
@@ -146,36 +142,38 @@ export function AdminMovieList() {
     {
       className: "hidden sm:table-cell",
       key: "duration_minutes",
-      label: "Duração",
+      label: t("admin.movie.duration"),
       render: (row) => {
         const movie = row as unknown as CatalogMovieDetail;
-        return `${movie.duration_minutes} min`;
+        return t("admin.movie.durationUnit", { count: movie.duration_minutes });
       },
     },
     {
       className: "hidden md:table-cell",
       key: "release_date",
-      label: "Lançamento",
+      label: t("admin.movie.releaseShort"),
       render: (row) => {
         const movie = row as unknown as CatalogMovieDetail;
-        return movie.release_date ?? "—";
+        return movie.release_date
+          ? formatDate(`${movie.release_date}T00:00:00`)
+          : "—";
       },
     },
     {
       key: "status",
-      label: "Status",
+      label: t("admin.movie.status"),
       render: (row) => {
         const movie = row as unknown as CatalogMovieDetail;
         return (
           <Badge size="sm" tone={STATUS_TONES[movie.status]}>
-            {STATUS_LABELS[movie.status]}
+            {t(`domain.movieStatus.${movie.status}`)}
           </Badge>
         );
       },
     },
     {
       key: "actions",
-      label: "Ações",
+      label: t("admin.actions"),
       render: (row) => {
         const movie = row as unknown as CatalogMovieDetail;
         return (
@@ -185,14 +183,14 @@ export function AdminMovieList() {
               size="sm"
               variant="ghost"
             >
-              Editar
+              {t("admin.edit")}
             </ButtonLink>
             <Button
               onClick={() => setDeleteTarget(movie)}
               size="sm"
               variant="danger"
             >
-              Excluir
+              {t("admin.delete")}
             </Button>
           </div>
         );
@@ -205,25 +203,25 @@ export function AdminMovieList() {
       <AdminToolbar
         actions={
           <ButtonLink href="/admin/movies/new" size="sm" variant="primary">
-            Novo filme
+            {t("admin.movie.new")}
           </ButtonLink>
         }
         filters={
           <select
-            aria-label="Filtrar por status"
+            aria-label={t("admin.movie.statusFilter")}
             className="rounded-control border border-white/[0.12] bg-white/[0.05] px-3 py-2 text-sm text-white outline-none transition focus:border-brand focus:bg-white/[0.07]"
             onChange={(e) => setStatusFilter(e.target.value as MovieStatus | "")}
             value={statusFilter}
           >
-            <option value="">Todos os status</option>
-            <option value="em_cartaz">Em cartaz</option>
-            <option value="pre_venda">Pré-venda</option>
-            <option value="em_breve">Em breve</option>
+            <option value="">{t("admin.movie.statusAll")}</option>
+            <option value="em_cartaz">{t("domain.movieStatus.em_cartaz")}</option>
+            <option value="pre_venda">{t("domain.movieStatus.pre_venda")}</option>
+            <option value="em_breve">{t("domain.movieStatus.em_breve")}</option>
           </select>
         }
         onSearch={setSearchInput}
-        searchPlaceholder="Buscar filme..."
-        title="Filmes"
+        searchPlaceholder={t("admin.movie.search")}
+        title={t("admin.movies")}
       />
 
       {errorMessage ? (
@@ -239,29 +237,29 @@ export function AdminMovieList() {
         ref={scrollContainerRef}
       >
         <AdminTable
-          caption="Lista de filmes"
+          caption={t("admin.movie.listCaption")}
           columns={columns}
           data={movies as unknown as Record<string, unknown>[]}
-          emptyDescription="Nenhum filme encontrado. Adicione um novo filme para começar."
-          emptyTitle="Nenhum filme cadastrado"
+          emptyDescription={t("admin.movie.noneDescription")}
+          emptyTitle={t("admin.movie.noneTitle")}
           keyField="id"
           loading={loading}
         />
 
         {loadingMore ? (
           <p className="border-t border-white/[0.05] py-3 text-center text-xs text-white/40">
-            Carregando mais filmes…
+            {t("admin.movie.loadingMore")}
           </p>
         ) : null}
       </div>
 
       <AdminConfirmDialog
-        confirmLabel={isDeleting ? "Excluindo..." : "Excluir"}
-        description={`Tem certeza que deseja excluir "${deleteTarget?.title}"? Esta ação não pode ser desfeita.`}
+        confirmLabel={isDeleting ? t("admin.deleting") : t("admin.delete")}
+        description={t("admin.movie.deleteDescription", { title: deleteTarget?.title ?? "" })}
         isOpen={deleteTarget !== null}
         onCancel={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
-        title="Excluir filme"
+        title={t("admin.movie.delete")}
         tone="danger"
       />
     </div>

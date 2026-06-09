@@ -1,11 +1,14 @@
 import { DEFAULT_TICKET_TYPE } from "@/contexts/reservation-state";
 import type { ReservedSeat, TicketType } from "@/types/reservation";
+import { DEFAULT_LOCALE, type Locale, resolveLocale } from "@/i18n/locales";
+import { messages } from "@/i18n/messages";
 
 import {
   calculateOrderTotal,
   calculateTicketUnitPrice,
   formatSeatLabel,
   ticketTypeLabels,
+  getTicketTypeLabel,
 } from "./order-summary";
 
 export type TicketTypeOption = {
@@ -36,6 +39,23 @@ export const ticketTypeOptions: TicketTypeOption[] = [
   },
 ];
 
+export function getTicketTypeOptions(
+  locale: Locale | string = DEFAULT_LOCALE
+): TicketTypeOption[] {
+  return [
+    {
+      description: t(locale, "ticketTypes.fullDescription"),
+      label: getTicketTypeLabel("inteira", locale),
+      value: "inteira",
+    },
+    {
+      description: t(locale, "ticketTypes.halfDescription"),
+      label: getTicketTypeLabel("meia", locale),
+      value: "meia",
+    },
+  ];
+}
+
 export function buildTicketTypeSelectionRows(
   reservedSeats: ReservedSeat[],
   ticketTypes: Record<string, TicketType>
@@ -59,4 +79,9 @@ export function calculateTicketTypeSubtotal(
   rows: Pick<TicketTypeSelectionRow, "unitPrice">[]
 ) {
   return calculateOrderTotal(rows);
+}
+
+function t(locale: Locale | string, key: string) {
+  const resolvedLocale = resolveLocale(locale);
+  return messages[resolvedLocale][key] ?? messages[DEFAULT_LOCALE][key] ?? key;
 }

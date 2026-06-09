@@ -1,6 +1,9 @@
+"use client";
+
 import type { CatalogMovie } from "@/types/catalog";
 
 import { StateMessage } from "@/components/ui/StateMessage";
+import { useI18n } from "@/i18n";
 
 import { MovieCard } from "./MovieCard";
 
@@ -17,20 +20,21 @@ type MovieGridProps = {
 
 export function MovieGrid({
   ariaLabel,
-  emptyDescription = "Nenhum filme foi encontrado para esta seção.",
-  emptyTitle = "Nenhum filme disponível",
+  emptyDescription,
+  emptyTitle,
   isLoading = false,
-  loadingLabel = "Carregando filmes...",
+  loadingLabel,
   movies,
   skeletonCount = 6,
   title,
 }: MovieGridProps) {
+  const { t } = useI18n();
   const headingId = title ? `movie-grid-${slugify(title)}` : undefined;
 
   return (
     <section
       aria-busy={isLoading || undefined}
-      aria-label={headingId ? undefined : (ariaLabel ?? "Lista de filmes")}
+      aria-label={headingId ? undefined : (ariaLabel ?? t("catalog.movieListA11y"))}
       aria-labelledby={headingId}
       className="movie-grid-section"
     >
@@ -42,7 +46,7 @@ export function MovieGrid({
 
       {isLoading ? (
         <div className="movie-grid-loading" role="status">
-          <span>{loadingLabel}</span>
+          <span>{loadingLabel ?? t("catalog.loadingMovies")}</span>
           <ul aria-hidden="true" className="movie-grid" role="list">
             {Array.from({ length: skeletonCount }, (_, index) => (
               <li className="movie-grid__item" key={index}>
@@ -61,7 +65,9 @@ export function MovieGrid({
       ) : null}
 
       {!isLoading && movies.length === 0 ? (
-        <StateMessage title={emptyTitle}>{emptyDescription}</StateMessage>
+        <StateMessage title={emptyTitle ?? t("catalog.emptyTitle")}>
+          {emptyDescription ?? t("catalog.emptyDescription")}
+        </StateMessage>
       ) : null}
 
       {!isLoading && movies.length > 0 ? (

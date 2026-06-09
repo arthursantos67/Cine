@@ -2,14 +2,17 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { CheckoutConfirmation } from "@/components/reservations/CheckoutConfirmation";
 import { PurchaseFlowLayout } from "@/components/reservations/PurchaseFlowLayout";
 import { PageSection } from "@/components/ui/PageSection";
+import { getServerLocale, getTranslator } from "@/i18n/server";
 
-export default function ConfirmationPage() {
+export default async function ConfirmationPage() {
+  const t = getTranslator(await getServerLocale());
+
   return (
     <ProtectedRoute>
       <PageSection
-        description="Confira os ingressos gerados depois da aprovação do pedido."
-        eyebrow="Pedido"
-        title="Confirmação"
+        description={t("confirmation.description")}
+        eyebrow={t("confirmation.eyebrow")}
+        title={t("checkout.confirmation")}
       >
         <PurchaseFlowLayout currentStep="confirmation" showSummary={false}>
           <CheckoutConfirmation />

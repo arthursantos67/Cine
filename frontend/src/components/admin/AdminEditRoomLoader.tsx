@@ -7,8 +7,10 @@ import type { AdminRoom } from "@/types/catalog";
 import { AdminRoomForm } from "./AdminRoomForm";
 import { AdminToolbar } from "./AdminToolbar";
 import { ButtonLink } from "@/components/ui/Button";
+import { useI18n } from "@/i18n";
 
 export function AdminEditRoomLoader({ roomId }: { roomId: string }) {
+  const { t } = useI18n();
   const [room, setRoom] = useState<AdminRoom | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -17,11 +19,9 @@ export function AdminEditRoomLoader({ roomId }: { roomId: string }) {
     adminApi
       .getRoom(roomId)
       .then(setRoom)
-      .catch(() =>
-        setError("Sala não encontrada ou você não tem permissão para editá-la.")
-      )
+      .catch(() => setError(t("admin.room.notFoundOrDenied")))
       .finally(() => setLoading(false));
-  }, [roomId]);
+  }, [roomId, t]);
 
   if (loading) {
     return (
@@ -29,10 +29,10 @@ export function AdminEditRoomLoader({ roomId }: { roomId: string }) {
         <AdminToolbar
           actions={
             <ButtonLink href="/admin/rooms" size="sm" variant="ghost">
-              Voltar
+              {t("admin.back")}
             </ButtonLink>
           }
-          title="Editar sala"
+          title={t("admin.room.edit")}
         />
         <div className="grid max-w-2xl gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -52,13 +52,13 @@ export function AdminEditRoomLoader({ roomId }: { roomId: string }) {
         <AdminToolbar
           actions={
             <ButtonLink href="/admin/rooms" size="sm" variant="ghost">
-              Voltar
+              {t("admin.back")}
             </ButtonLink>
           }
-          title="Editar sala"
+          title={t("admin.room.edit")}
         />
         <p className="text-sm font-bold text-error" role="alert">
-          {error ?? "Sala não encontrada."}
+          {error ?? t("admin.room.notFound")}
         </p>
       </div>
     );
@@ -74,14 +74,14 @@ export function AdminEditRoomLoader({ roomId }: { roomId: string }) {
               size="sm"
               variant="secondary"
             >
-              Layout
+              {t("admin.layout")}
             </ButtonLink>
             <ButtonLink href="/admin/rooms" size="sm" variant="ghost">
-              Voltar
+              {t("admin.back")}
             </ButtonLink>
           </div>
         }
-        title={`Editar: ${room.name}`}
+        title={t("admin.editPrefix", { name: room.name })}
       />
       <AdminRoomForm room={room} />
     </div>

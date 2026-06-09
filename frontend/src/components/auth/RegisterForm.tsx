@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import { authApi } from "@/api/auth";
+import { useI18n } from "@/i18n";
 import {
   buildRegisteredLoginUrl,
   getRegistrationValidationState,
@@ -24,6 +25,7 @@ export function RegisterFormView({
   isSubmitting,
   onSubmit,
 }: RegisterFormViewProps) {
+  const { t } = useI18n();
   const formErrorId = formError ? "register-form-error" : undefined;
 
   return (
@@ -34,7 +36,7 @@ export function RegisterFormView({
         onSubmit={onSubmit}
       >
         <div className="form-field">
-          <label htmlFor="username">Nome de usuário</label>
+          <label htmlFor="username">{t("auth.username")}</label>
           <input
             aria-describedby={fieldErrors.username ? "username-error" : undefined}
             aria-invalid={fieldErrors.username ? "true" : undefined}
@@ -42,7 +44,7 @@ export function RegisterFormView({
             disabled={isSubmitting}
             id="username"
             name="username"
-            placeholder="seu_nome"
+            placeholder={t("auth.usernamePlaceholder")}
             required
             type="text"
           />
@@ -53,7 +55,7 @@ export function RegisterFormView({
           ) : null}
         </div>
         <div className="form-field">
-          <label htmlFor="email">E-mail</label>
+          <label htmlFor="email">{t("auth.email")}</label>
           <input
             aria-describedby={fieldErrors.email ? "email-error" : undefined}
             aria-invalid={fieldErrors.email ? "true" : undefined}
@@ -61,7 +63,7 @@ export function RegisterFormView({
             disabled={isSubmitting}
             id="email"
             name="email"
-            placeholder="voce@email.com"
+            placeholder={t("auth.emailPlaceholder")}
             required
             type="email"
           />
@@ -72,7 +74,7 @@ export function RegisterFormView({
           ) : null}
         </div>
         <div className="form-field">
-          <label htmlFor="password">Senha</label>
+          <label htmlFor="password">{t("auth.password")}</label>
           <input
             aria-describedby={fieldErrors.password ? "password-error" : undefined}
             aria-invalid={fieldErrors.password ? "true" : undefined}
@@ -80,7 +82,7 @@ export function RegisterFormView({
             disabled={isSubmitting}
             id="password"
             name="password"
-            placeholder="Crie uma senha"
+            placeholder={t("auth.createPasswordPlaceholder")}
             required
             type="password"
           />
@@ -96,7 +98,7 @@ export function RegisterFormView({
           </p>
         ) : null}
         <button className="button button-primary" disabled={isSubmitting} type="submit">
-          {isSubmitting ? "Criando conta..." : "Criar conta"}
+          {isSubmitting ? t("auth.registerSubmitting") : t("auth.createAccount")}
         </button>
       </form>
     </div>
@@ -104,6 +106,7 @@ export function RegisterFormView({
 }
 
 export function RegisterForm() {
+  const { locale } = useI18n();
   const router = useRouter();
   const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -124,7 +127,7 @@ export function RegisterForm() {
       await authApi.register({ email, password, username });
       router.replace(buildRegisteredLoginUrl());
     } catch (error) {
-      const validationState = getRegistrationValidationState(error);
+      const validationState = getRegistrationValidationState(error, locale);
       setFieldErrors(validationState.fieldErrors);
       setFormError(validationState.formError);
     } finally {

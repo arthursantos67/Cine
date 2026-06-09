@@ -7,9 +7,10 @@ import { ApiError } from "@/api/client";
 import { Button } from "@/components/ui/Button";
 import { AdminConfirmDialog, AdminTable, AdminToolbar } from "@/components/admin";
 import type { AdminTableColumn } from "@/components/admin";
-import { ButtonLink } from "@/components/ui/Button";
+import { useI18n } from "@/i18n";
 
 export function AdminGenreList() {
+  const { t } = useI18n();
   const [genres, setGenres] = useState<AdminGenre[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -21,6 +22,7 @@ export function AdminGenreList() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [editEnglishName, setEditEnglishName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -29,6 +31,7 @@ export function AdminGenreList() {
 
   const [showCreateInput, setShowCreateInput] = useState(false);
   const [createName, setCreateName] = useState("");
+  const [createEnglishName, setCreateEnglishName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -49,7 +52,7 @@ export function AdminGenreList() {
       setHasMore(result.next !== null);
       setPage(pageNum);
     } catch {
-      setErrorMessage("Não foi possível carregar os gêneros. Tente novamente.");
+      setErrorMessage(t("admin.genre.loadError"));
     } finally {
       if (replace) {
         setLoading(false);
@@ -57,7 +60,7 @@ export function AdminGenreList() {
         setLoadingMore(false);
       }
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchPage(1, true);
@@ -85,12 +88,14 @@ export function AdminGenreList() {
   function startEdit(genre: AdminGenre) {
     setEditingId(genre.id);
     setEditName(genre.name);
+    setEditEnglishName(genre.translations?.["en-US"]?.name ?? "");
     setEditError(null);
   }
 
   function cancelEdit() {
     setEditingId(null);
     setEditName("");
+    setEditEnglishName("");
     setEditError(null);
   }
 
@@ -101,16 +106,20 @@ export function AdminGenreList() {
     setIsSaving(true);
     setEditError(null);
     try {
-      const updated = await adminApi.updateGenre(genreId, { name });
+      const updated = await adminApi.updateGenre(genreId, {
+        name,
+        translations: { "en-US": { name: editEnglishName.trim() } },
+      });
       setGenres((prev) => prev.map((g) => (g.id === genreId ? { ...g, ...updated } : g)));
       cancelEdit();
     } catch (err) {
       if (err instanceof ApiError && err.code === "VALIDATION_FAILED") {
         const details = err.details as Record<string, unknown> | null;
         const nameErr = details?.name;
-        setEditError(Array.isArray(nameErr) ? nameErr[0] : String(nameErr ?? "Nome inválido."));
+        const msg = Array.isArray(nameErr) ? nameErr[0] : String(nameErr ?? "");
+        setEditError(msg.toLowerCase().includes("already exists") ? t("admin.genre.alreadyExists") : (msg || t("admin.genre.emptyName")));
       } else {
-        setEditError("Não foi possível salvar. Tente novamente.");
+        setEditError(t("admin.error.saveGenre"));
       }
     } finally {
       setIsSaving(false);
@@ -126,7 +135,7 @@ export function AdminGenreList() {
       setGenres([]);
       fetchPage(1, true);
     } catch {
-      setErrorMessage("Não foi possível excluir o gênero. Tente novamente.");
+      setErrorMessage(t("admin.genre.deleteError"));
       setDeleteTarget(null);
     } finally {
       setIsDeleting(false);
@@ -140,8 +149,12 @@ export function AdminGenreList() {
     setIsCreating(true);
     setCreateError(null);
     try {
-      const created = await adminApi.createGenre({ name });
+      await adminApi.createGenre({
+        name,
+        translations: { "en-US": { name: createEnglishName.trim() } },
+      });
       setCreateName("");
+      setCreateEnglishName("");
       setShowCreateInput(false);
       setGenres([]);
       fetchPage(1, true);
@@ -149,9 +162,10 @@ export function AdminGenreList() {
       if (err instanceof ApiError && err.code === "VALIDATION_FAILED") {
         const details = err.details as Record<string, unknown> | null;
         const nameErr = details?.name;
-        setCreateError(Array.isArray(nameErr) ? nameErr[0] : String(nameErr ?? "Nome inválido."));
+        const msg = Array.isArray(nameErr) ? nameErr[0] : String(nameErr ?? "");
+        setCreateError(msg.toLowerCase().includes("already exists") ? t("admin.genre.alreadyExists") : (msg || t("admin.genre.emptyName")));
       } else {
-        setCreateError("Não foi possível criar o gênero. Tente novamente.");
+        setCreateError(t("admin.genre.createError"));
       }
     } finally {
       setIsCreating(false);
@@ -161,7 +175,7 @@ export function AdminGenreList() {
   const columns: AdminTableColumn<Record<string, unknown>>[] = [
     {
       key: "name",
-      label: "Nome",
+      label: t("admin.genre.name"),
       render: (row) => {
         const genre = row as unknown as AdminGenre;
         if (editingId === genre.id) {
@@ -182,6 +196,21 @@ export function AdminGenreList() {
                 ref={editInputRef}
                 value={editName}
               />
+              <input
+                className={[
+                  "min-h-[var(--control-height)] rounded-control border bg-surface px-3 py-1.5",
+                  "text-sm text-white placeholder:text-white/30 outline-none transition focus:border-brand focus:shadow-focus",
+                  editError ? "border-error" : "border-border",
+                ].join(" ")}
+                disabled={isSaving}
+                onChange={(e) => setEditEnglishName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveEdit(genre.id);
+                  if (e.key === "Escape") cancelEdit();
+                }}
+                placeholder={t("admin.genre.englishName")}
+                value={editEnglishName}
+              />
               {editError ? (
                 <p className="text-xs font-bold text-error" role="alert">
                   {editError}
@@ -195,7 +224,7 @@ export function AdminGenreList() {
     },
     {
       key: "actions",
-      label: "Ações",
+      label: t("admin.actions"),
       render: (row) => {
         const genre = row as unknown as AdminGenre;
         if (editingId === genre.id) {
@@ -209,7 +238,7 @@ export function AdminGenreList() {
                 type="button"
                 variant="primary"
               >
-                Salvar
+                {t("admin.save")}
               </Button>
               <Button
                 disabled={isSaving}
@@ -218,7 +247,7 @@ export function AdminGenreList() {
                 type="button"
                 variant="ghost"
               >
-                Cancelar
+                {t("admin.cancel")}
               </Button>
             </div>
           );
@@ -231,7 +260,7 @@ export function AdminGenreList() {
               type="button"
               variant="ghost"
             >
-              Editar
+              {t("admin.edit")}
             </Button>
             <Button
               onClick={() => setDeleteTarget(genre)}
@@ -239,7 +268,7 @@ export function AdminGenreList() {
               type="button"
               variant="danger"
             >
-              Excluir
+              {t("admin.delete")}
             </Button>
           </div>
         );
@@ -255,16 +284,17 @@ export function AdminGenreList() {
             onClick={() => {
               setShowCreateInput(true);
               setCreateName("");
+              setCreateEnglishName("");
               setCreateError(null);
             }}
             size="sm"
             type="button"
             variant="primary"
           >
-            Novo gênero
+            {t("admin.genre.new")}
           </Button>
         }
-        title="Gêneros"
+        title={t("admin.genres")}
       />
 
       {errorMessage ? (
@@ -275,7 +305,7 @@ export function AdminGenreList() {
 
       {showCreateInput ? (
         <div className="flex flex-col gap-2 rounded-[8px] border border-brand/30 bg-brand/5 p-4">
-          <span className="text-sm font-extrabold text-white">Novo gênero</span>
+          <span className="text-sm font-extrabold text-white">{t("admin.genre.new")}</span>
           <div className="flex gap-2">
             <input
               className={[
@@ -291,12 +321,34 @@ export function AdminGenreList() {
                 if (e.key === "Escape") {
                   setShowCreateInput(false);
                   setCreateName("");
+                  setCreateEnglishName("");
                   setCreateError(null);
                 }
               }}
-              placeholder="Nome do gênero"
+              placeholder={t("admin.genre.namePlaceholder")}
               ref={createInputRef}
               value={createName}
+            />
+            <input
+              className={[
+                "flex-1 min-h-[var(--control-height-lg)] rounded-control border bg-surface px-3 py-2",
+                "text-sm text-white placeholder:text-white/30 outline-none transition",
+                "focus:border-brand focus:shadow-focus",
+                createError ? "border-error" : "border-border",
+              ].join(" ")}
+              disabled={isCreating}
+              onChange={(e) => setCreateEnglishName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleCreate();
+                if (e.key === "Escape") {
+                  setShowCreateInput(false);
+                  setCreateName("");
+                  setCreateEnglishName("");
+                  setCreateError(null);
+                }
+              }}
+              placeholder={t("admin.genre.englishName")}
+              value={createEnglishName}
             />
             <Button
               disabled={isCreating || !createName.trim()}
@@ -306,20 +358,21 @@ export function AdminGenreList() {
               type="button"
               variant="primary"
             >
-              Criar
+              {t("admin.create")}
             </Button>
             <Button
               disabled={isCreating}
               onClick={() => {
                 setShowCreateInput(false);
                 setCreateName("");
+                setCreateEnglishName("");
                 setCreateError(null);
               }}
               size="sm"
               type="button"
               variant="ghost"
             >
-              Cancelar
+              {t("admin.cancel")}
             </Button>
           </div>
           {createError ? (
@@ -337,29 +390,29 @@ export function AdminGenreList() {
         ref={scrollContainerRef}
       >
         <AdminTable
-          caption="Lista de gêneros"
+          caption={t("admin.genre.listCaption")}
           columns={columns}
           data={genres as unknown as Record<string, unknown>[]}
-          emptyDescription="Nenhum gênero cadastrado. Clique em 'Novo gênero' para adicionar."
-          emptyTitle="Nenhum gênero cadastrado"
+          emptyDescription={t("admin.genre.emptyDescription")}
+          emptyTitle={t("admin.genre.emptyTitle")}
           keyField="id"
           loading={loading}
         />
 
         {loadingMore ? (
           <p className="border-t border-white/[0.05] py-3 text-center text-xs text-white/40">
-            Carregando mais gêneros…
+            {t("admin.genre.loadingMore")}
           </p>
         ) : null}
       </div>
 
       <AdminConfirmDialog
-        confirmLabel={isDeleting ? "Excluindo..." : "Excluir"}
-        description={`Tem certeza que deseja excluir o gênero "${deleteTarget?.name}"?`}
+        confirmLabel={isDeleting ? t("admin.deleting") : t("admin.delete")}
+        description={t("admin.genre.deleteDescription", { name: deleteTarget?.name ?? "" })}
         isOpen={deleteTarget !== null}
         onCancel={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
-        title="Excluir gênero"
+        title={t("admin.genre.deleteTitle")}
         tone="danger"
       />
     </div>

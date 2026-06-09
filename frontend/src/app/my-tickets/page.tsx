@@ -4,19 +4,22 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { MyTicketsClient } from "@/components/tickets/MyTicketsClient";
 import { PageSection } from "@/components/ui/PageSection";
 import { StateMessage } from "@/components/ui/StateMessage";
+import { getServerLocale, getTranslator } from "@/i18n/server";
 
-export default function MyTicketsPage() {
+export default async function MyTicketsPage() {
+  const t = getTranslator(await getServerLocale());
+
   return (
     <ProtectedRoute>
       <PageSection
-        description="Consulte ingressos futuros e compras anteriores quando estiver autenticado."
-        eyebrow="Conta"
-        title="Meus ingressos"
+        description={t("tickets.description")}
+        eyebrow={t("tickets.eyebrow")}
+        title={t("tickets.title")}
       >
         <Suspense
           fallback={
-            <StateMessage tone="loading" title="Carregando ingressos">
-              Aguarde enquanto preparamos seus filtros.
+            <StateMessage tone="loading" title={t("tickets.loadingTitle")}>
+              {t("tickets.loadingDescription")}
             </StateMessage>
           }
         >

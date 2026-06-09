@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/components/ui/classNames";
+import { useI18n } from "@/i18n";
 
 type ConfirmTone = "danger" | "default";
 
@@ -19,8 +20,8 @@ type AdminConfirmDialogProps = {
 };
 
 export function AdminConfirmDialog({
-  cancelLabel = "Cancelar",
-  confirmLabel = "Confirmar",
+  cancelLabel,
+  confirmLabel,
   description,
   isOpen,
   onCancel,
@@ -28,6 +29,7 @@ export function AdminConfirmDialog({
   title,
   tone = "default",
 }: AdminConfirmDialogProps) {
+  const { t } = useI18n();
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -65,13 +67,13 @@ export function AdminConfirmDialog({
       </div>
       <div className="flex justify-end gap-2">
         <Button onClick={onCancel} variant="ghost">
-          {cancelLabel}
+          {cancelLabel ?? t("admin.cancel")}
         </Button>
         <Button
           onClick={onConfirm}
           variant={tone === "danger" ? "danger" : "primary"}
         >
-          {confirmLabel}
+          {confirmLabel ?? t("admin.confirm")}
         </Button>
       </div>
     </dialog>

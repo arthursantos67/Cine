@@ -1,16 +1,22 @@
+import { DEFAULT_LOCALE, type Locale, resolveLocale } from "@/i18n/locales";
+import { messages } from "@/i18n/messages";
+
 const DEFAULT_API_BASE_URL = "http://localhost:8000";
 
-export type KnownBackendErrorCode =
-  | "VALIDATION_FAILED"
-  | "INVALID_CREDENTIALS"
-  | "NOT_AUTHENTICATED"
-  | "PERMISSION_DENIED"
-  | "RESOURCE_NOT_FOUND"
-  | "SEAT_ALREADY_RESERVED"
-  | "INVALID_TICKET_TYPE"
-  | "INVALID_PAYMENT_METHOD"
-  | "THROTTLED"
-  | "INTERNAL_SERVER_ERROR";
+export const KNOWN_BACKEND_ERROR_CODES = [
+  "VALIDATION_FAILED",
+  "INVALID_CREDENTIALS",
+  "NOT_AUTHENTICATED",
+  "PERMISSION_DENIED",
+  "RESOURCE_NOT_FOUND",
+  "SEAT_ALREADY_RESERVED",
+  "INVALID_TICKET_TYPE",
+  "INVALID_PAYMENT_METHOD",
+  "THROTTLED",
+  "INTERNAL_SERVER_ERROR",
+] as const;
+
+export type KnownBackendErrorCode = (typeof KNOWN_BACKEND_ERROR_CODES)[number];
 
 export type BackendErrorCode = KnownBackendErrorCode | (string & {});
 
@@ -47,6 +53,7 @@ export type ApiAuthController = {
 };
 
 let apiAuthController: ApiAuthController | null = null;
+let apiLocale: Locale = DEFAULT_LOCALE;
 
 export class ApiError extends Error {
   public readonly code: BackendErrorCode;
@@ -94,6 +101,14 @@ export function buildApiUrl(path: string, baseUrl = API_BASE_URL) {
 
 export function setApiAuthController(controller: ApiAuthController | null) {
   apiAuthController = controller;
+}
+
+export function setApiLocale(locale: string) {
+  apiLocale = resolveLocale(locale);
+}
+
+export function getApiLocale() {
+  return apiLocale;
 }
 
 export async function apiRequest<T>(
@@ -218,40 +233,41 @@ export function buildLoginRedirectUrl(path: string) {
   return `/login?redirect=${encodeURIComponent(redirectPath)}`;
 }
 
-export const API_ERROR_MESSAGES: Record<KnownBackendErrorCode, string> = {
-  VALIDATION_FAILED: "Confira as informações preenchidas e tente novamente.",
-  INVALID_CREDENTIALS: "E-mail ou senha incorretos.",
-  NOT_AUTHENTICATED: "Sua sessão expirou. Faça login novamente.",
-  PERMISSION_DENIED: "Você não tem permissão para realizar esta ação.",
-  RESOURCE_NOT_FOUND: "Não encontramos o recurso solicitado.",
-  SEAT_ALREADY_RESERVED:
-    "Este assento foi reservado por outra pessoa. Escolha outro assento.",
-  INVALID_TICKET_TYPE: "O tipo de ingresso selecionado é inválido.",
-  INVALID_PAYMENT_METHOD: "A forma de pagamento selecionada é inválida.",
-  THROTTLED: "Muitas tentativas. Aguarde um momento e tente novamente.",
-  INTERNAL_SERVER_ERROR:
-    "Não foi possível concluir a solicitação. Tente novamente mais tarde.",
-};
+const API_ERROR_MESSAGES: Record<KnownBackendErrorCode, string> =
+  Object.fromEntries(
+    KNOWN_BACKEND_ERROR_CODES.map((code) => [
+      code,
+      messages[DEFAULT_LOCALE][`error.${code}`] ?? messages[DEFAULT_LOCALE]["error.fallback"],
+    ])
+  ) as Record<KnownBackendErrorCode, string>;
 
 export function isNetworkError(error: unknown): boolean {
   return !(error instanceof ApiError);
 }
 
-export function getApiErrorUserMessage(error: unknown) {
+export function getApiErrorUserMessage(
+  error: unknown,
+  locale: Locale | string = apiLocale
+) {
+  const resolvedLocale = resolveLocale(locale);
+
   if (
     error instanceof ApiError &&
     Object.hasOwn(API_ERROR_MESSAGES, error.code)
   ) {
-    return API_ERROR_MESSAGES[
-      error.code as keyof typeof API_ERROR_MESSAGES
-    ];
+    return (
+      messages[resolvedLocale][`error.${error.code}`] ??
+      messages[DEFAULT_LOCALE][`error.${error.code}`] ??
+      messages[resolvedLocale]["error.fallback"] ??
+      messages[DEFAULT_LOCALE]["error.fallback"]
+    );
   }
 
   if (isNetworkError(error)) {
-    return "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.";
+    return messages[resolvedLocale]["error.network"] ?? messages[DEFAULT_LOCALE]["error.network"];
   }
 
-  return "Não foi possível concluir a solicitação. Tente novamente.";
+  return messages[resolvedLocale]["error.fallback"] ?? messages[DEFAULT_LOCALE]["error.fallback"];
 }
 
 export function isPaginatedResponse<T = unknown>(
@@ -274,6 +290,10 @@ function buildHeaders(headers: HeadersInit | undefined, token: string | undefine
 
   if (!requestHeaders.has("Accept")) {
     requestHeaders.set("Accept", "application/json");
+  }
+
+  if (!requestHeaders.has("Accept-Language")) {
+    requestHeaders.set("Accept-Language", apiLocale);
   }
 
   if (!requestHeaders.has("Content-Type")) {

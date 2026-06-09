@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { ResponsiveImage } from "@/components/ui/ResponsiveImage";
 import type { CatalogMovie } from "@/types/catalog";
+import { useI18n } from "@/i18n";
 
 import {
   formatMovieDuration,
@@ -22,8 +23,10 @@ type FeaturedMovieBannerProps = {
 export function FeaturedMovieBanner({
   movie,
   movies,
-  primaryActionLabel = "Ver sessões",
+  primaryActionLabel,
 }: FeaturedMovieBannerProps) {
+  const { locale, t } = useI18n();
+  const actionLabel = primaryActionLabel ?? t("movie.viewSessions");
   const featuredMovies = movies?.length ? movies : movie ? [movie] : [];
   const [activeIndex, setActiveIndex] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -72,7 +75,7 @@ export function FeaturedMovieBanner({
       className="featured-movie-carousel relative overflow-hidden text-white ml-[calc(50%_-_50vw)] mr-[calc(50%_-_50vw)] w-screen h-[75svh] min-h-[400px] mt-[calc(-1_*_var(--layout-page-block))]"
     >
       <h2 className="sr-only" id="featured-movies-heading">
-        Filmes em destaque
+        {t("home.featuredMovies")}
       </h2>
 
       {/* Full-bleed backdrop with per-slide images */}
@@ -85,7 +88,7 @@ export function FeaturedMovieBanner({
             }`}
           >
             <ResponsiveImage
-              alt={`Poster de ${fm.title}`}
+              alt={t("movie.posterAlt", { title: fm.title })}
               className="block h-full w-full object-cover object-top"
               height={1080}
               priority={i === 0}
@@ -115,7 +118,7 @@ export function FeaturedMovieBanner({
           {featuredMovies.map((fm, i) => (
             <article
               key={fm.id}
-              aria-label={`Filme em destaque: ${fm.title}`}
+              aria-label={t("home.featuredMovieA11y", { title: fm.title })}
               aria-hidden={i !== activeIndex || undefined}
               className={`grid gap-4 max-w-[580px] transition-opacity duration-[600ms] ${
                 i === activeIndex
@@ -124,7 +127,7 @@ export function FeaturedMovieBanner({
               }`}
             >
               <Badge className="w-fit" tone="accent">
-                Destaque
+                {t("movie.featured")}
               </Badge>
               <h3
                 className="m-0 text-[clamp(2rem,5vw,3.5rem)] font-extrabold leading-[1.05] text-white"
@@ -133,24 +136,28 @@ export function FeaturedMovieBanner({
                 {fm.title}
               </h3>
               <p className="m-0 text-base font-semibold text-white/75">
-                {formatMovieGenres(fm.genres)} |{" "}
-                {formatMovieDuration(fm.duration_minutes)}
+                {formatMovieGenres(fm.genres, locale)} |{" "}
+                {formatMovieDuration(fm.duration_minutes, locale)}
               </p>
               <ButtonLink
-                aria-label={`${primaryActionLabel} de ${fm.title}`}
+                aria-label={
+                  primaryActionLabel
+                    ? `${primaryActionLabel} ${fm.title}`
+                    : t("movie.viewSessionsFor", { title: fm.title })
+                }
                 className="w-fit min-h-[48px] px-7"
                 href={getMovieDetailsHref(fm.id)}
                 size="lg"
                 variant="primary"
               >
-                {primaryActionLabel}
+                {actionLabel}
               </ButtonLink>
             </article>
           ))}
 
           {featuredMovies.length > 1 ? (
             <div
-              aria-label="Destaques"
+              aria-label={t("home.featuredTablist")}
               className="flex gap-2 pt-2"
               role="tablist"
               onKeyDown={(e) => {
@@ -169,7 +176,10 @@ export function FeaturedMovieBanner({
               {featuredMovies.map((fm, i) => (
                 <button
                   key={fm.id}
-                  aria-label={`Destaque ${i + 1}: ${fm.title}`}
+                  aria-label={t("home.featuredTab", {
+                    index: i + 1,
+                    title: fm.title,
+                  })}
                   aria-selected={i === activeIndex}
                   className={`h-1.5 rounded-pill border-0 cursor-pointer p-0 transition-all duration-200 focus-visible:outline-none focus-visible:shadow-focus ${
                     i === activeIndex
@@ -194,7 +204,7 @@ export function FeaturedMovieBanner({
       {featuredMovies.length > 1 ? (
         <>
           <button
-            aria-label="Mostrar destaque anterior"
+            aria-label={t("home.previousFeatured")}
             className="absolute left-1 top-1/2 z-[3] -translate-y-1/2 flex h-[52px] w-9 items-center justify-center rounded-[6px] bg-white/55 text-[rgb(20_20_20/0.65)] transition-all hover:bg-white/[0.92] hover:scale-[1.08] focus-visible:outline-none focus-visible:shadow-focus"
             onClick={() => scrollFeatured("previous")}
             type="button"
@@ -205,7 +215,7 @@ export function FeaturedMovieBanner({
             />
           </button>
           <button
-            aria-label="Mostrar próximo destaque"
+            aria-label={t("home.nextFeatured")}
             className="absolute right-1 top-1/2 z-[3] -translate-y-1/2 flex h-[52px] w-9 items-center justify-center rounded-[6px] bg-white/55 text-[rgb(20_20_20/0.65)] transition-all hover:bg-white/[0.92] hover:scale-[1.08] focus-visible:outline-none focus-visible:shadow-focus"
             onClick={() => scrollFeatured("next")}
             type="button"
@@ -220,7 +230,7 @@ export function FeaturedMovieBanner({
 
       {/* Scroll hint to catalog */}
       <a
-        aria-label="Rolar para o catálogo de filmes"
+        aria-label={t("home.scrollToCatalog")}
         className="absolute bottom-6 left-1/2 z-[3] flex -translate-x-1/2 flex-col items-center gap-1 text-white/55 transition-colors hover:text-white focus-visible:outline-none"
         href="#catalogo"
       >
@@ -228,7 +238,7 @@ export function FeaturedMovieBanner({
           aria-hidden="true"
           className="block h-2.5 w-2.5 rotate-45 border-b-2 border-r-2 border-current animate-scroll-bounce"
         />
-        <span className="sr-only">Ver catálogo</span>
+        <span className="sr-only">{t("home.viewCatalog")}</span>
       </a>
     </section>
   );

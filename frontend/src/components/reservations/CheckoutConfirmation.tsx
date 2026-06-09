@@ -6,10 +6,11 @@ import { TicketCard } from "@/components/tickets/TicketCard";
 import { StateMessage } from "@/components/ui/StateMessage";
 import { cn } from "@/components/ui/classNames";
 import { useReservation } from "@/contexts/ReservationContext";
+import { useI18n } from "@/i18n";
 import type { CheckoutResponse } from "@/types/reservation";
 import { formatCurrency } from "@/utils/formatters";
 
-import { paymentMethodLabels } from "./order-summary";
+import { getPaymentMethodLabel } from "./order-summary";
 
 export function CheckoutConfirmation() {
   const { checkoutResult } = useReservation();
@@ -22,6 +23,8 @@ export function CheckoutConfirmationContent({
 }: {
   checkoutResult: CheckoutResponse | null;
 }) {
+  const { locale, t } = useI18n();
+
   if (!checkoutResult || checkoutResult.tickets.length === 0) {
     return (
       <StateMessage
@@ -30,13 +33,12 @@ export function CheckoutConfirmationContent({
             className="inline-flex min-h-10 items-center justify-center rounded-md border border-brand bg-brand px-3.5 text-sm font-extrabold leading-none text-white transition hover:bg-brand-strong"
             href="/my-tickets"
           >
-            Ver meus ingressos
+            {t("nav.myTickets")}
           </Link>
         }
-        title="Confirmação indisponível"
+        title={t("checkout.confirmationUnavailable")}
       >
-        Os dados desta confirmação ficam apenas na memória da sessão. Se a
-        página foi recarregada, consulte seus ingressos em Meus Ingressos.
+        {t("confirmation.unavailableDescription")}
       </StateMessage>
     );
   }
@@ -52,17 +54,28 @@ export function CheckoutConfirmationContent({
             className="m-0 text-[21px] leading-tight text-white"
             id="ingressos-gerados"
           >
-            Compra confirmada
+            {t("confirmation.purchaseConfirmed")}
           </h2>
           <p className="m-0 mt-1.5 leading-6 text-text/65">
-            Sua compra foi concluída com sucesso. {checkoutResult.tickets.length}{" "}
-            ingresso{checkoutResult.tickets.length === 1 ? "" : "s"} gerado
-            {checkoutResult.tickets.length === 1 ? "" : "s"} com pagamento em{" "}
-            {paymentMethodLabels[checkoutResult.payment_method]}.
+            {t("confirmation.successDescription", {
+              count: checkoutResult.tickets.length,
+              generatedWord:
+                checkoutResult.tickets.length === 1
+                  ? t("checkout.ticketsGeneratedSingular")
+                  : t("checkout.ticketsGeneratedPlural"),
+              paymentMethod: getPaymentMethodLabel(
+                checkoutResult.payment_method,
+                locale
+              ),
+              ticketWord:
+                checkoutResult.tickets.length === 1
+                  ? t("checkout.ticketSingular")
+                  : t("checkout.ticketPlural"),
+            })}
           </p>
         </div>
         <strong className="inline-flex min-h-[38px] items-center whitespace-nowrap rounded-md border border-brand/50 bg-brand/20 px-3 py-1.5 text-xl text-white">
-          {formatCurrency(Number(checkoutResult.total_amount))}
+          {formatCurrency(Number(checkoutResult.total_amount), locale)}
         </strong>
       </div>
 
@@ -82,7 +95,7 @@ export function CheckoutConfirmationContent({
           )}
           href="/my-tickets"
         >
-          Ir para Meus Ingressos
+          {t("confirmation.goToMyTickets")}
         </Link>
       </div>
     </section>

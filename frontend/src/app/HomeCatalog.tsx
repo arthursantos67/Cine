@@ -9,6 +9,7 @@ import { HomeSchedule } from "@/components/movies/HomeSchedule";
 import { TabbedMovieCatalog } from "@/components/movies/TabbedMovieCatalog";
 import { StateMessage } from "@/components/ui/StateMessage";
 import type { CatalogMovie } from "@/types/catalog";
+import { useI18n } from "@/i18n";
 
 type SectionStatus = "error" | "loading" | "success";
 
@@ -35,6 +36,7 @@ const loadingSectionState: MovieSectionState = {
 };
 
 export function HomeCatalog() {
+  const { locale } = useI18n();
   const [featured, setFeatured] =
     useState<MovieSectionState>(loadingSectionState);
   const [nowShowing, setNowShowing] =
@@ -65,11 +67,12 @@ export function HomeCatalog() {
   }, []);
 
   useEffect(() => {
+    void locale;
     void loadFeatured();
     void loadNowShowing();
     void loadPreSale();
     void loadUpcoming();
-  }, [loadFeatured, loadNowShowing, loadPreSale, loadUpcoming]);
+  }, [loadFeatured, loadNowShowing, loadPreSale, loadUpcoming, locale]);
 
   return (
     <HomeCatalogSections
@@ -95,6 +98,8 @@ export function HomeCatalogSections({
   preSale,
   upcoming,
 }: HomeCatalogSectionsProps) {
+  const { t } = useI18n();
+
   return (
     <div>
       {/* Cinematic hero area — full-bleed, full-height */}
@@ -104,8 +109,8 @@ export function HomeCatalogSections({
           className="relative overflow-hidden text-white ml-[calc(50%_-_50vw)] mr-[calc(50%_-_50vw)] w-screen mt-[calc(-1_*_var(--layout-page-block))] bg-[rgb(8_10_16)] h-[75svh] min-h-[400px] flex items-center justify-center"
         >
           <div className="shell-container">
-            <StateMessage title="Carregando filme em destaque" tone="loading">
-              Buscando os destaques do catálogo.
+            <StateMessage title={t("home.featuredLoadingTitle")} tone="loading">
+              {t("home.featuredLoadingDescription")}
             </StateMessage>
           </div>
         </div>
@@ -117,10 +122,10 @@ export function HomeCatalogSections({
             <CatalogErrorState
               message={
                 featured.errorMessage ??
-                "Não foi possível carregar o filme em destaque. Tente novamente."
+                t("home.featuredErrorDescription")
               }
               onRetry={onRetryFeatured}
-              title="Destaque indisponível"
+              title={t("home.featuredErrorTitle")}
             />
           </div>
         </div>
@@ -136,7 +141,7 @@ export function HomeCatalogSections({
       {featured.status === "success" && featured.movies.length > 0 ? (
         <FeaturedMovieBanner
           movies={featured.movies}
-          primaryActionLabel="Ver detalhes"
+          primaryActionLabel={t("movie.viewDetails")}
         />
       ) : null}
 
@@ -175,8 +180,7 @@ async function loadMovieSection(
     });
   } catch {
     setSection({
-      errorMessage:
-        "Não conseguimos carregar esta seção agora. Verifique sua conexão e tente novamente.",
+      errorMessage: undefined,
       movies: [],
       status: "error",
     });
@@ -192,12 +196,14 @@ function CatalogErrorState({
   onRetry?: () => void;
   title: string;
 }) {
+  const { t } = useI18n();
+
   return (
     <StateMessage
       action={
         onRetry ? (
           <Button onClick={onRetry} variant="ghost">
-            Tentar novamente
+            {t("common.tryAgain")}
           </Button>
         ) : undefined
       }

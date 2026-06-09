@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import type { CatalogMovie } from "@/types/catalog";
 import { StateMessage } from "@/components/ui/StateMessage";
+import { useI18n } from "@/i18n";
 
 import { MovieCard } from "./MovieCard";
 
@@ -38,10 +39,10 @@ const itemClasses = "grid min-w-0 [scroll-snap-align:start]";
 
 export function MovieCarousel({
   ariaLabel,
-  emptyDescription = "Nenhum filme foi encontrado para esta seção.",
-  emptyTitle = "Nenhum filme disponível",
+  emptyDescription,
+  emptyTitle,
   isLoading = false,
-  loadingLabel = "Carregando filmes...",
+  loadingLabel,
   movies,
   nextButtonLabel,
   previousButtonLabel,
@@ -49,6 +50,7 @@ export function MovieCarousel({
   title,
   titleVisible = true,
 }: MovieCarouselProps) {
+  const { t } = useI18n();
   const railRef = useRef<HTMLUListElement>(null);
   const [canScroll, setCanScroll] = useState(movies.length > 1);
   const isDragging = useRef(false);
@@ -165,7 +167,9 @@ export function MovieCarousel({
 
       {isLoading ? (
         <div className="grid gap-3" role="status">
-          <span className="font-[750] text-muted">{loadingLabel}</span>
+          <span className="font-[750] text-muted">
+            {loadingLabel ?? t("catalog.loadingMovies")}
+          </span>
           <ul aria-hidden="true" className={railClasses} role="list">
             {Array.from({ length: skeletonCount }, (_, index) => (
               <li className={itemClasses} key={index}>
@@ -184,14 +188,18 @@ export function MovieCarousel({
       ) : null}
 
       {!isLoading && movies.length === 0 ? (
-        <StateMessage title={emptyTitle}>{emptyDescription}</StateMessage>
+        <StateMessage title={emptyTitle ?? t("catalog.emptyTitle")}>
+          {emptyDescription ?? t("catalog.emptyDescription")}
+        </StateMessage>
       ) : null}
 
       {!isLoading && movies.length > 0 ? (
         <div className="relative min-w-0">
           {canScroll ? (
             <button
-              aria-label={previousButtonLabel ?? `Filme anterior em ${title}`}
+              aria-label={
+                previousButtonLabel ?? t("catalog.previousMovieIn", { title })
+              }
               className="absolute left-1 top-[42%] z-[2] flex h-[52px] w-9 -translate-y-1/2 items-center justify-center rounded-[6px] border-0 bg-white/55 text-[rgba(20,20,20,0.65)] shadow-[0_1px_4px_rgb(0_0_0/0.12)] transition-[background-color,box-shadow,transform,color] duration-[180ms] hover:scale-[1.08] hover:bg-white/[0.92] hover:text-[rgba(20,20,20,0.9)] hover:shadow-[0_2px_8px_rgb(0_0_0/0.18)] focus-visible:outline-none focus-visible:shadow-focus"
               onClick={() => scrollRail("previous")}
               type="button"
@@ -201,7 +209,7 @@ export function MovieCarousel({
           ) : null}
 
           <ul
-            aria-label={`${title}: carrossel de filmes`}
+            aria-label={t("catalog.movieCarouselA11y", { title })}
             className={railClasses}
             onDragStart={(e) => e.preventDefault()}
             onKeyDown={handleCarouselKeyDown}
@@ -221,7 +229,7 @@ export function MovieCarousel({
 
           {canScroll ? (
             <button
-              aria-label={nextButtonLabel ?? `Próximo filme em ${title}`}
+              aria-label={nextButtonLabel ?? t("catalog.nextMovieIn", { title })}
               className="absolute right-1 top-[42%] z-[2] flex h-[52px] w-9 -translate-y-1/2 items-center justify-center rounded-[6px] border-0 bg-white/55 text-[rgba(20,20,20,0.65)] shadow-[0_1px_4px_rgb(0_0_0/0.12)] transition-[background-color,box-shadow,transform,color] duration-[180ms] hover:scale-[1.08] hover:bg-white/[0.92] hover:text-[rgba(20,20,20,0.9)] hover:shadow-[0_2px_8px_rgb(0_0_0/0.18)] focus-visible:outline-none focus-visible:shadow-focus"
               onClick={() => scrollRail("next")}
               type="button"
