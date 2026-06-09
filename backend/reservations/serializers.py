@@ -1,6 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 
+from cineprime_api.localization import get_context_locale, get_translation_value
 from catalog.models import Session
 from reservations.exceptions import (
     InvalidPaymentMethodApiException,
@@ -126,9 +127,15 @@ class TicketSerializer(serializers.ModelSerializer):
 
     def get_movie(self, obj):
         movie = obj.session_seat.session.movie
+        locale = get_context_locale(self.context)
         return {
             "id": str(movie.id),
-            "title": movie.title,
+            "title": get_translation_value(
+                fallback_value=movie.title,
+                field="title",
+                locale=locale,
+                translations=movie.translations,
+            ),
             "poster_url": movie.poster_url,
         }
 
@@ -142,9 +149,15 @@ class TicketSerializer(serializers.ModelSerializer):
 
     def get_room(self, obj):
         room = obj.session_seat.session.room
+        locale = get_context_locale(self.context)
         return {
             "id": str(room.id),
-            "name": room.name,
+            "name": get_translation_value(
+                fallback_value=room.display_name or room.name,
+                field="display_name",
+                locale=locale,
+                translations=room.translations,
+            ),
         }
 
     def get_seat(self, obj):

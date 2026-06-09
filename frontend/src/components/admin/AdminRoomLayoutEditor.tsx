@@ -8,6 +8,7 @@ import type { AdminRoom, AdminSeat, AdminSeatRow } from "@/types/catalog";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { AdminConfirmDialog, AdminToolbar } from "@/components/admin";
 import { cn } from "@/components/ui/classNames";
+import { useI18n } from "@/i18n";
 
 type LayoutState =
   | { status: "error"; message: string }
@@ -27,7 +28,9 @@ type AdminRoomLayoutEditorProps = {
   roomId: string;
 };
 
-function extractConstraintMessage(error: unknown): string | null {
+type Translate = (key: string, params?: Record<string, string | number>) => string;
+
+function extractConstraintMessage(error: unknown, t: Translate): string | null {
   if (!(error instanceof ApiError)) return null;
 
   if (error.code === "VALIDATION_FAILED") {
@@ -45,11 +48,11 @@ function extractConstraintMessage(error: unknown): string | null {
         const msg = msgs.join(" ");
 
         if (msg.includes("future sessions")) {
-          return "Não é possível alterar o layout desta sala enquanto houver sessões futuras agendadas.";
+          return t("admin.layout.constraintFutureSessions");
         }
 
         if (msg.includes("capacity")) {
-          return "Capacidade da sala atingida. Aumente a capacidade antes de adicionar mais assentos.";
+          return t("admin.layout.constraintCapacity");
         }
 
         return msg;
@@ -69,9 +72,17 @@ function SeatPreviewCell({
   disabled?: boolean;
   onClick: () => void;
 }) {
+  const { t } = useI18n();
+  const accessibleSuffix = seat.is_accessible
+    ? t("admin.layout.accessibleSeatSuffix")
+    : "";
+
   return (
     <button
-      aria-label={`Assento ${seat.number}${seat.is_accessible ? ", acessível" : ""}`}
+      aria-label={t("admin.layout.seatA11y", {
+        accessible: accessibleSuffix,
+        number: seat.number,
+      })}
       className={cn(
         "flex h-7 w-7 items-center justify-center rounded-[4px] text-[10px] font-bold transition",
         seat.is_accessible
@@ -81,7 +92,11 @@ function SeatPreviewCell({
       )}
       disabled={disabled}
       onClick={onClick}
-      title={seat.is_accessible ? "Acessível — clique para alternar" : "Clique para marcar como acessível"}
+      title={
+        seat.is_accessible
+          ? t("admin.layout.accessibleToggleTitle")
+          : t("admin.layout.markAccessibleTitle")
+      }
       type="button"
     >
       {seat.is_accessible ? "♿" : seat.number}
@@ -96,25 +111,26 @@ function SeatMapPreview({
   rows: AdminSeatRow[];
   seatsByRow: Record<string, AdminSeat[]>;
 }) {
+  const { t } = useI18n();
   const allSeats = rows.flatMap((r) => seatsByRow[r.id] ?? []);
 
   if (allSeats.length === 0) {
     return (
       <p className="py-6 text-center text-sm text-white/40">
-        Nenhum assento cadastrado para prévia.
+        {t("admin.layout.noPreviewSeats")}
       </p>
     );
   }
 
   return (
     <div
-      aria-label="Prévia do mapa de assentos"
+      aria-label={t("admin.layout.mapPreviewA11y")}
       className="overflow-x-auto"
       role="img"
     >
       <div className="inline-flex min-w-full flex-col items-center gap-2 pb-4">
         <div className="flex h-6 w-3/4 max-w-xs items-center justify-center rounded-b-full bg-brand/30 text-[10px] font-extrabold uppercase tracking-widest text-brand/80">
-          TELA
+          {t("admin.layout.screen")}
         </div>
 
         {rows.map((row) => {
@@ -128,7 +144,9 @@ function SeatMapPreview({
                 <span className="w-5 text-center text-xs font-extrabold text-white/30">
                   {row.name}
                 </span>
-                <span className="text-xs text-white/20 italic">vazia</span>
+                <span className="text-xs text-white/20 italic">
+                  {t("admin.layout.emptyRow")}
+                </span>
               </div>
             );
           }
@@ -139,7 +157,7 @@ function SeatMapPreview({
 
           return (
             <div
-              aria-label={`Fileira ${row.name}`}
+              aria-label={t("admin.layout.rowA11y", { row: row.name })}
               className="flex items-center gap-2"
               key={row.id}
               role="group"
@@ -194,19 +212,19 @@ function SeatMapPreview({
         })}
 
         <div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-white/20">
-          Fundo da sala
+          {t("admin.layout.backOfRoom")}
         </div>
 
         <div className="mt-2 flex flex-wrap justify-center gap-4 text-[10px] text-white/50">
           <span className="flex items-center gap-1.5">
             <span className="inline-block h-3.5 w-3.5 rounded-[2px] border border-white/[0.20] bg-white/[0.05]" />
-            Disponível
+            {t("admin.layout.available")}
           </span>
           <span className="flex items-center gap-1.5">
             <span className="inline-block h-3.5 w-3.5 rounded-[2px] border border-brand/50 bg-brand/20 text-[8px] text-brand">
               ♿
             </span>
-            Acessível
+            {t("admin.layout.accessible")}
           </span>
         </div>
       </div>
@@ -231,6 +249,7 @@ function RowEditor({
   onSeatUpdated: (seat: AdminSeat) => void;
   onSeatDelete: (seat: AdminSeat) => void;
 }) {
+  const { t } = useI18n();
   const [isAdding, setIsAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -254,9 +273,9 @@ function RowEditor({
       });
       onSeatAdded(created);
     } catch (err) {
-      const constraintMsg = extractConstraintMessage(err);
+      const constraintMsg = extractConstraintMessage(err, t);
       setAddError(
-        constraintMsg ?? "Não foi possível adicionar o assento. Tente novamente."
+        constraintMsg ?? t("admin.layout.addSeatError")
       );
     } finally {
       setIsAdding(false);
@@ -291,7 +310,7 @@ function RowEditor({
               seat={seat}
             />
             <button
-              aria-label={`Remover assento ${seat.number}`}
+              aria-label={t("admin.layout.removeSeatA11y", { number: seat.number })}
               className="ml-0.5 flex h-5 w-5 items-center justify-center rounded text-white/30 transition hover:text-error"
               disabled={togglingId === seat.id}
               onClick={() => onSeatDelete(seat)}
@@ -304,7 +323,7 @@ function RowEditor({
 
         {isAtCapacity ? (
           <div className="flex items-center rounded-[6px] border border-warning/30 bg-warning/5 px-3 py-1 text-xs font-bold text-warning">
-            Capacidade máxima atingida
+            {t("admin.layout.capacityMax")}
           </div>
         ) : (
           <button
@@ -315,7 +334,7 @@ function RowEditor({
             ].join(" ")}
             disabled={isAdding}
             onClick={handleAddSeat}
-            title={`Adicionar assento ${nextNumber}`}
+            title={t("admin.layout.addSeatTitle", { number: nextNumber })}
             type="button"
           >
             +
@@ -333,6 +352,7 @@ function RowEditor({
 }
 
 export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
+  const { t } = useI18n();
   const [state, setState] = useState<LayoutState>({ status: "loading" });
   const [showPreview, setShowPreview] = useState(false);
 
@@ -357,7 +377,7 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
       ]);
 
       const sortedRows = [...rows].sort((a, b) =>
-        a.name.localeCompare(b.name, "pt-BR")
+        a.name.localeCompare(b.name)
       );
 
       const rowIds = new Set(sortedRows.map((r) => r.id));
@@ -371,11 +391,11 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
       setState({ room, rows: sortedRows, seatsByRow, status: "ready" });
     } catch {
       setState({
-        message: "Não foi possível carregar o layout da sala. Tente novamente.",
+        message: t("admin.layout.loadError"),
         status: "error",
       });
     }
-  }, [roomId]);
+  }, [roomId, t]);
 
   useEffect(() => {
     loadLayout();
@@ -398,7 +418,7 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
       setState((prev) => {
         if (prev.status !== "ready") return prev;
         const newRows = [...prev.rows, created].sort((a, b) =>
-          a.name.localeCompare(b.name, "pt-BR")
+          a.name.localeCompare(b.name)
         );
         return {
           ...prev,
@@ -409,17 +429,19 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
       setNewRowName("");
       setShowCreateRow(false);
     } catch (err) {
-      const constraintMsg = extractConstraintMessage(err);
+      const constraintMsg = extractConstraintMessage(err, t);
       if (constraintMsg) {
         setCreateRowError(constraintMsg);
       } else if (err instanceof ApiError && err.code === "VALIDATION_FAILED") {
         const details = err.details as Record<string, unknown> | null;
         const nameErr = details?.name;
         setCreateRowError(
-          Array.isArray(nameErr) ? nameErr[0] : String(nameErr ?? "Nome inválido.")
+          Array.isArray(nameErr)
+            ? nameErr[0]
+            : String(nameErr ?? t("admin.layout.invalidRowName"))
         );
       } else {
-        setCreateRowError("Não foi possível criar a fileira. Tente novamente.");
+        setCreateRowError(t("admin.layout.createRowError"));
       }
     } finally {
       setIsCreatingRow(false);
@@ -463,9 +485,9 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
       }
       setDeleteTarget(null);
     } catch (err) {
-      const constraintMsg = extractConstraintMessage(err);
+      const constraintMsg = extractConstraintMessage(err, t);
       setDeleteError(
-        constraintMsg ?? "Não foi possível excluir. Tente novamente."
+        constraintMsg ?? t("admin.layout.deleteError")
       );
       setDeleteTarget(null);
     } finally {
@@ -525,7 +547,7 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
         </p>
         <div>
           <Button onClick={() => loadLayout()} variant="secondary">
-            Tentar novamente
+            {t("common.tryAgain")}
           </Button>
         </div>
       </div>
@@ -543,12 +565,16 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
   const deleteDialogProps = deleteTarget
     ? deleteTarget.kind === "row"
       ? {
-          description: `Excluir a fileira "${deleteTarget.row.name}" removerá todos os seus assentos. Esta ação não pode ser desfeita.`,
-          title: `Excluir fileira ${deleteTarget.row.name}`,
+          description: t("admin.layout.deleteRowDescription", {
+            row: deleteTarget.row.name,
+          }),
+          title: t("admin.layout.deleteRowTitle", { row: deleteTarget.row.name }),
         }
       : {
-          description: `Tem certeza que deseja excluir o assento ${deleteTarget.rowName}${deleteTarget.seat.number}?`,
-          title: "Excluir assento",
+          description: t("admin.layout.deleteSeatDescription", {
+            seat: `${deleteTarget.rowName}${deleteTarget.seat.number}`,
+          }),
+          title: t("admin.layout.deleteSeatTitle"),
         }
     : { description: "", title: "" };
 
@@ -562,31 +588,35 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
               size="sm"
               variant="secondary"
             >
-              {showPreview ? "Ocultar prévia" : "Prévia do mapa"}
+              {showPreview
+                ? t("admin.layout.hidePreview")
+                : t("admin.layout.mapPreview")}
             </Button>
             <ButtonLink
               href={`/admin/rooms/${room.id}/edit`}
               size="sm"
               variant="ghost"
             >
-              Editar sala
+              {t("admin.room.edit")}
             </ButtonLink>
           </div>
         }
-        title={`Layout — ${room.display_name || room.name}`}
+        title={t("admin.layout.roomTitle", {
+          room: room.display_name || room.name,
+        })}
       />
 
       {/* Room info bar */}
       <div className="flex flex-wrap gap-4 rounded-[8px] border border-white/[0.07] bg-white/[0.02] p-4 text-sm">
         <div className="flex flex-col gap-0.5">
           <span className="text-xs font-bold uppercase tracking-wider text-white/40">
-            Sala
+            {t("admin.session.room")}
           </span>
           <span className="font-bold text-white">{room.name}</span>
         </div>
         <div className="flex flex-col gap-0.5">
           <span className="text-xs font-bold uppercase tracking-wider text-white/40">
-            Capacidade
+            {t("admin.room.capacity")}
           </span>
           <span
             className={cn(
@@ -594,15 +624,18 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
               isNearCapacity ? "text-warning" : "text-white"
             )}
           >
-            {totalSeats} / {room.capacity} lugares
+            {t("admin.layout.capacitySummary", {
+              capacity: room.capacity,
+              used: totalSeats,
+            })}
             {capacityUsed > 0
-              ? ` (${isNearCapacity ? "cheio" : `${capacityUsed}%`})`
+              ? ` (${isNearCapacity ? t("admin.layout.capacityFull") : `${capacityUsed}%`})`
               : ""}
           </span>
         </div>
         <div className="flex flex-col gap-0.5">
           <span className="text-xs font-bold uppercase tracking-wider text-white/40">
-            Fileiras
+            {t("admin.layout.rows")}
           </span>
           <span className="font-bold text-white">{rows.length}</span>
         </div>
@@ -612,7 +645,7 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
       {showPreview ? (
         <div className="rounded-[8px] border border-white/[0.07] bg-white/[0.02] p-4">
           <p className="mb-4 text-xs font-bold uppercase tracking-wider text-white/40">
-            Prévia do mapa de assentos
+            {t("admin.layout.mapPreviewA11y")}
           </p>
           <SeatMapPreview rows={rows} seatsByRow={seatsByRow} />
         </div>
@@ -627,7 +660,7 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
         ) : null}
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-sm font-extrabold uppercase tracking-wider text-white/60">
-            Fileiras
+            {t("admin.layout.rows")}
           </h2>
           <Button
             onClick={() => {
@@ -638,17 +671,17 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
             size="sm"
             variant="secondary"
           >
-            + Adicionar fileira
+            {t("admin.layout.addRow")}
           </Button>
         </div>
 
         {showCreateRow ? (
           <div className="flex flex-col gap-2 rounded-[8px] border border-brand/30 bg-brand/5 p-4">
             <span className="text-sm font-extrabold text-white">
-              Nova fileira
+              {t("admin.layout.newRow")}
             </span>
             <p className="text-xs text-white/50">
-              Use letras (A–Z). A fileira será ordenada automaticamente.
+              {t("admin.layout.rowHelp")}
             </p>
             <div className="flex gap-2">
               <input
@@ -669,7 +702,7 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
                     setCreateRowError(null);
                   }
                 }}
-                placeholder="Ex.: A"
+                placeholder={t("admin.layout.rowPlaceholder")}
                 ref={createRowInputRef}
                 value={newRowName}
               />
@@ -681,7 +714,7 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
                 type="button"
                 variant="primary"
               >
-                Criar
+                {t("admin.create")}
               </Button>
               <Button
                 disabled={isCreatingRow}
@@ -694,7 +727,7 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
                 type="button"
                 variant="ghost"
               >
-                Cancelar
+                {t("admin.cancel")}
               </Button>
             </div>
             {createRowError ? (
@@ -708,10 +741,10 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
         {rows.length === 0 && !showCreateRow ? (
           <div className="flex flex-col items-center gap-2 rounded-[8px] border border-dashed border-white/[0.10] py-10 text-center">
             <p className="text-sm font-bold text-white/50">
-              Nenhuma fileira cadastrada
+              {t("admin.layout.noRowsTitle")}
             </p>
             <p className="text-xs text-white/30">
-              Adicione fileiras para começar a configurar o layout da sala.
+              {t("admin.layout.noRowsDescription")}
             </p>
           </div>
         ) : null}
@@ -729,7 +762,13 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
                     {row.name}
                   </span>
                   <span className="text-xs text-white/40">
-                    {seats.length} assento{seats.length !== 1 ? "s" : ""}
+                    {t("admin.layout.seatCount", {
+                      count: seats.length,
+                      seatWord:
+                        seats.length === 1
+                          ? t("admin.layout.seatSingular")
+                          : t("admin.layout.seatPlural"),
+                    })}
                   </span>
                 </div>
                 <Button
@@ -737,7 +776,7 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
                   size="sm"
                   variant="danger"
                 >
-                  Excluir fileira
+                  {t("admin.layout.deleteRow")}
                 </Button>
               </div>
 
@@ -758,7 +797,7 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
       </div>
 
       <AdminConfirmDialog
-        confirmLabel={isDeleting ? "Excluindo..." : "Excluir"}
+        confirmLabel={isDeleting ? t("admin.deleting") : t("admin.delete")}
         description={deleteDialogProps.description}
         isOpen={deleteTarget !== null}
         onCancel={() => setDeleteTarget(null)}

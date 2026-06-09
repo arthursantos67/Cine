@@ -1,4 +1,8 @@
+"use client";
+
 import { ChevronLeft, ChevronRight } from "lucide-react";
+
+import { useI18n } from "@/i18n";
 
 import { cn } from "./classNames";
 
@@ -22,12 +26,15 @@ export function CarouselControls({
   canNext = true,
   canPrevious = true,
   className,
-  nextLabel = "Próximo item",
+  nextLabel,
   onNext,
   onPrevious,
-  previousLabel = "Item anterior",
+  previousLabel,
   tone = "light",
 }: CarouselControlsProps) {
+  const { t } = useI18n();
+  const resolvedPreviousLabel = previousLabel ?? t("common.previousItem");
+  const resolvedNextLabel = nextLabel ?? t("common.nextItem");
   const buttonClasses = cn(
     "inline-flex size-10 items-center justify-center rounded-pill border transition duration-150 active:scale-[0.92] focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-[0.45] disabled:active:scale-100",
     toneClasses[tone]
@@ -36,21 +43,21 @@ export function CarouselControls({
   return (
     <div className={cn("inline-flex items-center gap-2", className)}>
       <button
-        aria-label={previousLabel}
+        aria-label={resolvedPreviousLabel}
         className={buttonClasses}
         disabled={!canPrevious}
         onClick={onPrevious}
-        title={previousLabel}
+        title={resolvedPreviousLabel}
         type="button"
       >
         <ChevronLeft aria-hidden="true" size={20} strokeWidth={2.5} />
       </button>
       <button
-        aria-label={nextLabel}
+        aria-label={resolvedNextLabel}
         className={buttonClasses}
         disabled={!canNext}
         onClick={onNext}
-        title={nextLabel}
+        title={resolvedNextLabel}
         type="button"
       >
         <ChevronRight aria-hidden="true" size={20} strokeWidth={2.5} />

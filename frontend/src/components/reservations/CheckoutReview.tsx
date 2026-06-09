@@ -16,6 +16,7 @@ import { useReservation } from "@/contexts/ReservationContext";
 import type { CatalogSession } from "@/types/catalog";
 import type { PaymentMethod } from "@/types/reservation";
 import { formatCurrency, formatDateTime } from "@/utils/formatters";
+import { useI18n } from "@/i18n";
 
 import {
   buildCheckoutPayload,
@@ -25,7 +26,7 @@ import {
 import {
   buildOrderSummaryItems,
   calculateOrderTotal,
-  paymentMethodLabels,
+  getPaymentMethodLabel,
 } from "./order-summary";
 
 type SessionDetailState =
@@ -50,9 +51,11 @@ export function PaymentMethodSelector({
   onChange,
   selectedMethod,
 }: PaymentMethodSelectorProps) {
+  const { locale, t } = useI18n();
+
   return (
     <fieldset className="payment-methods m-0 grid min-w-0 gap-2.5 border-0 p-0">
-      <legend className="sr-only">Forma de pagamento</legend>
+      <legend className="sr-only">{t("checkout.selectPayment")}</legend>
       {PAYMENT_METHODS.map((method) => (
         <label
           className="payment-methods__option grid min-h-[72px] cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-md border border-white/10 bg-white/[0.04] p-3 text-text/80 has-[input:checked]:border-brand/70 has-[input:checked]:bg-brand/20 has-[input:checked]:text-white has-[input:checked]:shadow-[inset_0_1px_0_rgb(255_255_255_/_8%)] focus-within:border-info focus-within:shadow-[0_0_0_3px_rgb(31_111_235_/_18%)]"
@@ -69,12 +72,12 @@ export function PaymentMethodSelector({
           />
           <span className="grid min-w-0 gap-1">
             <strong className="text-base text-white">
-              {paymentMethodLabels[method]}
+              {getPaymentMethodLabel(method, locale)}
             </strong>
             <small className="text-sm font-bold leading-snug text-text/60">
               {method === "cartao_credito"
-                ? "Finalize com cartão de crédito."
-                : "Finalize com pagamento via PIX."}
+                ? t("checkout.creditCardDescription")
+                : t("checkout.pixDescription")}
             </small>
           </span>
         </label>
@@ -84,6 +87,7 @@ export function PaymentMethodSelector({
 }
 
 export function CheckoutReview() {
+  const { locale, t } = useI18n();
   const router = useRouter();
   const reservation = useReservation();
   const [sessionState, setSessionState] = useState<SessionDetailState>({
@@ -96,14 +100,15 @@ export function CheckoutReview() {
     () =>
       buildOrderSummaryItems(
         reservation.reservedSeats,
-        reservation.ticketTypes
+        reservation.ticketTypes,
+        locale
       ),
-    [reservation.reservedSeats, reservation.ticketTypes]
+    [locale, reservation.reservedSeats, reservation.ticketTypes]
   );
   const total = calculateOrderTotal(items);
   const session =
     sessionState.status === "success" ? sessionState.session : null;
-  const sessionBadges = session ? getSessionBadges(session) : [];
+  const sessionBadges = session ? getSessionBadges(session, locale) : [];
 
   useEffect(() => {
     let isActive = true;
@@ -120,8 +125,7 @@ export function CheckoutReview() {
       } catch {
         if (isActive) {
           setSessionState({
-            errorMessage:
-              "Não conseguimos carregar os detalhes da sessão. Você ainda pode revisar os assentos selecionados.",
+            errorMessage: t("checkout.sessionLoadError"),
             status: "error",
           });
         }
@@ -137,7 +141,7 @@ export function CheckoutReview() {
     return () => {
       isActive = false;
     };
-  }, [reservation.sessionId]);
+  }, [locale, reservation.sessionId, t]);
 
   async function submitCheckout(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -149,6 +153,7 @@ export function CheckoutReview() {
     const blocker = getCheckoutSubmitBlocker({
       paymentMethod: reservation.paymentMethod,
       reservedSeats: reservation.reservedSeats,
+      locale,
     });
 
     if (blocker) {
@@ -159,7 +164,7 @@ export function CheckoutReview() {
     const paymentMethod = reservation.paymentMethod;
 
     if (!paymentMethod) {
-      setErrorMessage("Escolha uma forma de pagamento para finalizar a compra.");
+      setErrorMessage(t("checkout.paymentRequired"));
       return;
     }
 
@@ -177,7 +182,7 @@ export function CheckoutReview() {
       reservation.storeCheckoutResult(checkoutResult);
       router.push("/confirmation");
     } catch (error) {
-      setErrorMessage(getCheckoutErrorMessage(error));
+      setErrorMessage(getCheckoutErrorMessage(error, locale));
     } finally {
       setIsSubmitting(false);
     }
@@ -199,15 +204,14 @@ export function CheckoutReview() {
               className="m-0 text-[21px] leading-tight text-white"
               id="revisao-pedido"
             >
-              Revise seu pedido
+              {t("checkout.reviewTitle")}
             </h2>
             <p className="m-0 mt-1.5 leading-6 text-text/65">
-              O total abaixo é informativo. A cobrança final é calculada pelo
-              sistema no momento da confirmação.
+              {t("checkout.reviewHelp")}
             </p>
           </div>
           <strong className="inline-flex min-h-[38px] items-center whitespace-nowrap rounded-md border border-brand/50 bg-brand/20 px-3 py-1.5 text-xl text-white">
-            {formatCurrency(total)}
+            {formatCurrency(total, locale)}
           </strong>
         </div>
 
@@ -221,7 +225,7 @@ export function CheckoutReview() {
             className="inline-status inline-status-info m-0 inline-flex w-fit rounded-pill border border-info/40 bg-info/15 px-2.5 py-2 text-[13px] font-extrabold leading-none text-[#b8d4ff]"
             role="status"
           >
-            Carregando detalhes da sessão...
+            {t("checkout.sessionLoading")}
           </p>
         ) : null}
 
@@ -243,7 +247,7 @@ export function CheckoutReview() {
             >
               <div className="grid min-w-0 gap-0.5">
                 <span className="text-[13px] font-extrabold text-text/65">
-                  Assento
+                  {t("tickets.seat")}
                 </span>
                 <strong className="text-[15px] text-white">
                   {item.seatLabel}
@@ -251,7 +255,7 @@ export function CheckoutReview() {
               </div>
               <div className="grid min-w-0 gap-0.5">
                 <span className="text-[13px] font-extrabold text-text/65">
-                  Ingresso
+                  {t("tickets.ticket")}
                 </span>
                 <strong className="text-[15px] text-white">
                   {item.ticketTypeLabel}
@@ -259,10 +263,10 @@ export function CheckoutReview() {
               </div>
               <div className="grid min-w-0 gap-0.5">
                 <span className="text-[13px] font-extrabold text-text/65">
-                  Valor unitário
+                  {t("checkout.unitPrice")}
                 </span>
                 <strong className="text-[15px] text-white">
-                  {formatCurrency(item.unitPrice)}
+                  {formatCurrency(item.unitPrice, locale)}
                 </strong>
               </div>
             </div>
@@ -280,10 +284,10 @@ export function CheckoutReview() {
               className="m-0 text-[21px] leading-tight text-white"
               id="forma-pagamento"
             >
-              Forma de pagamento
+              {t("checkout.selectPayment")}
             </h2>
             <p className="m-0 mt-1.5 leading-6 text-text/65">
-              Escolha como deseja concluir este pedido.
+              {t("checkout.paymentHelp")}
             </p>
           </div>
         </div>
@@ -300,7 +304,7 @@ export function CheckoutReview() {
 
       {errorMessage ? (
         <div id="checkout-review-error">
-          <StateMessage tone="error" title="Não foi possível finalizar">
+          <StateMessage tone="error" title={t("checkout.errorTitle")}>
             {errorMessage}
           </StateMessage>
         </div>
@@ -311,7 +315,7 @@ export function CheckoutReview() {
         disabled={isSubmitting}
         type="submit"
       >
-        {isSubmitting ? "Finalizando..." : "Confirmar compra"}
+        {isSubmitting ? t("checkout.submitLoading") : t("checkout.confirm")}
       </button>
     </form>
   );
@@ -324,31 +328,33 @@ export function CheckoutSessionDetails({
   badges: ReturnType<typeof getSessionBadges>;
   session: CatalogSession | null;
 }) {
+  const { locale, t } = useI18n();
+
   return (
     <dl className="checkout-review__session m-0 grid gap-2.5">
       <div className="flex min-w-0 items-center justify-between gap-3.5 rounded-md border border-white/10 bg-white/[0.04] px-3 py-2.5 max-[420px]:grid max-[420px]:items-start max-[420px]:gap-1">
-        <dt className="text-sm font-extrabold text-text/65">Filme</dt>
+        <dt className="text-sm font-extrabold text-text/65">{t("tickets.movie")}</dt>
         <dd className="m-0 text-right font-extrabold max-[420px]:text-left">
-          {session?.movie.title ?? "Filme indisponível"}
+          {session?.movie.title ?? t("movie.unavailable")}
         </dd>
       </div>
       <div className="flex min-w-0 items-center justify-between gap-3.5 rounded-md border border-white/10 bg-white/[0.04] px-3 py-2.5 max-[420px]:grid max-[420px]:items-start max-[420px]:gap-1">
-        <dt className="text-sm font-extrabold text-text/65">Sessão</dt>
+        <dt className="text-sm font-extrabold text-text/65">{t("tickets.session")}</dt>
         <dd className="m-0 text-right font-extrabold max-[420px]:text-left">
           {session
-            ? formatDateTime(session.start_time)
-            : "Data e horário indisponíveis"}
+            ? formatDateTime(session.start_time, locale)
+            : t("session.dateTimeUnavailable")}
         </dd>
       </div>
       <div className="flex min-w-0 items-center justify-between gap-3.5 rounded-md border border-white/10 bg-white/[0.04] px-3 py-2.5 max-[420px]:grid max-[420px]:items-start max-[420px]:gap-1">
-        <dt className="text-sm font-extrabold text-text/65">Sala</dt>
+        <dt className="text-sm font-extrabold text-text/65">{t("tickets.room")}</dt>
         <dd className="m-0 text-right font-extrabold max-[420px]:text-left">
-          {session ? getRoomDisplayName(session.room) : "Sala indisponível"}
+          {session ? getRoomDisplayName(session.room) : t("session.roomUnavailable")}
         </dd>
       </div>
       {session ? (
         <div className="flex min-w-0 items-center justify-between gap-3.5 rounded-md border border-white/10 bg-white/[0.04] px-3 py-2.5 max-[420px]:grid max-[420px]:items-start max-[420px]:gap-1">
-          <dt className="text-sm font-extrabold text-text/65">Formato</dt>
+          <dt className="text-sm font-extrabold text-text/65">{t("session.format")}</dt>
           <dd className="m-0 text-right font-extrabold max-[420px]:text-left">
             {badges.length > 0 ? (
               <SessionBadgeList
@@ -356,7 +362,7 @@ export function CheckoutSessionDetails({
                 className="checkout-review__badges"
               />
             ) : (
-              "Formato padrão"
+              t("session.formatDefault")
             )}
           </dd>
         </div>

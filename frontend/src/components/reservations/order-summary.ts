@@ -3,6 +3,8 @@ import type {
   ReservedSeat,
   TicketType,
 } from "@/types/reservation";
+import { DEFAULT_LOCALE, type Locale, resolveLocale } from "@/i18n/locales";
+import { messages } from "@/i18n/messages";
 
 export type OrderSummaryItem = {
   seat: ReservedSeat;
@@ -22,6 +24,24 @@ export const paymentMethodLabels: Record<PaymentMethod, string> = {
   pix: "PIX",
 };
 
+export function getTicketTypeLabel(
+  ticketType: TicketType | null | undefined,
+  locale: Locale | string = DEFAULT_LOCALE
+) {
+  if (!ticketType) {
+    return t(locale, "domain.ticketType.pending");
+  }
+
+  return t(locale, `domain.ticketType.${ticketType}`);
+}
+
+export function getPaymentMethodLabel(
+  paymentMethod: PaymentMethod,
+  locale: Locale | string = DEFAULT_LOCALE
+) {
+  return t(locale, `domain.payment.${paymentMethod}`);
+}
+
 export function formatSeatLabel(seat: Pick<ReservedSeat, "number" | "row">) {
   return `${seat.row}${seat.number}`;
 }
@@ -39,7 +59,8 @@ export function calculateTicketUnitPrice(
 
 export function buildOrderSummaryItems(
   reservedSeats: ReservedSeat[],
-  ticketTypes: Record<string, TicketType>
+  ticketTypes: Record<string, TicketType>,
+  locale: Locale | string = DEFAULT_LOCALE
 ): OrderSummaryItem[] {
   return reservedSeats.map((seat) => {
     const ticketType = ticketTypes[seat.sessionSeatId] ?? null;
@@ -48,7 +69,7 @@ export function buildOrderSummaryItems(
       seat,
       seatLabel: formatSeatLabel(seat),
       ticketType,
-      ticketTypeLabel: ticketType ? ticketTypeLabels[ticketType] : "A definir",
+      ticketTypeLabel: getTicketTypeLabel(ticketType, locale),
       unitPrice: calculateTicketUnitPrice(seat.basePrice, ticketType),
     };
   });
@@ -62,4 +83,9 @@ export function calculateOrderTotal(items: Pick<OrderSummaryItem, "unitPrice">[]
 
 function roundCurrency(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function t(locale: Locale | string, key: string) {
+  const resolvedLocale = resolveLocale(locale);
+  return messages[resolvedLocale][key] ?? messages[DEFAULT_LOCALE][key] ?? key;
 }

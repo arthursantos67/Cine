@@ -12,6 +12,7 @@ from rest_framework.generics import (
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
+from cineprime_api.localization import get_request_locale
 from cineprime_api.throttling import ReservationRateThrottle
 
 from catalog.models import Session
@@ -291,6 +292,7 @@ class CheckoutView(GenericAPIView):
                 payment_method=serializer.validated_data["payment_method"],
                 user=request.user,
                 submitted_total=serializer.validated_data.get("total_amount"),
+                locale=get_request_locale(request),
             )
         except CheckoutInvalidSeatSelectionError as exc:
             raise ValidationError(detail={"seats": [str(exc)]}) from exc

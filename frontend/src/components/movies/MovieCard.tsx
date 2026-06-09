@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/Badge";
 import type { BadgeTone } from "@/components/ui/Badge";
 import { ResponsiveImage } from "@/components/ui/ResponsiveImage";
 import type { CatalogMovie } from "@/types/catalog";
+import { useI18n } from "@/i18n";
 
 import {
   formatMovieDuration,
@@ -17,32 +18,36 @@ type MovieCardProps = {
 
 type StatusBadge = { label: string; tone: BadgeTone };
 
-function getStatusBadge(movie: CatalogMovie): StatusBadge | null {
+function getStatusBadge(
+  movie: CatalogMovie,
+  t: (key: string, params?: Record<string, string | number>) => string
+): StatusBadge | null {
   if (movie.status === "pre_venda") {
-    return { label: "Pré-venda", tone: "accent" };
+    return { label: t("domain.movieStatus.pre_venda"), tone: "accent" };
   }
   if (movie.is_featured) {
-    return { label: "Destaque", tone: "brand" };
+    return { label: t("movie.featured"), tone: "brand" };
   }
   return null;
 }
 
 export function MovieCard({ movie }: MovieCardProps) {
-  const genres = formatMovieGenres(movie.genres);
-  const duration = formatMovieDuration(movie.duration_minutes);
-  const badge = getStatusBadge(movie);
+  const { locale, t } = useI18n();
+  const genres = formatMovieGenres(movie.genres, locale);
+  const duration = formatMovieDuration(movie.duration_minutes, locale);
+  const badge = getStatusBadge(movie, t);
 
   return (
     <article className="h-full overflow-hidden rounded-card bg-[#1e2535] border border-white/[0.08] shadow-[0_4px_20px_rgb(0_0_0/0.3)]">
       <Link
-        aria-label={`Ver detalhes de ${movie.title}`}
+        aria-label={t("movie.viewDetailsFor", { title: movie.title })}
         className="group grid h-full focus-visible:outline-offset-[-4px]"
         data-carousel-item-link
         href={getMovieDetailsHref(movie.id)}
       >
         <div className="relative">
           <ResponsiveImage
-            alt={`Poster de ${movie.title}`}
+            alt={t("movie.posterAlt", { title: movie.title })}
             className="aspect-[2/3] w-full object-cover bg-surface-muted block"
             height={480}
             loading="lazy"

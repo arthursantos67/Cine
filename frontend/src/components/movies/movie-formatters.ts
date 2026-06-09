@@ -1,12 +1,13 @@
 import type { CatalogMovie } from "@/types/catalog";
+import { DEFAULT_LOCALE, type Locale, resolveLocale } from "@/i18n/locales";
+import { messages } from "@/i18n/messages";
 
-const ptBrDateFormatter = new Intl.DateTimeFormat("pt-BR", {
-  timeZone: "UTC",
-});
-
-export function formatMovieDuration(durationMinutes: number) {
+export function formatMovieDuration(
+  durationMinutes: number,
+  locale: Locale | string = DEFAULT_LOCALE
+) {
   if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
-    return "Duração indisponível";
+    return t(locale, "movie.durationUnavailable");
   }
 
   const hours = Math.floor(durationMinutes / 60);
@@ -23,28 +24,41 @@ export function formatMovieDuration(durationMinutes: number) {
   return `${hours}h ${minutes}min`;
 }
 
-export function formatMovieGenres(genres: CatalogMovie["genres"]) {
+export function formatMovieGenres(
+  genres: CatalogMovie["genres"],
+  locale: Locale | string = DEFAULT_LOCALE
+) {
   if (genres.length === 0) {
-    return "Gênero indisponível";
+    return t(locale, "movie.genreUnavailable");
   }
 
   return genres.map((genre) => genre.name).join(", ");
 }
 
-export function formatMovieReleaseDate(releaseDate?: string | null) {
+export function formatMovieReleaseDate(
+  releaseDate?: string | null,
+  locale: Locale | string = DEFAULT_LOCALE
+) {
   if (!releaseDate) {
-    return "Estreia indisponível";
+    return t(locale, "movie.releaseUnavailable");
   }
 
   const parsedDate = new Date(`${releaseDate}T00:00:00.000Z`);
 
   if (Number.isNaN(parsedDate.getTime())) {
-    return "Estreia indisponível";
+    return t(locale, "movie.releaseUnavailable");
   }
 
-  return ptBrDateFormatter.format(parsedDate);
+  return new Intl.DateTimeFormat(resolveLocale(locale), {
+    timeZone: "UTC",
+  }).format(parsedDate);
 }
 
 export function getMovieDetailsHref(movieId: CatalogMovie["id"]) {
   return `/movies/${movieId}`;
+}
+
+function t(locale: Locale | string, key: string) {
+  const resolvedLocale = resolveLocale(locale);
+  return messages[resolvedLocale][key] ?? messages[DEFAULT_LOCALE][key] ?? key;
 }

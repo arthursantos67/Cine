@@ -3,15 +3,18 @@ import { CheckoutReview } from "@/components/reservations/CheckoutReview";
 import { PurchaseFlowLayout } from "@/components/reservations/PurchaseFlowLayout";
 import { PurchaseFlowGuard } from "@/components/reservations/PurchaseFlowGuard";
 import { PageSection } from "@/components/ui/PageSection";
+import { getServerLocale, getTranslator } from "@/i18n/server";
 
-export default function CheckoutPage() {
+export default async function CheckoutPage() {
+  const t = getTranslator(await getServerLocale());
+
   return (
     <ProtectedRoute>
       <PurchaseFlowGuard>
         <PageSection
-          description="Revise a compra, escolha a forma de pagamento e finalize seu pedido com mensagens claras de carregamento e erro."
-          eyebrow="Pagamento"
-          title="Finalizar compra"
+          description={t("checkout.reviewDescription")}
+          eyebrow={t("checkout.payment")}
+          title={t("checkout.finish")}
         >
           <PurchaseFlowLayout currentStep="checkout">
             <CheckoutReview />

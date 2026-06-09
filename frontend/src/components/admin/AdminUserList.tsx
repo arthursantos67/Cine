@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { AdminConfirmDialog, AdminTable, AdminToolbar } from "@/components/admin";
 import type { AdminTableColumn } from "@/components/admin";
+import { useI18n } from "@/i18n";
 
 type PermissionAction = "grant" | "revoke";
 
@@ -22,35 +23,39 @@ type AuditPanelProps = {
 };
 
 function AuditPanel({ logs, onClose, username }: AuditPanelProps) {
+  const { formatDateTime, t } = useI18n();
+
   return (
     <div className="mt-4 rounded-[10px] border border-white/[0.07] bg-surface-muted p-4">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-[750] text-white/70">
-          Histórico de permissões — {username}
+          {t("admin.user.auditTitle", { username })}
         </h2>
         <button
-          aria-label="Fechar histórico"
+          aria-label={t("admin.user.auditClose")}
           className="text-xs text-white/40 hover:text-white/70"
           onClick={onClose}
           type="button"
         >
-          Fechar
+          {t("admin.close")}
         </button>
       </div>
       {logs.length === 0 ? (
-        <p className="text-sm text-white/40">Nenhuma alteração registrada.</p>
+        <p className="text-sm text-white/40">{t("admin.user.auditEmpty")}</p>
       ) : (
         <ul className="space-y-2">
           {logs.map((entry) => (
             <li className="flex flex-wrap items-center gap-2 text-sm" key={`${entry.created_at}-${entry.action}`}>
               <Badge size="sm" tone={entry.action === "granted" ? "success" : "danger"}>
-                {entry.action === "granted" ? "Promovido" : "Rebaixado"}
+                {entry.action === "granted"
+                  ? t("admin.user.permissionGranted")
+                  : t("admin.user.permissionRevoked")}
               </Badge>
               <span className="text-white/60">
-                por <span className="text-white/80">{entry.actor}</span>
+                {t("admin.user.byActor", { actor: entry.actor })}
               </span>
               <span className="text-white/30 tabular-nums">
-                {new Date(entry.created_at).toLocaleString("pt-BR")}
+                {formatDateTime(entry.created_at)}
               </span>
             </li>
           ))}
@@ -61,6 +66,7 @@ function AuditPanel({ logs, onClose, username }: AuditPanelProps) {
 }
 
 export function AdminUserList() {
+  const { t } = useI18n();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -96,7 +102,7 @@ export function AdminUserList() {
       setTotalCount(result.count);
       setPage(pageNum);
     } catch {
-      setErrorMessage("Não foi possível carregar os usuários. Tente novamente.");
+      setErrorMessage(t("admin.user.loadError"));
     } finally {
       if (replace) {
         setLoading(false);
@@ -104,7 +110,7 @@ export function AdminUserList() {
         setLoadingMore(false);
       }
     }
-  }, [search]);
+  }, [search, t]);
 
   useEffect(() => {
     setUsers([]);
@@ -119,7 +125,7 @@ export function AdminUserList() {
       const logs = await adminApi.getUserPermissionLogs(user.id);
       setAuditLogs(logs);
     } catch {
-      setActionError("Não foi possível carregar o histórico. Tente novamente.");
+      setActionError(t("admin.user.auditLoadError"));
     } finally {
       setAuditLoading(false);
     }
@@ -154,8 +160,8 @@ export function AdminUserList() {
     } catch (err: unknown) {
       const msg =
         err instanceof Error && err.message.includes("last active administrator")
-          ? "Não é possível remover o último administrador ativo."
-          : "Não foi possível concluir a operação. Tente novamente.";
+          ? t("admin.user.lastAdmin")
+          : t("admin.user.operationError");
       setActionError(msg);
     } finally {
       setIsActing(false);
@@ -165,7 +171,7 @@ export function AdminUserList() {
   const columns: AdminTableColumn<AdminUser & Record<string, unknown>>[] = [
     {
       key: "username",
-      label: "Usuário",
+      label: t("admin.user.username"),
       render: (row) => (
         <span className="font-medium text-white">{row.username}</span>
       ),
@@ -176,15 +182,15 @@ export function AdminUserList() {
     },
     {
       key: "is_staff",
-      label: "Perfil",
+      label: t("admin.user.profile"),
       render: (row) =>
         row.is_staff ? (
           <Badge size="sm" tone="brand">
-            Admin
+            {t("admin.user.roleAdmin")}
           </Badge>
         ) : (
           <Badge size="sm" tone="neutral">
-            Usuário
+            {t("admin.user.roleUser")}
           </Badge>
         ),
     },
@@ -197,12 +203,12 @@ export function AdminUserList() {
         return (
           <div className="flex items-center justify-end gap-2">
             <button
-              aria-label={`Ver histórico de ${row.username}`}
+              aria-label={t("admin.user.viewAuditFor", { username: row.username })}
               className="text-xs text-white/40 hover:text-white/70 transition"
               onClick={() => openAuditPanel(row as AdminUser)}
               type="button"
             >
-              Histórico
+              {t("admin.user.auditLabel")}
             </button>
             {row.is_staff ? (
               <Button
@@ -211,12 +217,12 @@ export function AdminUserList() {
                 size="sm"
                 title={
                   isLastAdmin
-                    ? "Não é possível remover o último administrador"
+                    ? t("admin.user.lastAdminTitle")
                     : undefined
                 }
                 variant="danger"
               >
-                Remover admin
+                {t("admin.user.revoke")}
               </Button>
             ) : (
               <Button
@@ -224,7 +230,7 @@ export function AdminUserList() {
                 size="sm"
                 variant="secondary"
               >
-                Tornar admin
+                {t("admin.user.grant")}
               </Button>
             )}
           </div>
@@ -235,20 +241,20 @@ export function AdminUserList() {
 
   const confirmTitle =
     pendingAction?.action === "grant"
-      ? `Promover ${pendingAction.user.username} a administrador?`
-      : `Remover permissão admin de ${pendingAction?.user.username}?`;
+      ? t("admin.user.grantTitle", { username: pendingAction.user.username })
+      : t("admin.user.revokeTitle", { username: pendingAction?.user.username ?? "" });
 
   const confirmDescription =
     pendingAction?.action === "grant"
-      ? "Este usuário terá acesso total ao painel de administração."
-      : "Este usuário perderá o acesso ao painel de administração.";
+      ? t("admin.user.grantDescription")
+      : t("admin.user.revokeDescription");
 
   return (
     <div className="grid gap-6">
       <AdminToolbar
         onSearch={setSearchInput}
-        searchPlaceholder="Buscar por e-mail ou usuário..."
-        title="Administradores"
+        searchPlaceholder={t("admin.user.search")}
+        title={t("admin.users")}
       />
 
       {errorMessage ? (
@@ -258,11 +264,11 @@ export function AdminUserList() {
       ) : null}
 
       <AdminTable
-        caption="Lista de usuários do sistema"
+        caption={t("admin.user.caption")}
         columns={columns as AdminTableColumn<Record<string, unknown>>[]}
         data={users as (AdminUser & Record<string, unknown>)[]}
-        emptyDescription="Nenhum usuário encontrado com os critérios informados."
-        emptyTitle="Nenhum usuário"
+        emptyDescription={t("admin.user.emptyDescription")}
+        emptyTitle={t("admin.user.emptyTitle")}
         keyField="id"
         loading={loading}
       />
@@ -274,7 +280,7 @@ export function AdminUserList() {
             onClick={() => fetchPage(page + 1, false)}
             variant="ghost"
           >
-            {loadingMore ? "Carregando..." : "Carregar mais"}
+            {loadingMore ? t("admin.user.loadingMore") : t("admin.user.loadMore")}
           </Button>
         </div>
       ) : null}
@@ -295,10 +301,10 @@ export function AdminUserList() {
         <AdminConfirmDialog
           confirmLabel={
             isActing
-              ? "Aguarde..."
+              ? t("admin.user.wait")
               : pendingAction.action === "grant"
-                ? "Promover"
-                : "Remover admin"
+                ? t("admin.user.grantConfirm")
+                : t("admin.user.revoke")
           }
           description={confirmDescription}
           isOpen

@@ -58,6 +58,7 @@ class Movie(models.Model):
         related_name="movies",
     )
     synopsis = models.TextField()
+    translations = models.JSONField(default=dict, blank=True)
     duration_minutes = models.PositiveIntegerField()
     release_date = models.DateField()
     poster_url = models.URLField(max_length=500)
@@ -129,6 +130,7 @@ class Room(models.Model):
     )
     display_name = models.CharField(max_length=120, blank=True, default="")
     description = models.TextField(blank=True, default="")
+    translations = models.JSONField(default=dict, blank=True)
     base_price = models.DecimalField(
         max_digits=8,
         decimal_places=2,
@@ -338,6 +340,7 @@ class CastMember(models.Model):
 class Genre(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100, unique=True)
+    translations = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

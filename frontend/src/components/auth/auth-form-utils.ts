@@ -3,6 +3,8 @@ import {
   getApiErrorUserMessage,
   sanitizeRedirectPath,
 } from "../../api/client";
+import { DEFAULT_LOCALE, type Locale, resolveLocale } from "@/i18n/locales";
+import { messages } from "@/i18n/messages";
 
 export type AuthFieldName = "email" | "password" | "username";
 
@@ -11,12 +13,6 @@ export type AuthFieldErrors = Partial<Record<AuthFieldName, string>>;
 export type RegistrationValidationState = {
   fieldErrors: AuthFieldErrors;
   formError: string | null;
-};
-
-const REGISTRATION_FIELD_MESSAGES: Record<AuthFieldName, string> = {
-  email: "Informe um e-mail válido.",
-  password: "Informe uma senha válida.",
-  username: "Informe um nome de usuário válido.",
 };
 
 export const REGISTRATION_SUCCESS_PARAM = "cadastro";
@@ -30,48 +26,55 @@ export function buildRegisteredLoginUrl() {
   return `/login?${REGISTRATION_SUCCESS_PARAM}=ok`;
 }
 
-export function getLoginConfirmationMessage(search: string) {
+export function getLoginConfirmationMessage(
+  search: string,
+  locale: Locale | string = DEFAULT_LOCALE
+) {
   const params = new URLSearchParams(search);
   return params.get(REGISTRATION_SUCCESS_PARAM) === "ok"
-    ? "Cadastro criado com sucesso. Entre para continuar."
+    ? t(locale, "auth.registrationSuccess")
     : null;
 }
 
-export function getLoginFormErrorMessage(error: unknown) {
-  return getApiErrorUserMessage(error);
+export function getLoginFormErrorMessage(
+  error: unknown,
+  locale: Locale | string = DEFAULT_LOCALE
+) {
+  return getApiErrorUserMessage(error, locale);
 }
 
 export function getRegistrationValidationState(
-  error: unknown
+  error: unknown,
+  locale: Locale | string = DEFAULT_LOCALE
 ): RegistrationValidationState {
   if (!(error instanceof ApiError) || error.code !== "VALIDATION_FAILED") {
     return {
       fieldErrors: {},
-      formError: getApiErrorUserMessage(error),
+      formError: getApiErrorUserMessage(error, locale),
     };
   }
 
-  const fieldErrors = mapValidationFieldErrors(error.details);
+  const fieldErrors = mapValidationFieldErrors(error.details, locale);
 
   return {
     fieldErrors,
     formError:
       Object.keys(fieldErrors).length > 0
         ? null
-        : "Confira os dados informados e tente novamente.",
+        : t(locale, "auth.validationFallback"),
   };
 }
 
-function mapValidationFieldErrors(details: unknown) {
+function mapValidationFieldErrors(details: unknown, locale: Locale | string) {
   const fieldErrors: AuthFieldErrors = {};
 
   if (!isRecord(details)) {
     return fieldErrors;
   }
 
-  for (const field of Object.keys(REGISTRATION_FIELD_MESSAGES) as AuthFieldName[]) {
+  for (const field of ["email", "password", "username"] as AuthFieldName[]) {
     if (Object.hasOwn(details, field)) {
-      fieldErrors[field] = REGISTRATION_FIELD_MESSAGES[field];
+      fieldErrors[field] = t(locale, `auth.fieldError.${field}`);
     }
   }
 
@@ -80,4 +83,9 @@ function mapValidationFieldErrors(details: unknown) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function t(locale: Locale | string, key: string) {
+  const resolvedLocale = resolveLocale(locale);
+  return messages[resolvedLocale][key] ?? messages[DEFAULT_LOCALE][key] ?? key;
 }

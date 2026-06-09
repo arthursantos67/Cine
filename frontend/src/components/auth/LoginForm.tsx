@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { useI18n } from "@/i18n";
 import {
   getLoginConfirmationMessage,
   getLoginFormErrorMessage,
@@ -24,6 +25,7 @@ export function LoginFormView({
   isSubmitting,
   onSubmit,
 }: LoginFormViewProps) {
+  const { t } = useI18n();
   const formErrorId = errorMessage ? "login-form-error" : undefined;
 
   return (
@@ -39,7 +41,7 @@ export function LoginFormView({
         onSubmit={onSubmit}
       >
         <div className="form-field">
-          <label htmlFor="email">E-mail</label>
+          <label htmlFor="email">{t("auth.email")}</label>
           <input
             aria-describedby={formErrorId}
             aria-invalid={errorMessage ? "true" : undefined}
@@ -47,13 +49,13 @@ export function LoginFormView({
             disabled={isSubmitting}
             id="email"
             name="email"
-            placeholder="voce@email.com"
+            placeholder={t("auth.emailPlaceholder")}
             required
             type="email"
           />
         </div>
         <div className="form-field">
-          <label htmlFor="password">Senha</label>
+          <label htmlFor="password">{t("auth.password")}</label>
           <input
             aria-describedby={formErrorId}
             aria-invalid={errorMessage ? "true" : undefined}
@@ -61,13 +63,13 @@ export function LoginFormView({
             disabled={isSubmitting}
             id="password"
             name="password"
-            placeholder="Sua senha"
+            placeholder={t("auth.passwordPlaceholder")}
             required
             type="password"
           />
         </div>
         <div className="form-field form-field-checkbox">
-          <label htmlFor="stayLoggedIn">Continuar conectado</label>
+          <label htmlFor="stayLoggedIn">{t("auth.stayLoggedIn")}</label>
           <input
             disabled={isSubmitting}
             id="stayLoggedIn"
@@ -81,7 +83,7 @@ export function LoginFormView({
           </p>
         ) : null}
         <button className="button button-primary" disabled={isSubmitting} type="submit">
-          {isSubmitting ? "Entrando..." : "Entrar"}
+          {isSubmitting ? t("auth.loginSubmitting") : t("auth.login")}
         </button>
       </form>
     </div>
@@ -89,6 +91,7 @@ export function LoginFormView({
 }
 
 export function LoginForm() {
+  const { locale } = useI18n();
   const router = useRouter();
   const { loading, login } = useAuth();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -110,15 +113,15 @@ export function LoginForm() {
       const search = typeof window === "undefined" ? "" : window.location.search;
       router.replace(getSafeRedirectFromSearch(search));
     } catch (error) {
-      setErrorMessage(getLoginFormErrorMessage(error));
+      setErrorMessage(getLoginFormErrorMessage(error, locale));
     }
   }
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setConfirmationMessage(getLoginConfirmationMessage(window.location.search));
+      setConfirmationMessage(getLoginConfirmationMessage(window.location.search, locale));
     }
-  }, []);
+  }, [locale]);
 
   return (
     <LoginFormView

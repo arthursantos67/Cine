@@ -7,7 +7,9 @@ import { useRouter } from "next/navigation";
 import { StateMessage } from "@/components/ui/StateMessage";
 import { useReservation } from "@/contexts/ReservationContext";
 import { useReservationCountdown } from "@/hooks/useReservationCountdown";
+import { useI18n } from "@/i18n";
 import {
+  PURCHASE_FLOW_EXPIRED_MESSAGE,
   getPurchaseFlowGuardDecision,
   PURCHASE_FLOW_MISSING_RESERVATION_MESSAGE,
 } from "./purchase-flow-guards";
@@ -18,6 +20,7 @@ type PurchaseFlowGuardProps = {
 
 export function PurchaseFlowGuard({ children }: PurchaseFlowGuardProps) {
   const router = useRouter();
+  const { t } = useI18n();
   const reservation = useReservation();
   const countdown = useReservationCountdown(reservation.reservationExpiresAt);
   const hasReservedSeats = reservation.reservedSeats.length > 0;
@@ -32,7 +35,11 @@ export function PurchaseFlowGuard({ children }: PurchaseFlowGuardProps) {
       return;
     }
 
-    reservation.expireReservation(decision.message ?? undefined);
+    reservation.expireReservation(
+      decision.message === PURCHASE_FLOW_EXPIRED_MESSAGE
+        ? t("reservation.expired")
+        : decision.message ?? undefined
+    );
 
     if (decision.redirectPath) {
       router.replace(decision.redirectPath);
@@ -43,6 +50,7 @@ export function PurchaseFlowGuard({ children }: PurchaseFlowGuardProps) {
     decision.shouldResetExpiredReservation,
     reservation,
     router,
+    t,
   ]);
 
   if (decision.renderContent) {
@@ -52,7 +60,9 @@ export function PurchaseFlowGuard({ children }: PurchaseFlowGuardProps) {
   const recoveryPath = reservation.expiredSessionId
     ? `/sessions/${encodeURIComponent(reservation.expiredSessionId)}/seats`
     : "/";
-  const message = reservation.expirationNotice ?? decision.message;
+  const message =
+    reservation.expirationNotice ??
+    translateGuardMessage(decision.message, t);
   const tone =
     reservation.expirationNotice ||
     decision.message !== PURCHASE_FLOW_MISSING_RESERVATION_MESSAGE
@@ -67,14 +77,42 @@ export function PurchaseFlowGuard({ children }: PurchaseFlowGuardProps) {
           href={recoveryPath}
         >
           {reservation.expiredSessionId
-            ? "Escolher assentos"
-            : "Voltar ao catálogo"}
+            ? t("purchaseFlow.chooseSeats")
+            : t("purchaseFlow.backToCatalog")}
         </Link>
       }
       tone={tone}
-      title={decision.title ?? "Reserva indisponível"}
+      title={translateGuardTitle(decision.message, decision.title, t)}
     >
       {message}
     </StateMessage>
   );
+}
+
+function translateGuardMessage(message: string | null, t: (key: string) => string) {
+  if (message === PURCHASE_FLOW_EXPIRED_MESSAGE) {
+    return t("reservation.expired");
+  }
+
+  if (message === PURCHASE_FLOW_MISSING_RESERVATION_MESSAGE) {
+    return t("purchaseFlow.missingMessage");
+  }
+
+  return message;
+}
+
+function translateGuardTitle(
+  message: string | null,
+  title: string | null,
+  t: (key: string) => string
+) {
+  if (message === PURCHASE_FLOW_EXPIRED_MESSAGE) {
+    return t("purchaseFlow.expiredTitle");
+  }
+
+  if (message === PURCHASE_FLOW_MISSING_RESERVATION_MESSAGE) {
+    return t("purchaseFlow.missingTitle");
+  }
+
+  return title ?? t("purchaseFlow.unavailableTitle");
 }

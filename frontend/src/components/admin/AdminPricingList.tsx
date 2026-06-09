@@ -4,16 +4,9 @@ import { useEffect, useId, useState } from "react";
 
 import { adminApi } from "@/api/admin";
 import type { RoomTypePricing } from "@/types/catalog";
-import { formatCurrency } from "@/utils/formatters";
 import { Button } from "@/components/ui/Button";
 import { AdminToolbar } from "@/components/admin";
-
-const EXPERIENCE_LABELS: Record<string, string> = {
-  standard: "Standard",
-  vip: "VIP",
-  premium: "Premium",
-  imax: "IMAX",
-};
+import { useI18n } from "@/i18n";
 
 type EditState = {
   id: number;
@@ -21,6 +14,7 @@ type EditState = {
 };
 
 export function AdminPricingList() {
+  const { formatCurrency, t } = useI18n();
   const [pricing, setPricing] = useState<RoomTypePricing[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -34,9 +28,9 @@ export function AdminPricingList() {
     adminApi
       .listRoomTypePricing()
       .then(setPricing)
-      .catch(() => setErrorMessage("Não foi possível carregar os preços."))
+      .catch(() => setErrorMessage(t("admin.pricing.loadError")))
       .finally(() => setLoading(false));
-  }, []);
+  }, [t]);
 
   function startEdit(entry: RoomTypePricing) {
     setEdit({ id: entry.id, value: entry.base_price });
@@ -52,7 +46,7 @@ export function AdminPricingList() {
     if (!edit) return;
     const price = Number(edit.value);
     if (!edit.value || isNaN(price) || price <= 0) {
-      setSaveError("Informe um valor válido maior que zero.");
+      setSaveError(t("admin.pricing.validPrice"));
       return;
     }
 
@@ -65,7 +59,7 @@ export function AdminPricingList() {
       setPricing((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
       setEdit(null);
     } catch {
-      setSaveError("Não foi possível salvar. Tente novamente.");
+      setSaveError(t("admin.pricing.saveError"));
     } finally {
       setIsSaving(false);
     }
@@ -73,12 +67,10 @@ export function AdminPricingList() {
 
   return (
     <div className="grid gap-6">
-      <AdminToolbar title="Preços por tipo de sala" />
+      <AdminToolbar title={t("admin.pricing.title")} />
 
       <p className="text-sm text-white/50">
-        Define o preço base do ingresso para cada tipo de sala. Sessões em
-        sextas, sábados e domingos recebem acréscimo automático de 24%.
-        Alterações aplicam-se apenas a sessões futuras.
+        {t("admin.pricing.description")}
       </p>
 
       {errorMessage ? (
@@ -89,13 +81,15 @@ export function AdminPricingList() {
 
       {loading ? (
         <p className="text-sm text-white/40" role="status">
-          Carregando preços...
+          {t("admin.pricing.loading")}
         </p>
       ) : (
         <div className="grid gap-3">
           {pricing.map((entry) => {
             const isEditing = edit?.id === entry.id;
-            const label = EXPERIENCE_LABELS[entry.experience_type] ?? entry.experience_type;
+            const label =
+              t(`domain.roomExperience.${entry.experience_type}`) ??
+              entry.experience_type;
             const weekendPrice = Math.round(Number(entry.base_price) * 1.24 * 100) / 100;
 
             return (
@@ -111,7 +105,7 @@ export function AdminPricingList() {
                     <div className="grid gap-2">
                       <div className="flex items-center gap-2">
                         <label className="sr-only" htmlFor={inputId}>
-                          Preço base de {label} em R$
+                          {t("admin.pricing.basePriceA11y", { label })}
                         </label>
                         <input
                           autoFocus
@@ -127,7 +121,7 @@ export function AdminPricingList() {
                             if (e.key === "Enter") void saveEdit();
                             if (e.key === "Escape") cancelEdit();
                           }}
-                          placeholder="Ex.: 42.00"
+                          placeholder={t("admin.pricing.pricePlaceholder")}
                           step="0.01"
                           type="number"
                           value={edit.value}
@@ -141,16 +135,14 @@ export function AdminPricingList() {
                   ) : (
                     <div className="flex flex-wrap gap-3">
                       <span className="text-sm text-white/60">
-                        Dia normal:{" "}
-                        <strong className="text-white">
-                          {formatCurrency(Number(entry.base_price))}
-                        </strong>
+                        {t("admin.pricing.normalDay", {
+                          price: formatCurrency(Number(entry.base_price)),
+                        })}
                       </span>
                       <span className="text-sm text-white/60">
-                        Sex/Sáb/Dom (+24%):{" "}
-                        <strong className="text-white">
-                          {formatCurrency(weekendPrice)}
-                        </strong>
+                        {t("admin.pricing.weekend", {
+                          price: formatCurrency(weekendPrice),
+                        })}
                       </span>
                     </div>
                   )}
@@ -165,7 +157,7 @@ export function AdminPricingList() {
                         size="sm"
                         variant="primary"
                       >
-                        {isSaving ? "Salvando..." : "Salvar"}
+                        {isSaving ? t("admin.pricing.saving") : t("admin.save")}
                       </Button>
                       <Button
                         disabled={isSaving}
@@ -173,7 +165,7 @@ export function AdminPricingList() {
                         size="sm"
                         variant="ghost"
                       >
-                        Cancelar
+                        {t("admin.cancel")}
                       </Button>
                     </>
                   ) : (
@@ -182,7 +174,7 @@ export function AdminPricingList() {
                       size="sm"
                       variant="ghost"
                     >
-                      Editar
+                      {t("admin.edit")}
                     </Button>
                   )}
                 </div>

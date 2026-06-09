@@ -170,6 +170,116 @@ class TestCatalogApi:
         assert len(response.data["results"]) == 1
         assert response.data["results"][0]["name"] == genre.name
 
+    def test_catalog_read_endpoints_localize_requested_content(
+        self,
+        anonymous_api_client,
+        genre,
+        movie,
+        room,
+        session,
+    ):
+        genre.translations = {"en-US": {"name": "Crime drama"}}
+        genre.save(update_fields=["translations"])
+        movie.title = "O Poderoso Chefao"
+        movie.synopsis = "Drama familiar sobre crime."
+        movie.translations = {
+            "en-US": {
+                "title": "The Godfather",
+                "synopsis": "Crime family drama.",
+            }
+        }
+        movie.save(update_fields=["title", "synopsis", "translations"])
+        room.display_name = "Sala Prime"
+        room.description = "Sala com poltronas premium."
+        room.translations = {
+            "en-US": {
+                "display_name": "Prime Room",
+                "description": "Room with premium seats.",
+            }
+        }
+        room.save(update_fields=["display_name", "description", "translations"])
+
+        movie_response = anonymous_api_client.get(
+            f"/api/v1/catalog/movies/{movie.id}/",
+            HTTP_ACCEPT_LANGUAGE="en-US,en;q=0.8",
+        )
+        session_response = anonymous_api_client.get(
+            f"/api/v1/catalog/sessions/{session.id}/?locale=en-US"
+        )
+
+        assert movie_response.status_code == status.HTTP_200_OK
+        assert movie_response.data["locale"] == "en-US"
+        assert movie_response.data["title"] == "The Godfather"
+        assert movie_response.data["synopsis"] == "Crime family drama."
+        localized_genre = next(
+            item for item in movie_response.data["genres"] if item["id"] == str(genre.id)
+        )
+        assert localized_genre["name"] == "Crime drama"
+        assert "en-US" in movie_response.data["available_locales"]
+
+        assert session_response.status_code == status.HTTP_200_OK
+        assert session_response.data["movie"]["title"] == "The Godfather"
+        assert session_response.data["room"]["display_name"] == "Prime Room"
+        assert session_response.data["room"]["description"] == "Room with premium seats."
+
+    def test_catalog_translation_falls_back_to_default_fields(
+        self,
+        anonymous_api_client,
+        genre,
+        movie,
+    ):
+        genre.translations = {"en-US": {"name": ""}}
+        genre.save(update_fields=["translations"])
+        movie.title = "Titulo padrao"
+        movie.synopsis = "Sinopse padrao."
+        movie.translations = {"en-US": {"title": "Translated title"}}
+        movie.save(update_fields=["title", "synopsis", "translations"])
+
+        response = anonymous_api_client.get(
+            f"/api/v1/catalog/movies/{movie.id}/",
+            HTTP_ACCEPT_LANGUAGE="en-US",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["title"] == "Translated title"
+        assert response.data["synopsis"] == "Sinopse padrao."
+        fallback_genre = next(
+            item for item in response.data["genres"] if item["id"] == str(genre.id)
+        )
+        assert fallback_genre["name"] == "Drama"
+
+    def test_admin_can_store_catalog_translations(
+        self,
+        api_client,
+        genre,
+    ):
+        movie_payload = {
+            "title": "Filme local",
+            "genres": [str(genre.id)],
+            "synopsis": "Sinopse local.",
+            "duration_minutes": 120,
+            "release_date": "2026-06-06",
+            "poster_url": "https://example.com/local.jpg",
+            "translations": {
+                "en-US": {
+                    "title": "Localized movie",
+                    "synopsis": "Localized synopsis.",
+                }
+            },
+        }
+
+        response = api_client.post(
+            "/api/v1/catalog/movies/",
+            movie_payload,
+            format="json",
+            HTTP_ACCEPT_LANGUAGE="en-US",
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.data["title"] == "Localized movie"
+        assert response.data["synopsis"] == "Localized synopsis."
+        assert response.data["translations"]["en-US"]["title"] == "Localized movie"
+
     def test_catalog_read_endpoints_remain_public(
         self,
         anonymous_api_client,

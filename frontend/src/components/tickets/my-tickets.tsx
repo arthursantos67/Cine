@@ -1,7 +1,10 @@
+"use client";
+
 import Link from "next/link";
 
 import { StateMessage } from "@/components/ui/StateMessage";
 import { cn } from "@/components/ui/classNames";
+import { useI18n } from "@/i18n";
 import type { TicketFilterType, UserTicket } from "@/types/ticket";
 
 import { TicketCard as SharedTicketCard } from "./TicketCard";
@@ -18,12 +21,12 @@ export type MyTicketsContentProps = {
 
 const filterOptions: Array<{
   href: string;
-  label: string;
+  labelKey: string;
   value: TicketFilterType | null;
 }> = [
-  { href: "/my-tickets", label: "Todos", value: null },
-  { href: "/my-tickets?type=upcoming", label: "Próximos", value: "upcoming" },
-  { href: "/my-tickets?type=past", label: "Anteriores", value: "past" },
+  { href: "/my-tickets", labelKey: "tickets.filterAll", value: null },
+  { href: "/my-tickets?type=upcoming", labelKey: "tickets.filterUpcoming", value: "upcoming" },
+  { href: "/my-tickets?type=past", labelKey: "tickets.filterPast", value: "past" },
 ];
 
 export function MyTicketsContent({
@@ -33,6 +36,9 @@ export function MyTicketsContent({
   status,
   tickets,
 }: MyTicketsContentProps) {
+  const { t } = useI18n();
+  const activeFilterKey = activeFilter ?? "all";
+
   return (
     <section aria-labelledby="meus-ingressos" className="my-tickets grid gap-4">
       <div className="my-tickets__toolbar grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 rounded-card border border-white/10 bg-[linear-gradient(180deg,rgb(255_255_255_/_5%),rgb(255_255_255_/_2%))] p-5 text-text shadow-[0_18px_54px_rgb(0_0_0_/_18%)] max-lg:grid-cols-1">
@@ -41,15 +47,15 @@ export function MyTicketsContent({
             className="m-0 text-[21px] leading-tight text-white"
             id="meus-ingressos"
           >
-            Ingressos da sua conta
+            {t("tickets.accountTickets")}
           </h2>
           <p className="m-0 mt-1.5 leading-6 text-text/65">
-            {filterDescriptionLabels[activeFilter ?? "all"]}
+            {t(filterDescriptionLabels[activeFilterKey])}
           </p>
         </div>
 
         <nav
-          aria-label="Filtros de ingressos"
+          aria-label={t("tickets.filtersLabel")}
           className="my-tickets__filters flex flex-wrap items-center justify-end gap-2 max-lg:justify-start"
         >
           {filterOptions.map((option) => {
@@ -65,9 +71,9 @@ export function MyTicketsContent({
                     : "border-white/15 bg-transparent text-text hover:bg-white/10"
                 )}
                 href={option.href}
-                key={option.label}
+                key={option.labelKey}
               >
-                {option.label}
+                {t(option.labelKey)}
               </Link>
             );
           })}
@@ -75,8 +81,8 @@ export function MyTicketsContent({
       </div>
 
       {status === "loading" ? (
-        <StateMessage tone="loading" title="Carregando ingressos">
-          Aguarde enquanto buscamos seus ingressos.
+        <StateMessage tone="loading" title={t("tickets.loadingTitle")}>
+          {t("tickets.loadingFetchDescription")}
         </StateMessage>
       ) : null}
 
@@ -89,20 +95,20 @@ export function MyTicketsContent({
                 onClick={onRetry}
                 type="button"
               >
-                Tentar novamente
+                {t("common.tryAgain")}
               </button>
             ) : null
           }
           tone="error"
-          title="Ingressos indisponíveis"
+          title={t("tickets.unavailableTitle")}
         >
-          {errorMessage ?? "Não foi possível carregar seus ingressos agora."}
+          {errorMessage ?? t("tickets.unavailableDescription")}
         </StateMessage>
       ) : null}
 
       {status === "success" && tickets.length === 0 ? (
-        <StateMessage title={emptyStateLabels[activeFilter ?? "all"].title}>
-          {emptyStateLabels[activeFilter ?? "all"].description}
+        <StateMessage title={t(emptyStateLabels[activeFilterKey].titleKey)}>
+          {t(emptyStateLabels[activeFilterKey].descriptionKey)}
         </StateMessage>
       ) : null}
 
@@ -136,26 +142,25 @@ export function getTicketFilterFromSearchParams(
 }
 
 const filterDescriptionLabels: Record<TicketFilterType | "all", string> = {
-  all: "Veja todos os ingressos comprados.",
-  past: "Exibindo sessões que já aconteceram.",
-  upcoming: "Exibindo sessões futuras.",
+  all: "tickets.filterAllDescription",
+  past: "tickets.filterPastDescription",
+  upcoming: "tickets.filterUpcomingDescription",
 };
 
 const emptyStateLabels: Record<
   TicketFilterType | "all",
-  { description: string; title: string }
+  { descriptionKey: string; titleKey: string }
 > = {
   all: {
-    description:
-      "Quando você finalizar uma compra, seus ingressos aparecerão aqui.",
-    title: "Você ainda não tem ingressos",
+    descriptionKey: "tickets.emptyAllDescription",
+    titleKey: "tickets.emptyAllTitle",
   },
   past: {
-    description: "Nenhum ingresso anterior foi encontrado para sua conta.",
-    title: "Nenhum ingresso anterior",
+    descriptionKey: "tickets.emptyPastDescription",
+    titleKey: "tickets.emptyPastTitle",
   },
   upcoming: {
-    description: "Nenhum ingresso futuro foi encontrado para sua conta.",
-    title: "Nenhum ingresso futuro",
+    descriptionKey: "tickets.emptyUpcomingDescription",
+    titleKey: "tickets.emptyUpcomingTitle",
   },
 };

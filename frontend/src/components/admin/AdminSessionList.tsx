@@ -4,51 +4,18 @@ import { useCallback, useEffect, useId, useState } from "react";
 
 import { adminApi } from "@/api/admin";
 import type { AdminRoom, AdminSession, CatalogMovieDetail } from "@/types/catalog";
-import { formatCurrency } from "@/utils/formatters";
 import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { AdminConfirmDialog, AdminTable, AdminToolbar } from "@/components/admin";
 import type { AdminTableColumn } from "@/components/admin";
-
-const AUDIO_LABELS: Record<string, string> = {
-  dublado: "Dublado",
-  legendado: "Legendado",
-  original: "Original",
-};
-
-const PROJECTION_LABELS: Record<string, string> = {
-  "2d": "2D",
-  "3d": "3D",
-  imax: "IMAX",
-};
-
-const SESSION_TYPE_LABELS: Record<string, string> = {
-  preview: "Pré-estreia",
-  regular: "Regular",
-  special_event: "Evento especial",
-};
-
-function formatDateTime(iso: string): string {
-  const date = new Date(iso);
-  return date.toLocaleString("pt-BR", {
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
-function formatDate(iso: string): string {
-  const date = new Date(iso);
-  return date.toLocaleDateString("pt-BR");
-}
+import { useI18n } from "@/i18n";
 
 function isProtected(session: AdminSession): boolean {
   return Boolean(session.has_reservations || session.has_purchases);
 }
 
 export function AdminSessionList() {
+  const { formatCurrency, formatDate, formatDateTime, t } = useI18n();
   const [sessions, setSessions] = useState<AdminSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -99,12 +66,12 @@ export function AdminSessionList() {
         setHasMore(result.next !== null);
         setPage(pageNum);
       } catch {
-        setErrorMessage("Não foi possível carregar as sessões. Tente novamente.");
+        setErrorMessage(t("admin.session.loadError"));
       } finally {
         setLoading(false);
       }
     },
-    [dateFilter, movieFilter, roomFilter]
+    [dateFilter, movieFilter, roomFilter, t]
   );
 
   useEffect(() => {
@@ -119,7 +86,7 @@ export function AdminSessionList() {
       setDeleteTarget(null);
       fetchSessions(1, true);
     } catch {
-      setErrorMessage("Não foi possível excluir a sessão. Tente novamente.");
+      setErrorMessage(t("admin.session.deleteError"));
       setDeleteTarget(null);
     } finally {
       setIsDeleting(false);
@@ -129,7 +96,7 @@ export function AdminSessionList() {
   const columns: AdminTableColumn<Record<string, unknown>>[] = [
     {
       key: "movie",
-      label: "Filme",
+      label: t("admin.session.movie"),
       render: (row) => {
         const s = row as unknown as AdminSession;
         return (
@@ -145,7 +112,7 @@ export function AdminSessionList() {
     {
       className: "hidden sm:table-cell",
       key: "room",
-      label: "Sala",
+      label: t("admin.session.room"),
       render: (row) => {
         const s = row as unknown as AdminSession;
         return (
@@ -158,7 +125,7 @@ export function AdminSessionList() {
     {
       className: "hidden md:table-cell",
       key: "base_price",
-      label: "Preço base",
+      label: t("admin.session.basePrice"),
       render: (row) => {
         const s = row as unknown as AdminSession;
         return (
@@ -171,15 +138,15 @@ export function AdminSessionList() {
     {
       className: "hidden lg:table-cell",
       key: "formats",
-      label: "Formato",
+      label: t("admin.session.format"),
       render: (row) => {
         const s = row as unknown as AdminSession;
         const tags: string[] = [];
-        if (s.audio_format) tags.push(AUDIO_LABELS[s.audio_format] ?? s.audio_format);
+        if (s.audio_format) tags.push(t(`domain.audio.${s.audio_format}`));
         if (s.projection_format)
-          tags.push(PROJECTION_LABELS[s.projection_format] ?? s.projection_format);
+          tags.push(t(`domain.projection.${s.projection_format}`));
         if (s.session_type)
-          tags.push(SESSION_TYPE_LABELS[s.session_type] ?? s.session_type);
+          tags.push(t(`domain.sessionType.${s.session_type}`));
 
         if (tags.length === 0) return <span className="text-white/30">—</span>;
 
@@ -196,7 +163,7 @@ export function AdminSessionList() {
     },
     {
       key: "actions",
-      label: "Ações",
+      label: t("admin.actions"),
       render: (row) => {
         const s = row as unknown as AdminSession;
         const protected_ = isProtected(s);
@@ -208,7 +175,7 @@ export function AdminSessionList() {
               size="sm"
               variant="ghost"
             >
-              Editar
+              {t("admin.edit")}
             </ButtonLink>
             <Button
               disabled={protected_}
@@ -216,12 +183,12 @@ export function AdminSessionList() {
               size="sm"
               title={
                 protected_
-                  ? "Esta sessão possui assentos reservados ou comprados"
+                  ? t("admin.session.protectedDelete")
                   : undefined
               }
               variant="danger"
             >
-              Excluir
+              {t("admin.delete")}
             </Button>
           </div>
         );
@@ -240,10 +207,10 @@ export function AdminSessionList() {
       <AdminToolbar
         actions={
           <ButtonLink href="/admin/sessions/new" size="sm" variant="primary">
-            Nova sessão
+            {t("admin.session.new")}
           </ButtonLink>
         }
-        title="Sessões"
+        title={t("admin.sessions")}
       />
 
       <div className="flex flex-wrap items-end gap-4 rounded-[8px] border border-white/[0.07] bg-white/[0.02] p-4">
@@ -252,7 +219,7 @@ export function AdminSessionList() {
             className="text-xs font-extrabold uppercase tracking-wider text-white/40"
             htmlFor={dateFilterId}
           >
-            Data
+            {t("admin.session.date")}
           </label>
           <input
             className="min-h-9 rounded-control border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none transition focus:border-brand focus:shadow-focus"
@@ -268,7 +235,7 @@ export function AdminSessionList() {
             className="text-xs font-extrabold uppercase tracking-wider text-white/40"
             htmlFor={movieFilterId}
           >
-            Filme
+            {t("admin.session.movie")}
           </label>
           <select
             className="min-h-9 rounded-control border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none transition focus:border-brand focus:shadow-focus"
@@ -276,7 +243,7 @@ export function AdminSessionList() {
             onChange={(e) => setMovieFilter(e.target.value)}
             value={movieFilter}
           >
-            <option value="">Todos os filmes</option>
+            <option value="">{t("admin.session.allMovies")}</option>
             {movieOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
@@ -290,7 +257,7 @@ export function AdminSessionList() {
             className="text-xs font-extrabold uppercase tracking-wider text-white/40"
             htmlFor={roomFilterId}
           >
-            Sala
+            {t("admin.session.room")}
           </label>
           <select
             className="min-h-9 rounded-control border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none transition focus:border-brand focus:shadow-focus"
@@ -298,7 +265,7 @@ export function AdminSessionList() {
             onChange={(e) => setRoomFilter(e.target.value)}
             value={roomFilter}
           >
-            <option value="">Todas as salas</option>
+            <option value="">{t("admin.session.allRooms")}</option>
             {roomOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
@@ -317,7 +284,7 @@ export function AdminSessionList() {
             size="sm"
             variant="ghost"
           >
-            Limpar filtros
+            {t("admin.session.clearFilters")}
           </Button>
         )}
       </div>
@@ -329,11 +296,11 @@ export function AdminSessionList() {
       ) : null}
 
       <AdminTable
-        caption="Lista de sessões"
+        caption={t("admin.session.listCaption")}
         columns={columns}
         data={sessions as unknown as Record<string, unknown>[]}
-        emptyDescription="Nenhuma sessão encontrada. Ajuste os filtros ou crie uma nova sessão."
-        emptyTitle="Nenhuma sessão encontrada"
+        emptyDescription={t("admin.session.noneDescription")}
+        emptyTitle={t("admin.session.noneTitle")}
         keyField="id"
         loading={loading}
       />
@@ -344,22 +311,25 @@ export function AdminSessionList() {
             onClick={() => fetchSessions(page + 1, false)}
             variant="ghost"
           >
-            Carregar mais
+            {t("admin.session.loadMore")}
           </Button>
         </div>
       ) : null}
 
       <AdminConfirmDialog
-        confirmLabel={isDeleting ? "Excluindo..." : "Excluir"}
+        confirmLabel={isDeleting ? t("admin.deleting") : t("admin.delete")}
         description={
           deleteTarget
-            ? `Tem certeza que deseja excluir a sessão de "${deleteTarget.movie.title}" em ${formatDate(deleteTarget.start_time)}? Esta ação não pode ser desfeita.`
+            ? t("admin.session.deleteDescription", {
+                date: formatDate(deleteTarget.start_time),
+                title: deleteTarget.movie.title,
+              })
             : ""
         }
         isOpen={deleteTarget !== null}
         onCancel={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
-        title="Excluir sessão"
+        title={t("admin.session.delete")}
         tone="danger"
       />
     </div>

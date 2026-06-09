@@ -12,6 +12,7 @@ from rest_framework.response import Response
 from cineprime_api.permissions import IsAdminUserOrReadOnly
 from rest_framework.generics import ListAPIView, RetrieveUpdateAPIView
 
+from cineprime_api.localization import DEFAULT_LOCALE, get_request_locale
 from catalog.models import (
     AudioFormat,
     Genre,
@@ -88,7 +89,10 @@ def _catalog_list_cache_key(namespace, version_key, request):
     version = _get_cache_namespace_version(version_key)
     if version is None:
         return None
-    return f"catalog:{namespace}:v{version}:{request.get_full_path()}"
+    locale = get_request_locale(request)
+    if locale == DEFAULT_LOCALE:
+        return f"catalog:{namespace}:v{version}:{request.get_full_path()}"
+    return f"catalog:{namespace}:v{version}:{locale}:{request.get_full_path()}"
 
 
 def _validate_choice_filter(name, value, allowed_values):
@@ -116,9 +120,15 @@ def invalidate_movie_and_session_list_cache():
 
 @extend_schema(tags=["Catalog"], summary="List or create genres")
 class GenreListCreateView(ListCreateAPIView):
-    queryset = Genre.objects.all()
     serializer_class = GenreSerializer
     permission_classes = [IsAdminUserOrReadOnly]
+
+    def get_queryset(self):
+        qs = Genre.objects.all()
+        search = self.request.query_params.get("search", "").strip()
+        if search:
+            qs = qs.filter(name__icontains=search)
+        return qs
 
 
 @extend_schema(tags=["Catalog"], summary="Get, update or delete genre")

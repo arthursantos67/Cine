@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 
 import { getApiErrorUserMessage } from "@/api/client";
 import { ticketsApi } from "@/api/tickets";
+import { useI18n } from "@/i18n";
 import type { UserTicket } from "@/types/ticket";
 
 import {
@@ -21,6 +22,7 @@ type MyTicketsState = {
 };
 
 export function MyTicketsClient() {
+  const { locale } = useI18n();
   const searchParams = useSearchParams();
   const activeFilter = useMemo(
     () => getTicketFilterFromSearchParams(searchParams),
@@ -54,7 +56,7 @@ export function MyTicketsClient() {
         }
 
         setState({
-          errorMessage: getApiErrorUserMessage(error),
+          errorMessage: getApiErrorUserMessage(error, locale),
           status: "error",
           tickets: [],
         });
@@ -63,7 +65,7 @@ export function MyTicketsClient() {
     return () => {
       abortController.abort();
     };
-  }, [activeFilter, retryCount]);
+  }, [activeFilter, locale, retryCount]);
 
   const handleRetry = useCallback(() => {
     setRetryCount((current) => current + 1);

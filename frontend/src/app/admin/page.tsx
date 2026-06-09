@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Building2, CalendarDays, Film, TrendingUp } from "lucide-react";
 
 import { adminApi, type AdminSummary } from "@/api/admin";
+import { useI18n } from "@/i18n";
 
 type StatCardProps = {
   href: string;
@@ -40,6 +41,7 @@ function StatCard({ href, icon, label, loading, value }: StatCardProps) {
 }
 
 export default function AdminDashboardPage() {
+  const { t } = useI18n();
   const [summary, setSummary] = useState<AdminSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -55,66 +57,68 @@ export default function AdminDashboardPage() {
   return (
     <div className="grid gap-8">
       <div>
-        <h1 className="text-2xl font-[850] text-white">Dashboard</h1>
+        <h1 className="text-2xl font-[850] text-white">
+          {t("admin.dashboard.title")}
+        </h1>
         <p className="mt-1 text-sm text-white/50">
-          Visão geral do sistema CinePrime.
+          {t("admin.dashboard.overview")}
         </p>
       </div>
 
       {error ? (
         <p className="text-sm text-error" role="alert">
-          Não foi possível carregar os contadores. Recarregue a página para tentar novamente.
+          {t("admin.dashboard.countsError")}
         </p>
       ) : null}
 
-      <section aria-label="Resumo do sistema">
+      <section aria-label={t("admin.dashboard.summary")}>
         <h2 className="mb-4 text-xs font-[750] uppercase tracking-wider text-white/40">
-          Resumo
+          {t("admin.dashboard.summary")}
         </h2>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard
             href="/admin/movies"
             icon={<Film size={18} />}
-            label="Filmes"
+            label={t("admin.movies")}
             loading={loading}
             value={summary?.movieCount ?? null}
           />
           <StatCard
             href="/admin/movies"
             icon={<TrendingUp size={18} />}
-            label="Em cartaz"
+            label={t("domain.movieStatus.em_cartaz")}
             loading={loading}
             value={summary?.nowShowingCount ?? null}
           />
           <StatCard
             href="/admin/sessions"
             icon={<CalendarDays size={18} />}
-            label="Sessões hoje"
+            label={t("admin.sessionsToday")}
             loading={loading}
             value={summary?.sessionsTodayCount ?? null}
           />
           <StatCard
             href="/admin/rooms"
             icon={<Building2 size={18} />}
-            label="Salas"
+            label={t("admin.rooms")}
             loading={loading}
             value={summary?.roomCount ?? null}
           />
         </div>
       </section>
 
-      <section aria-label="Atalhos de gerenciamento">
+      <section aria-label={t("admin.dashboard.shortcuts")}>
         <h2 className="mb-4 text-xs font-[750] uppercase tracking-wider text-white/40">
-          Gerenciamento
+          {t("admin.dashboard.management")}
         </h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {[
-            { href: "/admin/movies", label: "Filmes" },
-            { href: "/admin/genres", label: "Gêneros" },
-            { href: "/admin/rooms", label: "Salas" },
-            { href: "/admin/seat-rows", label: "Fileiras e Assentos" },
-            { href: "/admin/sessions", label: "Sessões" },
-            { href: "/admin/users", label: "Administradores" },
+            { href: "/admin/movies", label: t("admin.movies") },
+            { href: "/admin/genres", label: t("admin.genres") },
+            { href: "/admin/rooms", label: t("admin.rooms") },
+            { href: "/admin/seat-rows", label: t("admin.seats") },
+            { href: "/admin/sessions", label: t("admin.sessions") },
+            { href: "/admin/users", label: t("admin.users") },
           ].map((item) => (
             <Link
               className="rounded-[8px] border border-white/[0.07] px-4 py-3 text-sm font-bold text-white/60 transition hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-white"

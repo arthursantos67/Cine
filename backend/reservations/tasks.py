@@ -31,7 +31,7 @@ def release_expired_session_seat(session_seat_id: str) -> None:
     max_retries=5,
 )
 def send_ticket_confirmation_email_task(
-    self, user_id: str, ticket_ids: list[str]
+    self, user_id: str, ticket_ids: list[str], locale: str | None = None
 ) -> None:
     normalized_ticket_ids = sorted({str(ticket_id) for ticket_id in ticket_ids})
     if not normalized_ticket_ids:
@@ -81,7 +81,11 @@ def send_ticket_confirmation_email_task(
         )
         return
 
-    email_payload = build_ticket_confirmation_email(user=user, tickets=tickets)
+    email_payload = build_ticket_confirmation_email(
+        user=user,
+        tickets=tickets,
+        locale=locale,
+    )
     try:
         send_mail(
             subject=email_payload["subject"],

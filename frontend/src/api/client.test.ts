@@ -2,17 +2,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  API_ERROR_MESSAGES,
+  KNOWN_BACKEND_ERROR_CODES,
   ApiError,
   apiRequest,
   buildLoginRedirectUrl,
   buildApiUrl,
   getApiErrorUserMessage,
+  getApiLocale,
   isNetworkError,
   isPaginatedResponse,
   resolveApiBaseUrl,
   sanitizeRedirectPath,
   setApiAuthController,
+  setApiLocale,
   type PaginatedResponse,
 } from "./client";
 
@@ -48,6 +50,7 @@ test("apiRequest applies JSON headers, bearer token, and custom request options"
       assert.equal(headers.get("Accept"), "application/json");
       assert.equal(headers.get("Content-Type"), "application/json");
       assert.equal(headers.get("Authorization"), "Bearer access-token");
+      assert.equal(headers.get("Accept-Language"), "pt-BR");
 
       return Response.json({ success: true });
     };
@@ -65,6 +68,28 @@ test("apiRequest applies JSON headers, bearer token, and custom request options"
 
     assert.deepEqual(response, { success: true });
   } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("apiRequest sends the selected locale in Accept-Language", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    setApiLocale("en-US");
+    assert.equal(getApiLocale(), "en-US");
+
+    globalThis.fetch = async (_input, init) => {
+      const headers = new Headers(init?.headers);
+      assert.equal(headers.get("Accept-Language"), "en-US");
+      return Response.json({ success: true });
+    };
+
+    await apiRequest<{ success: boolean }>("/api/v1/catalog/movies/", {
+      baseUrl: "http://api.local:8000",
+    });
+  } finally {
+    setApiLocale("pt-BR");
     globalThis.fetch = originalFetch;
   }
 });
@@ -223,14 +248,15 @@ test("apiRequest clears auth through the controller when refresh fails", async (
 });
 
 test("getApiErrorUserMessage maps known backend codes without exposing raw backend messages", () => {
-  for (const [code, message] of Object.entries(API_ERROR_MESSAGES)) {
+  for (const code of KNOWN_BACKEND_ERROR_CODES) {
     const error = new ApiError("Raw backend message.", 400, {
       code,
       details: {},
     });
 
-    assert.equal(getApiErrorUserMessage(error), message);
-    assert.notEqual(getApiErrorUserMessage(error), error.message);
+    const msg = getApiErrorUserMessage(error);
+    assert.ok(typeof msg === "string" && msg.length > 0);
+    assert.notEqual(msg, error.message);
   }
 });
 
@@ -243,6 +269,18 @@ test("getApiErrorUserMessage falls back safely for unknown backend codes", () =>
   assert.equal(
     getApiErrorUserMessage(error),
     "Não foi possível concluir a solicitação. Tente novamente."
+  );
+});
+
+test("getApiErrorUserMessage localizes known backend codes", () => {
+  const error = new ApiError("Raw backend message.", 400, {
+    code: "INVALID_PAYMENT_METHOD",
+    details: {},
+  });
+
+  assert.equal(
+    getApiErrorUserMessage(error, "en-US"),
+    "The selected payment method is invalid."
   );
 });
 

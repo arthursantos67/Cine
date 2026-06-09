@@ -6,11 +6,9 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { cn } from "@/components/ui/classNames";
+import { useI18n } from "@/i18n";
 
-const navigationItems = [
-  { href: "/", label: "Início" },
-  { href: "/#catalogo", label: "Catálogo" },
-];
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 function isActiveLink(pathname: string, href: string) {
   if (href === "/") {
@@ -27,7 +25,12 @@ function isActiveLink(pathname: string, href: string) {
 export function AppHeader() {
   const pathname = usePathname();
   const { isAuthenticated, signOut, user } = useAuth();
+  const { t } = useI18n();
   const isAdmin = isAuthenticated && Boolean(user?.is_staff);
+  const navigationItems = [
+    { href: "/", label: t("nav.home") },
+    { href: "/#catalogo", label: t("nav.catalog") },
+  ];
 
   return (
     <header className="sticky top-0 z-10 border-b border-white/[0.07] bg-[rgb(10_13_20/0.97)] [backdrop-filter:blur(20px)]">
@@ -41,7 +44,7 @@ export function AppHeader() {
         {/* Brand */}
         <div className="inline-flex items-center gap-2.5 min-w-max max-md:py-3 max-md:col-start-1 max-md:row-start-1">
           <Link
-            aria-label="CinePrime, início"
+            aria-label={t("nav.logo")}
             className="inline-flex items-center gap-2.5 text-[18px] font-[850] text-white"
             href="/"
           >
@@ -54,7 +57,7 @@ export function AppHeader() {
             <span>CinePrime</span>
           </Link>
           <span
-            aria-label="Cinema selecionado: CinePrime Natal"
+            aria-label={t("nav.venue")}
             className="inline-flex items-center gap-1.5 rounded-pill border border-white/10 bg-white/[0.08] px-2.5 py-1.5 text-[12px] font-[750] leading-none text-white/60 whitespace-nowrap transition-colors hover:bg-white/[0.12] hover:text-white/80 max-[420px]:hidden"
           >
             <span aria-hidden="true">&#x1F4CD;</span>
@@ -64,7 +67,7 @@ export function AppHeader() {
 
         {/* Nav */}
         <nav
-          aria-label="Navegação principal"
+          aria-label={t("nav.main")}
           className={cn(
             "flex flex-wrap items-center gap-2 justify-center min-w-0",
             "max-md:col-span-full max-md:row-start-2",
@@ -96,10 +99,11 @@ export function AppHeader() {
 
         {/* Actions */}
         <div
-          aria-label="Ações da conta"
+          aria-label={t("nav.accountActions")}
           className="flex flex-wrap items-center justify-end gap-2 max-md:py-3 max-md:col-start-2 max-md:row-start-1"
           role="group"
         >
+          <LanguageSwitcher />
           {isAuthenticated ? (
             <>
               {isAdmin && (
@@ -108,7 +112,7 @@ export function AppHeader() {
                   href="/admin"
                   variant="ghost"
                 >
-                  Admin
+                  {t("common.admin")}
                 </ButtonLink>
               )}
               <ButtonLink
@@ -116,14 +120,14 @@ export function AppHeader() {
                 href="/my-tickets"
                 variant="ghost"
               >
-                Meus ingressos
+                {t("nav.myTickets")}
               </ButtonLink>
               <Button
                 className="border-white/[0.16] text-white/80 hover:bg-white/10 hover:border-white/[0.24] hover:text-white"
                 onClick={signOut}
                 variant="ghost"
               >
-                Sair
+                {t("nav.signOut")}
               </Button>
             </>
           ) : (
@@ -133,10 +137,10 @@ export function AppHeader() {
                 href="/login"
                 variant="ghost"
               >
-                Entrar
+                {t("auth.login")}
               </ButtonLink>
               <ButtonLink href="/register" variant="primary">
-                Criar conta
+                {t("auth.createAccount")}
               </ButtonLink>
             </>
           )}

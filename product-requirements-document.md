@@ -468,6 +468,46 @@ return `404` and are not documented in OpenAPI.
 | `start_from` | datetime | Filter sessions starting at or after an ISO 8601 timestamp |
 | `start_to` | datetime | Filter sessions starting at or before an ISO 8601 timestamp |
 | `experience_type` | string | Filter by room `standard`, `vip`, `premium`, or `imax` |
+
+### 9.3 Localization Contract
+
+Supported locales are `pt-BR` and `en-US`. The documented fallback locale is
+`pt-BR`. Clients may request localized catalog payloads with `Accept-Language`
+or the optional `locale` query parameter; `locale` takes precedence when both
+are provided.
+
+Catalog write payloads remain backward compatible: canonical fields such as
+`title`, `synopsis`, `name`, `display_name`, and `description` are still
+accepted and returned. Admin clients may also send a `translations` object:
+
+```json
+{
+  "translations": {
+    "en-US": {
+      "title": "Localized movie title",
+      "synopsis": "Localized synopsis"
+    }
+  }
+}
+```
+
+Supported translation fields:
+
+| Resource | Fields |
+|---|---|
+| Genre | `name` |
+| Movie | `title`, `synopsis` |
+| Room | `display_name`, `description` |
+
+Read responses include `locale`, `available_locales`, and `translations`.
+Localized fields fall back field-by-field to `pt-BR` canonical values when a
+translation is missing or blank. Checkout responses, user ticket payloads, and
+ticket confirmation emails use the selected locale when available and otherwise
+fall back to `pt-BR`.
+
+Frontend error handling must map backend `error.code` values to localized copy.
+Raw backend `error.message` values are preserved for diagnostics but must not be
+displayed directly to users.
 | `audio_format` | string | Filter by `original`, `legendado`, or `dublado` |
 | `projection_format` | string | Filter by `2d`, `3d`, or `imax` |
 | `session_type` | string | Filter by `regular`, `preview`, or `special_event` |

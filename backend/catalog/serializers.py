@@ -4,6 +4,12 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from rest_framework import serializers
 
+from cineprime_api.localization import (
+    available_translation_locales,
+    get_context_locale,
+    get_translation_value,
+    normalize_translation_payload,
+)
 from catalog.models import CastMember, Genre, Movie, Room, RoomTypePricing, Session
 from reservations.models import SessionSeat, SessionSeatStatus, Seat
 
@@ -23,20 +29,85 @@ def raise_serializer_validation_error(exc):
     raise serializers.ValidationError(details or str(exc)) from exc
 
 
-class GenreSerializer(serializers.ModelSerializer):
+class TranslatedCatalogSerializerMixin(serializers.Serializer):
+    translation_fields = ()
+
+    locale = serializers.SerializerMethodField()
+    available_locales = serializers.SerializerMethodField()
+
+    def get_locale(self, obj):
+        return get_context_locale(self.context)
+
+    def get_available_locales(self, obj):
+        return available_translation_locales(
+            fields=self.translation_fields,
+            translations=getattr(obj, "translations", {}),
+        )
+
+    def validate_translations(self, value):
+        try:
+            return normalize_translation_payload(
+                value,
+                fields=self.translation_fields,
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        locale = get_context_locale(self.context)
+        translations = getattr(instance, "translations", {})
+
+        for field in self.translation_fields:
+            if field in data:
+                data[field] = get_translation_value(
+                    fallback_value=getattr(instance, field, "") or "",
+                    field=field,
+                    locale=locale,
+                    translations=translations,
+                )
+
+        return data
+
+
+class GenreSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializer):
+    translation_fields = ("name",)
+
     class Meta:
         model = Genre
-        fields = ["id", "name", "created_at", "updated_at"]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "name",
+            "translations",
+            "locale",
+            "available_locales",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "locale", "available_locales", "created_at", "updated_at"]
+
+    def validate_name(self, value):
+        value = value.strip()
+        qs = Genre.objects.filter(name__iexact=value)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError("A genre with this name already exists.")
+        return value
 
 
-class GenreSummarySerializer(serializers.ModelSerializer):
+class GenreSummarySerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializer):
+    translation_fields = ("name",)
+
     class Meta:
         model = Genre
-        fields = ["id", "name"]
+        fields = ["id", "name", "locale"]
+        read_only_fields = ["id", "locale"]
 
 
-class RoomSerializer(serializers.ModelSerializer):
+class RoomSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializer):
+    translation_fields = ("display_name", "description")
+
     class Meta:
         model = Room
         fields = [
@@ -46,11 +117,21 @@ class RoomSerializer(serializers.ModelSerializer):
             "experience_type",
             "display_name",
             "description",
+            "translations",
+            "locale",
+            "available_locales",
             "base_price",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "base_price", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "base_price",
+            "locale",
+            "available_locales",
+            "created_at",
+            "updated_at",
+        ]
 
     def validate_capacity(self, value):
         if self.instance is None:
@@ -86,7 +167,9 @@ class RoomSerializer(serializers.ModelSerializer):
         return instance
 
 
-class RoomSummarySerializer(serializers.ModelSerializer):
+class RoomSummarySerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializer):
+    translation_fields = ("display_name", "description")
+
     class Meta:
         model = Room
         fields = [
@@ -96,7 +179,9 @@ class RoomSummarySerializer(serializers.ModelSerializer):
             "experience_type",
             "display_name",
             "description",
+            "locale",
         ]
+        read_only_fields = ["id", "locale"]
 
 
 class RoomTypePricingSerializer(serializers.ModelSerializer):
@@ -106,7 +191,9 @@ class RoomTypePricingSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "experience_type", "updated_at"]
 
 
-class MovieWriteSerializer(serializers.ModelSerializer):
+class MovieWriteSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializer):
+    translation_fields = ("title", "synopsis")
+
     genres = serializers.PrimaryKeyRelatedField(
         many=True,
         queryset=Genre.objects.all(),
@@ -125,6 +212,9 @@ class MovieWriteSerializer(serializers.ModelSerializer):
             "title",
             "genres",
             "synopsis",
+            "translations",
+            "locale",
+            "available_locales",
             "duration_minutes",
             "release_date",
             "poster_url",
@@ -136,7 +226,7 @@ class MovieWriteSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "locale", "available_locales", "created_at", "updated_at"]
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -164,7 +254,9 @@ class MovieWriteSerializer(serializers.ModelSerializer):
         return movie
 
 
-class MovieReadSerializer(serializers.ModelSerializer):
+class MovieReadSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializer):
+    translation_fields = ("title", "synopsis")
+
     genres = GenreSummarySerializer(many=True, read_only=True)
     cast = serializers.SerializerMethodField()
 
@@ -178,6 +270,9 @@ class MovieReadSerializer(serializers.ModelSerializer):
             "title",
             "genres",
             "synopsis",
+            "translations",
+            "locale",
+            "available_locales",
             "duration_minutes",
             "release_date",
             "poster_url",
@@ -191,7 +286,9 @@ class MovieReadSerializer(serializers.ModelSerializer):
         ]
 
 
-class MovieSummarySerializer(serializers.ModelSerializer):
+class MovieSummarySerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializer):
+    translation_fields = ("title", "synopsis")
+
     genres = GenreSummarySerializer(many=True, read_only=True)
     cast = serializers.SerializerMethodField()
 
@@ -204,6 +301,9 @@ class MovieSummarySerializer(serializers.ModelSerializer):
             "id",
             "title",
             "genres",
+            "translations",
+            "locale",
+            "available_locales",
             "duration_minutes",
             "release_date",
             "poster_url",

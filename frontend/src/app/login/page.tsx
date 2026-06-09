@@ -3,20 +3,23 @@ import Link from "next/link";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { PageSection } from "@/components/ui/PageSection";
 import { StateMessage } from "@/components/ui/StateMessage";
+import { getServerLocale, getTranslator } from "@/i18n/server";
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const t = getTranslator(await getServerLocale());
+
   return (
     <PageSection
-      description="Acesse sua conta para reservar assentos, finalizar compras e consultar ingressos."
-      eyebrow="Autenticação"
-      title="Entrar"
+      description={t("auth.loginDescription")}
+      eyebrow={t("auth.eyebrow")}
+      title={t("auth.login")}
     >
       <LoginForm />
-      <StateMessage title="Ainda não tem conta?">
+      <StateMessage title={t("auth.noAccount")}>
         <Link className="text-link" href="/register">
-          Criar uma conta
+          {t("auth.registerLink")}
         </Link>{" "}
-        para acompanhar seus ingressos e compras.
+        {t("auth.registerSuffix")}
       </StateMessage>
     </PageSection>
   );

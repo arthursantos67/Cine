@@ -16,6 +16,7 @@ import { catalogApi } from "@/api/catalog";
 import { ResponsiveImage } from "@/components/ui/ResponsiveImage";
 import { StateMessage } from "@/components/ui/StateMessage";
 import type { CatalogMovieDetail, CatalogSession } from "@/types/catalog";
+import { useI18n } from "@/i18n";
 
 import {
   formatMovieDuration,
@@ -63,6 +64,7 @@ const loadingState: MovieDetailState = {
 };
 
 export function MovieDetail({ movieId }: MovieDetailProps) {
+  const { locale } = useI18n();
   const [state, setState] = useState<MovieDetailState>(loadingState);
 
   const loadMovie = useCallback(async () => {
@@ -87,9 +89,9 @@ export function MovieDetail({ movieId }: MovieDetailProps) {
           : { status: "not-found" }
       );
     } catch (error) {
-      setState(toMovieDetailErrorState(error));
+      setState(toMovieDetailErrorState(error, locale));
     }
-  }, [movieId]);
+  }, [locale, movieId]);
 
   useEffect(() => {
     void loadMovie();
@@ -104,6 +106,8 @@ export function MovieDetail({ movieId }: MovieDetailProps) {
 }
 
 export function MovieDetailView({ onRetry, state }: MovieDetailViewProps) {
+  const { t } = useI18n();
+
   if (state.status === "loading") {
     return <MovieDetailLoadingState />;
   }
@@ -114,15 +118,14 @@ export function MovieDetailView({ onRetry, state }: MovieDetailViewProps) {
         action={
           onRetry ? (
             <button className="button button-ghost" onClick={onRetry} type="button">
-              Tentar novamente
+              {t("common.tryAgain")}
             </button>
           ) : undefined
         }
-        title="Detalhes indisponíveis"
+        title={t("movie.detailsUnavailable")}
         tone="error"
       >
-        {state.errorMessage ??
-          "Não conseguimos carregar este filme agora. Tente novamente em instantes."}
+        {state.errorMessage ?? t("movie.detailsLoadError")}
       </StateMessage>
     );
   }
@@ -135,21 +138,22 @@ export function MovieDetailView({ onRetry, state }: MovieDetailViewProps) {
 }
 
 function MovieDetailSuccess({ movie }: { movie: CatalogMovieDetail }) {
+  const { locale, t } = useI18n();
   const ageRatingLabel = movie.age_rating
     ? movie.age_rating === "L"
-      ? "Livre"
-      : `${movie.age_rating} anos`
+      ? t("movie.ageRatingFree")
+      : t("movie.ageRatingYears", { rating: movie.age_rating })
     : null;
-  const genres = formatMovieGenres(movie.genres);
-  const duration = formatMovieDuration(movie.duration_minutes);
-  const releaseDate = formatMovieReleaseDate(movie.release_date);
+  const genres = formatMovieGenres(movie.genres, locale);
+  const duration = formatMovieDuration(movie.duration_minutes, locale);
+  const releaseDate = formatMovieReleaseDate(movie.release_date, locale);
 
   return (
     <div className="movie-detail">
       <div className="movie-detail__poster-frame">
         {movie.poster_url ? (
           <ResponsiveImage
-            alt={`Poster de ${movie.title}`}
+            alt={t("movie.posterAlt", { title: movie.title })}
             className="movie-detail__poster"
             height={720}
             priority
@@ -160,22 +164,22 @@ function MovieDetailSuccess({ movie }: { movie: CatalogMovieDetail }) {
           />
         ) : (
           <div
-            aria-label={`Poster indisponível de ${movie.title}`}
+            aria-label={t("movie.posterUnavailableAlt", { title: movie.title })}
             className="movie-detail__poster-placeholder"
             role="img"
           >
-            Poster indisponível
+            {t("movie.posterUnavailable")}
           </div>
         )}
       </div>
 
       <article className="movie-detail__content">
         <div className="movie-detail__heading">
-          <p className="eyebrow">Filme</p>
+          <p className="eyebrow">{t("movie.eyebrow")}</p>
           <h1>{movie.title}</h1>
         </div>
 
-        <div className="movie-detail__metadata" aria-label="Informações do filme">
+        <div className="movie-detail__metadata" aria-label={t("movie.infoLabel")}>
           {ageRatingLabel ? (
             <span className="movie-detail__rating">{ageRatingLabel}</span>
           ) : null}
@@ -185,7 +189,7 @@ function MovieDetailSuccess({ movie }: { movie: CatalogMovieDetail }) {
           {movie.release_date ? (
             <>
               <span aria-hidden="true">·</span>
-              <span>Estreia {releaseDate}</span>
+              <span>{t("movie.releaseWithDate", { date: releaseDate })}</span>
             </>
           ) : null}
         </div>
@@ -194,20 +198,20 @@ function MovieDetailSuccess({ movie }: { movie: CatalogMovieDetail }) {
           <div className="movie-detail__credits">
             {movie.director && (
               <p>
-                <strong>Direção:</strong> {movie.director}
+                <strong>{t("movie.director")}:</strong> {movie.director}
               </p>
             )}
             {movie.cast && movie.cast.length > 0 && (
               <p>
-                <strong>Elenco:</strong> {movie.cast.join(", ")}
+                <strong>{t("movie.cast")}:</strong> {movie.cast.join(", ")}
               </p>
             )}
           </div>
         )}
 
         <section className="movie-detail__synopsis" aria-labelledby="sinopse">
-          <h2 id="sinopse">Sinopse</h2>
-          <p>{movie.synopsis || "Sinopse indisponível."}</p>
+          <h2 id="sinopse">{t("movie.synopsis")}</h2>
+          <p>{movie.synopsis || t("movie.synopsisUnavailable")}</p>
         </section>
 
         {movie.status === "em_breve" ? (
@@ -221,16 +225,21 @@ function MovieDetailSuccess({ movie }: { movie: CatalogMovieDetail }) {
 }
 
 function MovieComingSoonNotice() {
+  const { t } = useI18n();
+
   return (
-    <StateMessage title="Em breve nas telas">
-      Este filme ainda não está em cartaz. Fique de olho na programação para saber quando as
-      sessões estarão disponíveis.
+    <StateMessage title={t("movie.comingSoonTitle")}>
+      {t("movie.comingSoonDescription")}
     </StateMessage>
   );
 }
 
 function MovieSessionSelector({ movieId }: { movieId: string }) {
-  const dateOptions = useMemo(() => buildSessionDateOptions(new Date()), []);
+  const { locale, t } = useI18n();
+  const dateOptions = useMemo(
+    () => buildSessionDateOptions(new Date(), 7, locale),
+    [locale]
+  );
   const [selectedDate, setSelectedDate] = useState(dateOptions[0]?.value ?? "");
   const calendarInputRef = useRef<HTMLInputElement>(null);
   const dateRailRef = useRef<HTMLDivElement>(null);
@@ -259,12 +268,12 @@ function MovieSessionSelector({ movieId }: { movieId: string }) {
       });
     } catch (error) {
       setState({
-        errorMessage: getApiErrorUserMessage(error),
+        errorMessage: getApiErrorUserMessage(error, locale),
         sessions: [],
         status: "error",
       });
     }
-  }, [movieId, selectedDate]);
+  }, [locale, movieId, selectedDate]);
 
   useEffect(() => {
     let isActive = true;
@@ -294,7 +303,7 @@ function MovieSessionSelector({ movieId }: { movieId: string }) {
       } catch (error) {
         if (isActive) {
           setState({
-            errorMessage: getApiErrorUserMessage(error),
+            errorMessage: getApiErrorUserMessage(error, locale),
             sessions: [],
             status: "error",
           });
@@ -307,7 +316,7 @@ function MovieSessionSelector({ movieId }: { movieId: string }) {
     return () => {
       isActive = false;
     };
-  }, [movieId, selectedDate]);
+  }, [locale, movieId, selectedDate]);
 
   useEffect(() => {
     const selectedButton = dateRailRef.current?.querySelector<HTMLButtonElement>(
@@ -371,17 +380,17 @@ function MovieSessionSelector({ movieId }: { movieId: string }) {
       className="movie-detail__sessions"
     >
       <div className="movie-detail__sessions-header">
-        <h2 id="selecionar-sessao">Sessões</h2>
-        <p>{formatSessionFullDate(selectedDate)}</p>
+        <h2 id="selecionar-sessao">{t("movie.sessions")}</h2>
+        <p>{formatSessionFullDate(selectedDate, locale)}</p>
       </div>
 
       <div
-        aria-label="Selecionar data"
+        aria-label={t("schedule.selectDate")}
         className="session-date-carousel"
         role="group"
       >
         <button
-          aria-label="Data anterior"
+          aria-label={t("schedule.previousDate")}
           className="session-date-carousel__nav"
           disabled={!canGoPrev}
           onClick={goToPrevDate}
@@ -391,7 +400,7 @@ function MovieSessionSelector({ movieId }: { movieId: string }) {
         </button>
 
         <div
-          aria-label="Datas disponíveis"
+          aria-label={t("schedule.availableDates")}
           className="session-date-selector"
           ref={dateRailRef}
         >
@@ -401,7 +410,7 @@ function MovieSessionSelector({ movieId }: { movieId: string }) {
 
             return (
               <button
-                aria-label={`${dateOption.weekday}, ${formatSessionFullDate(dateOption.value)}`}
+                aria-label={`${dateOption.weekday}, ${formatSessionFullDate(dateOption.value, locale)}`}
                 aria-pressed={isSelected}
                 className="session-date-selector__button"
                 data-session-date={dateOption.value}
@@ -417,7 +426,7 @@ function MovieSessionSelector({ movieId }: { movieId: string }) {
         </div>
 
         <button
-          aria-label="Próxima data"
+          aria-label={t("schedule.nextDate")}
           className="session-date-carousel__nav"
           disabled={!canGoNext}
           onClick={goToNextDate}
@@ -428,7 +437,7 @@ function MovieSessionSelector({ movieId }: { movieId: string }) {
 
         <div className="session-date-carousel__calendar">
           <button
-            aria-label="Abrir calendário"
+            aria-label={t("schedule.openCalendar")}
             className="session-date-carousel__nav"
             onClick={openCalendarPicker}
             type="button"
@@ -466,10 +475,14 @@ export function SessionList({
   onRetry: () => void;
   state: SessionListState;
 }) {
+  const { locale, t } = useI18n();
+
   if (state.status === "loading") {
     return (
-      <StateMessage tone="loading" title="Carregando sessões">
-        Buscando horários para {formatSessionFullDate(date)}.
+      <StateMessage tone="loading" title={t("movie.sessionsLoadingTitle")}>
+        {t("movie.sessionsLoadingDescription", {
+          date: formatSessionFullDate(date, locale),
+        })}
       </StateMessage>
     );
   }
@@ -479,23 +492,23 @@ export function SessionList({
       <StateMessage
         action={
           <button className="button button-ghost" onClick={onRetry} type="button">
-            Tentar novamente
+            {t("common.tryAgain")}
           </button>
         }
-        title="Sessões indisponíveis"
+        title={t("movie.sessionsUnavailable")}
         tone="error"
       >
-        {state.errorMessage ??
-          "Não conseguimos carregar as sessões agora. Tente novamente em instantes."}
+        {state.errorMessage ?? t("movie.sessionsLoadError")}
       </StateMessage>
     );
   }
 
   if (state.sessions.length === 0) {
     return (
-      <StateMessage title="Nenhuma sessão nesta data">
-        Não há sessões disponíveis para {formatSessionFullDate(date)}. Escolha outra
-        data.
+      <StateMessage title={t("schedule.emptyTitle")}>
+        {t("schedule.emptyDescription", {
+          date: formatSessionFullDate(date, locale),
+        })}
       </StateMessage>
     );
   }
@@ -503,9 +516,9 @@ export function SessionList({
   const groups = groupSessionsByRoom(state.sessions);
 
   return (
-    <div aria-label="Sessões disponíveis" className="session-list">
+    <div aria-label={t("movie.availableSessions")} className="session-list">
       <p className="session-list__date-heading">
-        {formatScheduleDateHeading(date)}
+        {formatScheduleDateHeading(date, new Date(), locale)}
       </p>
       {groups.map((group) => (
         <section className="session-room-group" key={group.roomId}>
@@ -513,34 +526,37 @@ export function SessionList({
             <div>
               <h3>{group.roomName}</h3>
               {group.sessions[0] ? (
-                <SessionBadgeList badges={getSessionBadges(group.sessions[0])} />
+                <SessionBadgeList badges={getSessionBadges(group.sessions[0], locale)} />
               ) : null}
             </div>
             <HelpCircle aria-hidden="true" size={16} />
           </div>
           <div className="session-time-grid">
             {group.sessions.map((session) => {
-              const badges = getSessionBadges(session);
+              const badges = getSessionBadges(session, locale);
               const badgeText = badges.map((badge) => badge.label).join(", ");
               const badgeDescription = badgeText
-                ? `, formatos ${badgeText}`
+                ? t("schedule.badgeDescription", { badges: badgeText })
                 : "";
 
               return (
                 <Link
-                  aria-label={`Selecionar sessão das ${formatSessionTime(
-                    session.start_time
-                  )}, sala ${group.roomName}${badgeDescription}, valor ${formatSessionPrice(
-                    session.base_price
-                  )}`}
+                  aria-label={t("schedule.selectSession", {
+                    badges: badgeDescription,
+                    price: formatSessionPrice(session.base_price, locale),
+                    room: group.roomName,
+                    time: formatSessionTime(session.start_time, locale),
+                  })}
                   className="session-option"
                   href={getSessionSeatsHref(session.id)}
                   key={session.id}
                 >
-                  <strong>{formatSessionTime(session.start_time)}</strong>
+                  <strong>{formatSessionTime(session.start_time, locale)}</strong>
                   <span className="sr-only">
-                    até {formatSessionTime(session.end_time)},{" "}
-                    {formatSessionPrice(session.base_price)}
+                    {t("movie.sessionEndsAt", {
+                      price: formatSessionPrice(session.base_price, locale),
+                      time: formatSessionTime(session.end_time, locale),
+                    })}
                   </span>
                 </Link>
               );
@@ -553,11 +569,13 @@ export function SessionList({
 }
 
 function MovieDetailLoadingState() {
+  const { t } = useI18n();
+
   return (
     <div aria-busy="true" className="movie-detail-loading" role="status">
       <div className="movie-detail-loading__poster" />
       <div className="movie-detail-loading__content">
-        <span>Carregando detalhes do filme...</span>
+        <span>{t("movie.detailsLoading")}</span>
         <span className="skeleton-line skeleton-line--title" />
         <span className="skeleton-line" />
         <span className="skeleton-line skeleton-line--short" />
@@ -568,21 +586,22 @@ function MovieDetailLoadingState() {
 }
 
 function MovieDetailNotFoundState() {
+  const { t } = useI18n();
+
   return (
-    <StateMessage title="Filme não encontrado">
-      Não encontramos esse filme no catálogo. Volte para a página inicial e escolha
-      outro título disponível.
+    <StateMessage title={t("movie.notFoundTitle")}>
+      {t("movie.notFoundDescription")}
     </StateMessage>
   );
 }
 
-function toMovieDetailErrorState(error: unknown): MovieDetailState {
+function toMovieDetailErrorState(error: unknown, locale: string): MovieDetailState {
   if (error instanceof ApiError && error.code === "RESOURCE_NOT_FOUND") {
     return { status: "not-found" };
   }
 
   return {
-    errorMessage: getApiErrorUserMessage(error),
+    errorMessage: getApiErrorUserMessage(error, locale),
     status: "error",
   };
 }

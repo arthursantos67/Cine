@@ -9,6 +9,7 @@ import { useGuardedAction } from "@/components/auth/useGuardedAction";
 import { StateMessage } from "@/components/ui/StateMessage";
 import { useReservation } from "@/contexts/ReservationContext";
 import { useReservationCountdown } from "@/hooks/useReservationCountdown";
+import { useI18n } from "@/i18n";
 import type {
   ReservedSeat,
   SessionSeatMapItem,
@@ -55,6 +56,7 @@ export type SeatVisualState =
 type SeatAccessibleLabelOptions = {
   displayLabel?: string;
   displayNumber?: number;
+  t?: Translate;
 };
 
 type SeatMapProps = {
@@ -75,7 +77,9 @@ type SeatMapLayoutProps = {
   selectedSeatIds?: ReadonlySet<string>;
 };
 
-const seatStateLabels: Record<SeatVisualState, string> = {
+type Translate = (key: string, params?: Record<string, string | number>) => string;
+
+const defaultSeatStateLabels: Record<SeatVisualState, string> = {
   available: "Disponível",
   purchased: "Comprado",
   reserved: "Reservado ou indisponível",
@@ -93,6 +97,7 @@ const ACCESSIBLE_SEAT_COUNT = 6;
 const ACCESSIBLE_SEATS_PER_SIDE = 3;
 
 export function SeatMap({ sessionId }: SeatMapProps) {
+  const { locale, t } = useI18n();
   const [state, setState] = useState<SeatMapLoadState>({ status: "loading" });
   const [retryCount, setRetryCount] = useState(0);
 
@@ -102,7 +107,7 @@ export function SeatMap({ sessionId }: SeatMapProps) {
     let isActive = true;
 
     if (!trimmedSessionId) {
-      setState({ errorMessage: "Sessão inválida.", status: "error" });
+      setState({ errorMessage: t("seats.invalidSession"), status: "error" });
       return;
     }
 
@@ -128,7 +133,7 @@ export function SeatMap({ sessionId }: SeatMapProps) {
       } catch (error) {
         if (isActive) {
           setState({
-            errorMessage: getApiErrorUserMessage(error),
+            errorMessage: getApiErrorUserMessage(error, locale),
             status: "error",
           });
         }
@@ -140,7 +145,7 @@ export function SeatMap({ sessionId }: SeatMapProps) {
     return () => {
       isActive = false;
     };
-  }, [trimmedSessionId, retryCount]);
+  }, [trimmedSessionId, retryCount, locale, t]);
 
   const handleRetry = useCallback(() => {
     setRetryCount((count) => count + 1);
@@ -148,8 +153,8 @@ export function SeatMap({ sessionId }: SeatMapProps) {
 
   if (state.status === "loading") {
     return (
-      <StateMessage tone="loading" title="Carregando mapa de assentos">
-        Buscando a disposição da sala para esta sessão.
+      <StateMessage tone="loading" title={t("seats.loadTitle")}>
+        {t("seats.loadDescription")}
       </StateMessage>
     );
   }
@@ -163,14 +168,13 @@ export function SeatMap({ sessionId }: SeatMapProps) {
             onClick={handleRetry}
             type="button"
           >
-            Tentar novamente
+            {t("common.tryAgain")}
           </button>
         }
-        title="Mapa indisponível"
+        title={t("seats.unavailableTitle")}
         tone="error"
       >
-        {state.errorMessage ??
-          "Não conseguimos carregar os assentos desta sessão agora."}
+        {state.errorMessage ?? t("seats.unavailableDescription")}
       </StateMessage>
     );
   }
@@ -189,6 +193,7 @@ export function SeatMapView({
   sessionBasePrice,
   sessionId,
 }: SeatMapViewProps) {
+  const { locale, t } = useI18n();
   const guardAction = useGuardedAction();
   const reservation = useReservation();
   const [currentSeats, setCurrentSeats] = useState(seats);
@@ -313,7 +318,7 @@ export function SeatMapView({
       setCurrentSeats((current) =>
         restoreSeatSnapshots(current, [seat])
       );
-      setErrorMessage(getSeatInteractionErrorMessage(error));
+      setErrorMessage(getSeatInteractionErrorMessage(error, locale, t));
     } finally {
       setPendingSeatIds((current) =>
         removeFromSet(current, seat.session_seat_id)
@@ -353,7 +358,7 @@ export function SeatMapView({
         reservation.addSeats([reservedSeat], { sessionId });
       }
 
-      setErrorMessage(getSeatInteractionErrorMessage(error));
+      setErrorMessage(getSeatInteractionErrorMessage(error, locale, t));
     } finally {
       setPendingSeatIds((current) =>
         removeFromSet(current, seat.session_seat_id)
@@ -379,12 +384,13 @@ export function SeatMapLayout({
   seats,
   selectedSeatIds = new Set(),
 }: SeatMapLayoutProps) {
+  const { t } = useI18n();
   const layout = useMemo(() => buildSeatMapLayout(seats), [seats]);
 
   if (seats.length === 0) {
     return (
-      <StateMessage title="Sala sem assentos">
-        Ainda não há assentos cadastrados para esta sessão.
+      <StateMessage title={t("seats.emptyTitle")}>
+        {t("seats.emptyDescription")}
       </StateMessage>
     );
   }
@@ -392,11 +398,9 @@ export function SeatMapLayout({
   return (
     <section aria-labelledby="mapa-assentos" className="seat-map-section">
       <div className="seat-map-section__header">
-        <h2 id="mapa-assentos">Mapa de assentos</h2>
+        <h2 id="mapa-assentos">{t("seats.title")}</h2>
         <p className="sr-only" id="mapa-assentos-instrucoes">
-          Em telas estreitas, role horizontalmente para acessar todos os
-          assentos. Use Tab para chegar aos assentos e Enter ou Espaço para
-          selecionar ou liberar um assento disponível.
+          {t("seats.instructions")}
         </p>
       </div>
 
@@ -410,18 +414,18 @@ export function SeatMapLayout({
 
       <div
         aria-describedby="mapa-assentos-instrucoes"
-        aria-label="Área rolável do mapa de assentos"
+        aria-label={t("seats.scrollAreaA11y")}
         className="seat-map-scroll"
         tabIndex={0}
       >
         <div
-          aria-label="Mapa interativo de assentos da sessão"
+          aria-label={t("seats.interactiveMapA11y")}
           className="seat-map"
         >
-          <div className="seat-map__screen">Tela</div>
+          <div className="seat-map__screen">{t("seats.screen")}</div>
 
           <div
-            aria-label="Assentos acessíveis e prioritários"
+            aria-label={t("seats.accessiblePriorityA11y")}
             className="seat-map__accessible-row"
             role="group"
           >
@@ -435,6 +439,7 @@ export function SeatMapLayout({
                     pair,
                     pendingSeatIds,
                     selectedSeatIds,
+                    t,
                   })
                 )}
               </div>
@@ -445,6 +450,7 @@ export function SeatMapLayout({
                     pair,
                     pendingSeatIds,
                     selectedSeatIds,
+                    t,
                   })
                 )}
               </div>
@@ -462,7 +468,7 @@ export function SeatMapLayout({
                   {row.rowLabel}
                 </span>
                 <div
-                  aria-label={`Fileira ${row.rowLabel}`}
+                  aria-label={t("seats.rowA11y", { row: row.rowLabel })}
                   className="seat-map__seat-list"
                   role="group"
                 >
@@ -475,6 +481,7 @@ export function SeatMapLayout({
                         pendingSeatIds,
                         seat: seat.seat,
                         selectedSeatIds,
+                        t,
                       })
                     )}
                   </div>
@@ -488,6 +495,7 @@ export function SeatMapLayout({
                         pendingSeatIds,
                         seat: seat.seat,
                         selectedSeatIds,
+                        t,
                       })
                     )}
                   </div>
@@ -502,7 +510,7 @@ export function SeatMapLayout({
             ))}
           </div>
 
-          <div className="seat-map__back-label">Fundo da sala</div>
+          <div className="seat-map__back-label">{t("seats.backOfRoom")}</div>
         </div>
       </div>
     </section>
@@ -515,12 +523,14 @@ function renderAccessiblePair({
   pair,
   pendingSeatIds,
   selectedSeatIds,
+  t,
 }: {
   companionFirst?: boolean;
   onSeatToggle?: (seat: SessionSeatMapItem) => void;
   pair: SeatMapAccessiblePair;
   pendingSeatIds: ReadonlySet<string>;
   selectedSeatIds: ReadonlySet<string>;
+  t: Translate;
 }) {
   const accessibleSeatButton = renderSeatButton({
     displayNumber: pair.accessibleSeat.displayNumber,
@@ -529,6 +539,7 @@ function renderAccessiblePair({
     pendingSeatIds,
     seat: pair.accessibleSeat.seat,
     selectedSeatIds,
+    t,
   });
   const companionSeatButton = pair.companionSeat
     ? renderSeatButton({
@@ -539,6 +550,7 @@ function renderAccessiblePair({
         pendingSeatIds,
         seat: pair.companionSeat.seat,
         selectedSeatIds,
+        t,
       })
     : null;
 
@@ -562,6 +574,7 @@ function renderSeatButton({
   pendingSeatIds,
   seat,
   selectedSeatIds,
+  t,
 }: {
   displayLabel?: string;
   displayNumber?: number;
@@ -571,6 +584,7 @@ function renderSeatButton({
   pendingSeatIds: ReadonlySet<string>;
   seat: SessionSeatMapItem;
   selectedSeatIds: ReadonlySet<string>;
+  t: Translate;
 }) {
   const visualState = getSeatVisualState(seat, selectedSeatIds);
   const isSelected = visualState === "selected";
@@ -588,10 +602,12 @@ function renderSeatButton({
           ? getCompanionSeatAccessibleLabel(seat, visualState, {
               displayLabel,
               displayNumber,
+              t,
             })
           : getSeatAccessibleLabel(seat, visualState, {
               displayLabel,
               displayNumber,
+              t,
             })
       }
       aria-pressed={isSelected}
@@ -627,6 +643,7 @@ function renderSeatButton({
 }
 
 export function SeatMapLegend() {
+  const { t } = useI18n();
   const legendItems: Array<{
     className: string;
     label: string;
@@ -634,38 +651,38 @@ export function SeatMapLegend() {
   }> = [
     {
       className: "seat-map__legend-swatch--available",
-      label: "Disponível",
+      label: t("seats.status.available"),
       marker: seatStateMarkers.available,
     },
     {
       className: "seat-map__legend-swatch--selected",
-      label: "Selecionado",
+      label: t("seats.status.selected"),
       marker: seatStateMarkers.selected,
     },
     {
       className: "seat-map__legend-swatch--reserved",
-      label: "Reservado ou indisponível",
+      label: t("seats.status.reserved"),
       marker: seatStateMarkers.reserved,
     },
     {
       className: "seat-map__legend-swatch--purchased",
-      label: "Comprado",
+      label: t("seats.status.purchased"),
       marker: seatStateMarkers.purchased,
     },
     {
       className: "seat-map__legend-swatch--accessible",
-      label: "Acessível",
+      label: t("seats.accessible"),
       marker: "♿",
     },
     {
       className: "seat-map__legend-swatch--companion",
-      label: "Acompanhante",
+      label: t("seats.companion"),
       marker: "AC",
     },
   ];
 
   return (
-    <ul aria-label="Legenda dos assentos" className="seat-map__legend">
+    <ul aria-label={t("seats.legend")} className="seat-map__legend">
       {legendItems.map((item) => (
         <li className="seat-map__legend-item" key={item.label}>
           <span
@@ -766,9 +783,25 @@ export function getSeatAccessibleLabel(
   options: SeatAccessibleLabelOptions = {}
 ) {
   const displaySeat = getAccessibleLabelDisplaySeat(seat, options);
-  const accessibleSuffix = seat.is_accessible ? ", assento acessível" : "";
+  const accessibleSuffix = seat.is_accessible
+    ? options.t
+      ? options.t("seats.accessibleSuffix")
+      : ", assento acessível"
+    : "";
+  const stateLabel = getSeatStateLabel(visualState, options.t);
 
-  return `Assento ${displaySeat.identifier}, fileira ${seat.row}, número ${displaySeat.number}${displaySeat.originalSuffix}, ${seatStateLabels[visualState]}${accessibleSuffix}.`;
+  if (options.t) {
+    return options.t("seats.seatLabel", {
+      accessibleSuffix,
+      identifier: displaySeat.identifier,
+      number: displaySeat.number,
+      originalSuffix: displaySeat.originalSuffix,
+      row: seat.row,
+      state: stateLabel,
+    });
+  }
+
+  return `Assento ${displaySeat.identifier}, fileira ${seat.row}, número ${displaySeat.number}${displaySeat.originalSuffix}, ${stateLabel}${accessibleSuffix}.`;
 }
 
 export function getCompanionSeatAccessibleLabel(
@@ -777,13 +810,24 @@ export function getCompanionSeatAccessibleLabel(
   options: SeatAccessibleLabelOptions = {}
 ) {
   const displaySeat = getAccessibleLabelDisplaySeat(seat, options);
+  const stateLabel = getSeatStateLabel(visualState, options.t);
 
-  return `Assento acompanhante ${displaySeat.identifier}, fileira ${seat.row}, número ${displaySeat.number}${displaySeat.originalSuffix}, ${seatStateLabels[visualState]}.`;
+  if (options.t) {
+    return options.t("seats.companionLabel", {
+      identifier: displaySeat.identifier,
+      number: displaySeat.number,
+      originalSuffix: displaySeat.originalSuffix,
+      row: seat.row,
+      state: stateLabel,
+    });
+  }
+
+  return `Assento acompanhante ${displaySeat.identifier}, fileira ${seat.row}, número ${displaySeat.number}${displaySeat.originalSuffix}, ${stateLabel}.`;
 }
 
 function getAccessibleLabelDisplaySeat(
   seat: SessionSeatMapItem,
-  { displayLabel, displayNumber }: SeatAccessibleLabelOptions
+  { displayLabel, displayNumber, t }: SeatAccessibleLabelOptions
 ) {
   const displayValue = displayLabel ?? displayNumber ?? seat.number;
   const displayNumberText = String(displayValue);
@@ -792,8 +836,18 @@ function getAccessibleLabelDisplaySeat(
   return {
     identifier: displayLabel ?? `${seat.row}${displayNumberText}`,
     number: displayNumberText,
-    originalSuffix: isOverridden ? `, assento original ${seat.row}${seat.number}` : "",
+    originalSuffix: isOverridden
+      ? t
+        ? t("seats.originalSuffix", { seat: `${seat.row}${seat.number}` })
+        : `, assento original ${seat.row}${seat.number}`
+      : "",
   };
+}
+
+function getSeatStateLabel(visualState: SeatVisualState, t?: Translate): string {
+  return t
+    ? t(`seats.status.${visualState}`)
+    : defaultSeatStateLabels[visualState];
 }
 
 export function buildReservedSeatsFromReservation(
@@ -874,12 +928,18 @@ export function restoreSeatSnapshots(
   );
 }
 
-export function getSeatInteractionErrorMessage(error: unknown) {
+export function getSeatInteractionErrorMessage(
+  error: unknown,
+  locale?: string,
+  t?: Translate
+) {
   if (error instanceof ApiError && error.code === "SEAT_ALREADY_RESERVED") {
-    return "Esse assento acabou de ser reservado por outra pessoa. Escolha outro lugar.";
+    return t
+      ? t("seats.alreadyReserved")
+      : "Esse assento acabou de ser reservado por outra pessoa. Escolha outro lugar.";
   }
 
-  return getApiErrorUserMessage(error);
+  return getApiErrorUserMessage(error, locale);
 }
 
 function addToSet<T>(set: ReadonlySet<T>, value: T) {

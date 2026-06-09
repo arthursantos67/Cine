@@ -5,6 +5,7 @@ import Link from "next/link";
 import { cn } from "@/components/ui/classNames";
 import { useReservation } from "@/contexts/ReservationContext";
 import { useReservationCountdown } from "@/hooks/useReservationCountdown";
+import { useI18n } from "@/i18n";
 import type {
   PaymentMethod,
   ReservedSeat,
@@ -15,7 +16,7 @@ import { formatCurrency } from "@/utils/formatters";
 import {
   buildOrderSummaryItems,
   calculateOrderTotal,
-  paymentMethodLabels,
+  getPaymentMethodLabel,
 } from "./order-summary";
 
 type ReservationOrderSummaryProps = {
@@ -37,6 +38,7 @@ export function ReservationOrderSummary({
   actionHref,
   actionLabel = "Continuar",
 }: ReservationOrderSummaryProps) {
+  const { t } = useI18n();
   const reservation = useReservation();
   const countdown = useReservationCountdown(reservation.reservationExpiresAt);
 
@@ -45,7 +47,11 @@ export function ReservationOrderSummary({
       actionHref={actionHref}
       actionLabel={actionLabel}
       countdownExpired={countdown?.isExpired ?? false}
-      countdownLabel={countdown ? `Expira em ${countdown.displayValue}` : null}
+      countdownLabel={
+        countdown
+          ? t("orderSummary.expiresIn", { time: countdown.displayValue })
+          : null
+      }
       countdownWarning={countdown?.isWarning ?? false}
       paymentMethod={reservation.paymentMethod}
       reservationExpiresAt={reservation.reservationExpiresAt}
@@ -66,32 +72,45 @@ export function OrderSummaryPanel({
   reservedSeats,
   ticketTypes,
 }: OrderSummaryPanelProps) {
+  const { locale, t } = useI18n();
   const items = buildOrderSummaryItems(
     reservedSeats,
-    ticketTypes
+    ticketTypes,
+    locale
   );
   const total = calculateOrderTotal(items);
   const hasSeats = items.length > 0;
   const paymentLabel = paymentMethod
-    ? paymentMethodLabels[paymentMethod]
+    ? getPaymentMethodLabel(paymentMethod, locale)
     : null;
+  const resolvedActionLabel = actionLabel === "Continuar" ? t("common.continue") : actionLabel;
 
   return (
     <aside
-      aria-label="Resumo do pedido"
+      aria-label={t("checkout.summary")}
       className="order-summary grid min-h-[280px] gap-3.5 rounded-card border border-white/10 bg-[linear-gradient(180deg,rgb(255_255_255_/_5%),rgb(255_255_255_/_2%))] p-[18px] text-text shadow-[0_18px_54px_rgb(0_0_0_/_18%)] max-lg:min-h-0"
     >
       <div className="order-summary__header grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
         <div>
-          <h2 className="m-0 text-xl leading-tight">Resumo do pedido</h2>
+          <h2 className="m-0 text-xl leading-tight">{t("checkout.summary")}</h2>
           <p className="m-0 mt-1 leading-snug text-text/65">
             {hasSeats
-              ? `${items.length} assento${items.length === 1 ? "" : "s"} selecionado${items.length === 1 ? "" : "s"}`
-              : "Nenhum assento selecionado"}
+              ? t("orderSummary.selectedSeats", {
+                  count: items.length,
+                  seatWord:
+                    items.length === 1
+                      ? t("orderSummary.seatSingular")
+                      : t("orderSummary.seatPlural"),
+                  selectedWord:
+                    items.length === 1
+                      ? t("orderSummary.selectedSingular")
+                      : t("orderSummary.selectedPlural"),
+                })
+              : t("orderSummary.noSeats")}
           </p>
         </div>
         <strong className="order-summary__total whitespace-nowrap text-lg leading-tight text-white">
-          {formatCurrency(total)}
+          {formatCurrency(total, locale)}
         </strong>
       </div>
 
@@ -109,10 +128,10 @@ export function OrderSummaryPanel({
           role="timer"
         >
           {countdownExpired
-            ? "Reserva expirada"
+            ? t("orderSummary.expired")
             : countdownLabel
               ? countdownLabel
-              : "Reserva temporária ativa"}
+              : t("orderSummary.active")}
         </p>
       ) : null}
 
@@ -125,21 +144,21 @@ export function OrderSummaryPanel({
             >
               <div className="grid min-w-0 gap-0.5">
                 <strong className="text-[15px] leading-tight">
-                  Assento {item.seatLabel}
+                  {t("orderSummary.seatLabel", { seat: item.seatLabel })}
                 </strong>
                 <span className="text-sm font-bold text-text/65">
                   {item.ticketTypeLabel}
                 </span>
               </div>
               <span className="text-sm font-extrabold text-text/65">
-                {formatCurrency(item.unitPrice)}
+                {formatCurrency(item.unitPrice, locale)}
               </span>
             </li>
           ))}
         </ul>
       ) : (
         <p className="order-summary__empty m-0 leading-snug text-text/65">
-          Escolha os assentos para ver valores e tipos de ingresso.
+          {t("orderSummary.emptyHelp")}
         </p>
       )}
 
@@ -151,9 +170,9 @@ export function OrderSummaryPanel({
           </dd>
         </div>
         <div className="flex items-center justify-between gap-3 max-[420px]:grid max-[420px]:items-start max-[420px]:gap-1">
-          <dt className="text-sm font-extrabold text-text/65">Pagamento</dt>
+          <dt className="text-sm font-extrabold text-text/65">{t("checkout.payment")}</dt>
           <dd className="m-0 text-right text-[15px] font-extrabold max-[420px]:text-left">
-            {paymentLabel ?? "A definir"}
+            {paymentLabel ?? t("domain.ticketType.pending")}
           </dd>
         </div>
       </dl>
@@ -163,7 +182,7 @@ export function OrderSummaryPanel({
           className="order-summary__action inline-flex min-h-10 w-full items-center justify-center rounded-md border border-brand bg-brand px-3.5 text-sm font-extrabold leading-none text-white transition hover:bg-brand-strong"
           href={actionHref}
         >
-          {actionLabel}
+          {resolvedActionLabel}
         </Link>
       ) : null}
     </aside>
