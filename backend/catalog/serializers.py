@@ -10,7 +10,7 @@ from cineprime_api.localization import (
     get_translation_value,
     normalize_translation_payload,
 )
-from catalog.models import CastMember, Genre, Movie, Room, RoomTypePricing, Session
+from catalog.models import CastMember, Genre, Movie, MovieInterest, Room, RoomTypePricing, Session
 from reservations.models import SessionSeat, SessionSeatStatus, Seat
 
 _WEEKEND_WEEKDAYS = {4, 5, 6}  # Friday, Saturday, Sunday
@@ -412,6 +412,11 @@ class SessionWriteSerializer(serializers.ModelSerializer):
             raise_serializer_validation_error(exc)
 
         return instance
+
+
+class MovieInterestStatusSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    user_interested = serializers.BooleanField(allow_null=True)
 
 
 class SessionReadSerializer(serializers.ModelSerializer):

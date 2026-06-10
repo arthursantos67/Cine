@@ -122,3 +122,8 @@ export type AdminSeat = {
   number: number;
   row: string;
 };
+
+export type MovieInterestStatus = {
+  count: number;
+  user_interested: boolean | null;
+};

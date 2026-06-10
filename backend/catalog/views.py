@@ -2,12 +2,16 @@ import uuid
 
 from django.core.cache import cache
 from django.db import transaction
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from drf_spectacular.utils import extend_schema
+from rest_framework import status as http_status
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from cineprime_api.permissions import IsAdminUserOrReadOnly
 from rest_framework.generics import ListAPIView, RetrieveUpdateAPIView
@@ -17,6 +21,7 @@ from catalog.models import (
     AudioFormat,
     Genre,
     Movie,
+    MovieInterest,
     MovieStatus,
     ProjectionFormat,
     Room,
@@ -27,6 +32,7 @@ from catalog.models import (
 )
 from catalog.serializers import (
     GenreSerializer,
+    MovieInterestStatusSerializer,
     MovieReadSerializer,
     MovieWriteSerializer,
     RoomSerializer,
@@ -495,3 +501,51 @@ class RoomTypePricingDetailView(RetrieveUpdateAPIView):
             new_price = compute_session_price(instance.base_price, session.start_time)
             Session.objects.filter(pk=session.pk).update(base_price=new_price)
         invalidate_session_list_cache()
+
+
+@extend_schema(
+    tags=["Catalog"],
+    summary="Get interest count and toggle interest for a movie",
+)
+class MovieInterestView(APIView):
+    def get_permissions(self):
+        if self.request.method in ("POST", "DELETE"):
+            return [IsAuthenticated()]
+        return []
+
+    def _get_movie(self, movie_pk):
+        return get_object_or_404(Movie, pk=movie_pk)
+
+    def _interest_response(self, movie, user):
+        count = MovieInterest.objects.filter(movie=movie).count()
+        user_interested = (
+            MovieInterest.objects.filter(movie=movie, user=user).exists()
+            if user is not None and user.is_authenticated
+            else None
+        )
+        serializer = MovieInterestStatusSerializer(
+            {"count": count, "user_interested": user_interested}
+        )
+        return serializer.data
+
+    def get(self, request, movie_pk):
+        movie = self._get_movie(movie_pk)
+        user = request.user if request.user.is_authenticated else None
+        data = self._interest_response(movie, user)
+        return Response(data)
+
+    def post(self, request, movie_pk):
+        movie = self._get_movie(movie_pk)
+        if movie.status != MovieStatus.EM_BREVE:
+            return Response(
+                {"error": {"code": "MOVIE_NOT_COMING_SOON", "message": "Interest can only be registered for coming-soon movies.", "status": 400, "details": None}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+        _, created = MovieInterest.objects.get_or_create(movie=movie, user=request.user)
+        data = self._interest_response(movie, request.user)
+        return Response(data, status=http_status.HTTP_201_CREATED if created else http_status.HTTP_200_OK)
+
+    def delete(self, request, movie_pk):
+        movie = self._get_movie(movie_pk)
+        MovieInterest.objects.filter(movie=movie, user=request.user).delete()
+        return Response(status=http_status.HTTP_204_NO_CONTENT)
