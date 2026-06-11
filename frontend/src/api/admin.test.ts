@@ -560,6 +560,8 @@ const adminUser = {
   email: "admin@cineprime.local",
   username: "admin",
   is_staff: true,
+  is_protected: false,
+  role: "master" as const,
   created_at: "2026-01-01T00:00:00Z",
 };
 
@@ -568,6 +570,8 @@ const regularUser = {
   email: "user@cineprime.local",
   username: "regular",
   is_staff: false,
+  is_protected: false,
+  role: "user" as const,
   created_at: "2026-01-02T00:00:00Z",
 };
 
@@ -582,6 +586,7 @@ const permissionLog = {
   actor: "admin@cineprime.local",
   target: "user@cineprime.local",
   action: "granted",
+  role: "staff" as const,
   created_at: "2026-06-01T10:00:00Z",
 };
 
@@ -658,7 +663,7 @@ test("adminApi.grantAdmin posts to the admin endpoint", async () => {
       return Response.json({ ...regularUser, is_staff: true });
     };
 
-    const result = await adminApi.grantAdmin("user-2");
+    const result = await adminApi.grantAdmin("user-2", "staff");
 
     assert.equal(result.is_staff, true);
     assert.equal(result.id, "user-2");
@@ -674,7 +679,7 @@ test("adminApi.grantAdmin rejects unexpected response shape", async () => {
     globalThis.fetch = async () => Response.json({ id: "user-2" });
 
     await assert.rejects(
-      adminApi.grantAdmin("user-2"),
+      adminApi.grantAdmin("user-2", "staff"),
       /Unexpected admin grant response/
     );
   } finally {

@@ -12,11 +12,21 @@ def api_client():
 
 
 @pytest.fixture
-def admin_user(db):
+def master_user(db):
     return User.objects.create_superuser(
-        email="admin@cineprime.local",
-        username="admin",
-        password="AdminPass123!",
+        email="master@cineprime.local",
+        username="master",
+        password="MasterPass123!",
+    )
+
+
+@pytest.fixture
+def staff_user(db):
+    return User.objects.create_user(
+        email="staff@cineprime.local",
+        username="staff",
+        password="StaffPass123!",
+        is_staff=True,
     )
 
 
@@ -30,11 +40,20 @@ def regular_user(db):
 
 
 @pytest.fixture
-def second_admin(db):
+def second_master(db):
     return User.objects.create_superuser(
-        email="admin2@cineprime.local",
-        username="admin2",
-        password="AdminPass123!",
+        email="master2@cineprime.local",
+        username="master2",
+        password="MasterPass123!",
+    )
+
+
+@pytest.fixture
+def protected_master(db):
+    return User.objects.create_superuser(
+        email="santos008@cineprime.local",
+        username="santos008",
+        password="MasterPass123!",
     )
 
 
@@ -49,124 +68,247 @@ def grant_url(user):
     return f"/api/v1/users/{user.id}/admin/"
 
 
-# --- Grant (POST) ---
+# --- Grant staff (POST with role=staff) ---
 
 @pytest.mark.django_db
-def test_admin_can_grant_admin_to_user(admin_user, regular_user):
-    client = auth_client(admin_user)
+def test_master_can_grant_staff_to_user(master_user, regular_user):
+    client = auth_client(master_user)
 
-    response = client.post(grant_url(regular_user))
+    response = client.post(grant_url(regular_user), {"role": "staff"}, format="json")
+
+    assert response.status_code == status.HTTP_200_OK
+    regular_user.refresh_from_db()
+    assert regular_user.is_staff is True
+    assert regular_user.is_superuser is False
+    assert response.data["role"] == "staff"
+
+
+@pytest.mark.django_db
+def test_master_can_grant_master_to_user(master_user, regular_user):
+    client = auth_client(master_user)
+
+    response = client.post(grant_url(regular_user), {"role": "master"}, format="json")
 
     assert response.status_code == status.HTTP_200_OK
     regular_user.refresh_from_db()
     assert regular_user.is_staff is True
     assert regular_user.is_superuser is True
+    assert response.data["role"] == "master"
 
 
 @pytest.mark.django_db
-def test_grant_creates_audit_log(admin_user, regular_user):
-    client = auth_client(admin_user)
-    client.post(grant_url(regular_user))
+def test_master_can_promote_staff_to_master(master_user, staff_user):
+    client = auth_client(master_user)
+
+    response = client.post(grant_url(staff_user), {"role": "master"}, format="json")
+
+    assert response.status_code == status.HTTP_200_OK
+    staff_user.refresh_from_db()
+    assert staff_user.is_superuser is True
+
+
+@pytest.mark.django_db
+def test_master_can_downgrade_master_to_staff(master_user, second_master):
+    client = auth_client(master_user)
+
+    response = client.post(grant_url(second_master), {"role": "staff"}, format="json")
+
+    assert response.status_code == status.HTTP_200_OK
+    second_master.refresh_from_db()
+    assert second_master.is_staff is True
+    assert second_master.is_superuser is False
+    assert response.data["role"] == "staff"
+
+    log = AdminPermissionLog.objects.get(target=second_master)
+    assert log.action == AdminPermissionLog.Action.REVOKED
+    assert log.role == AdminPermissionLog.Role.MASTER
+
+
+@pytest.mark.django_db
+def test_cannot_downgrade_protected_master(master_user, protected_master, settings):
+    settings.PROTECTED_SUPERUSER_USERNAME = "santos008"
+    client = auth_client(master_user)
+
+    response = client.post(grant_url(protected_master), {"role": "staff"}, format="json")
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    protected_master.refresh_from_db()
+    assert protected_master.is_superuser is True
+
+
+@pytest.mark.django_db
+def test_grant_creates_audit_log(master_user, regular_user):
+    client = auth_client(master_user)
+    client.post(grant_url(regular_user), {"role": "staff"}, format="json")
 
     log = AdminPermissionLog.objects.get(target=regular_user)
     assert log.action == AdminPermissionLog.Action.GRANTED
-    assert log.actor == admin_user
+    assert log.actor == master_user
 
 
 @pytest.mark.django_db
-def test_grant_is_idempotent(admin_user, regular_user):
-    client = auth_client(admin_user)
+def test_grant_staff_is_idempotent(master_user, regular_user):
+    client = auth_client(master_user)
 
-    client.post(grant_url(regular_user))
-    response = client.post(grant_url(regular_user))
+    client.post(grant_url(regular_user), {"role": "staff"}, format="json")
+    response = client.post(grant_url(regular_user), {"role": "staff"}, format="json")
 
     assert response.status_code == status.HTTP_200_OK
     assert AdminPermissionLog.objects.filter(target=regular_user).count() == 1
 
 
 @pytest.mark.django_db
-def test_regular_user_cannot_grant_admin(regular_user, second_admin):
-    client = auth_client(regular_user)
+def test_grant_master_is_idempotent(master_user, second_master):
+    client = auth_client(master_user)
 
-    response = client.post(grant_url(second_admin))
+    response = client.post(grant_url(second_master), {"role": "master"}, format="json")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert AdminPermissionLog.objects.filter(target=second_master).count() == 0
+
+
+@pytest.mark.django_db
+def test_staff_user_cannot_grant(staff_user, regular_user):
+    client = auth_client(staff_user)
+
+    response = client.post(grant_url(regular_user), {"role": "staff"}, format="json")
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.django_db
-def test_unauthenticated_cannot_grant_admin(api_client, regular_user):
-    response = api_client.post(grant_url(regular_user))
+def test_regular_user_cannot_grant(regular_user, second_master):
+    client = auth_client(regular_user)
+
+    response = client.post(grant_url(second_master), {"role": "staff"}, format="json")
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
+def test_unauthenticated_cannot_grant(api_client, regular_user):
+    response = api_client.post(grant_url(regular_user), {"role": "staff"}, format="json")
 
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 @pytest.mark.django_db
-def test_grant_returns_404_for_nonexistent_user(admin_user):
+def test_grant_returns_404_for_nonexistent_user(master_user):
     import uuid
-    client = auth_client(admin_user)
+    client = auth_client(master_user)
 
-    response = client.post(f"/api/v1/users/{uuid.uuid4()}/admin/")
+    response = client.post(f"/api/v1/users/{uuid.uuid4()}/admin/", {"role": "staff"}, format="json")
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
-# --- Revoke (DELETE) ---
-
 @pytest.mark.django_db
-def test_admin_can_revoke_admin_from_another_admin(admin_user, second_admin):
-    client = auth_client(admin_user)
+def test_grant_response_includes_created_at(master_user, regular_user):
+    client = auth_client(master_user)
 
-    response = client.delete(grant_url(second_admin))
+    response = client.post(grant_url(regular_user), {"role": "staff"}, format="json")
 
     assert response.status_code == status.HTTP_200_OK
-    second_admin.refresh_from_db()
-    assert second_admin.is_staff is False
-    assert second_admin.is_superuser is False
+    assert "created_at" in response.data
+    assert response.data["created_at"] is not None
+
+
+# --- Revoke staff (DELETE) ---
+
+@pytest.mark.django_db
+def test_master_can_revoke_staff(master_user, staff_user):
+    client = auth_client(master_user)
+
+    response = client.delete(grant_url(staff_user))
+
+    assert response.status_code == status.HTTP_200_OK
+    staff_user.refresh_from_db()
+    assert staff_user.is_staff is False
+    assert staff_user.is_superuser is False
 
 
 @pytest.mark.django_db
-def test_revoke_creates_audit_log(admin_user, second_admin):
-    client = auth_client(admin_user)
-    client.delete(grant_url(second_admin))
+def test_master_can_revoke_other_master(master_user, second_master):
+    client = auth_client(master_user)
 
-    log = AdminPermissionLog.objects.get(target=second_admin)
+    response = client.delete(grant_url(second_master))
+
+    assert response.status_code == status.HTTP_200_OK
+    second_master.refresh_from_db()
+    assert second_master.is_staff is False
+    assert second_master.is_superuser is False
+    assert response.data["role"] == "user"
+
+    log = AdminPermissionLog.objects.get(target=second_master)
     assert log.action == AdminPermissionLog.Action.REVOKED
-    assert log.actor == admin_user
+    assert log.role == AdminPermissionLog.Role.MASTER
 
 
 @pytest.mark.django_db
-def test_last_admin_cannot_be_revoked(admin_user, api_client):
-    client = auth_client(admin_user)
+def test_cannot_revoke_protected_master(master_user, protected_master, settings):
+    settings.PROTECTED_SUPERUSER_USERNAME = "santos008"
+    client = auth_client(master_user)
 
-    response = client.delete(grant_url(admin_user))
+    response = client.delete(grant_url(protected_master))
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    admin_user.refresh_from_db()
-    assert admin_user.is_staff is True
+    protected_master.refresh_from_db()
+    assert protected_master.is_staff is True
+    assert protected_master.is_superuser is True
 
 
 @pytest.mark.django_db
-def test_regular_user_cannot_revoke_admin(regular_user, second_admin):
-    client = auth_client(regular_user)
+def test_master_cannot_revoke_self(master_user):
+    client = auth_client(master_user)
 
-    response = client.delete(grant_url(second_admin))
+    response = client.delete(grant_url(master_user))
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    master_user.refresh_from_db()
+    assert master_user.is_superuser is True
+
+
+@pytest.mark.django_db
+def test_revoke_creates_audit_log(master_user, staff_user):
+    client = auth_client(master_user)
+    client.delete(grant_url(staff_user))
+
+    log = AdminPermissionLog.objects.get(target=staff_user)
+    assert log.action == AdminPermissionLog.Action.REVOKED
+    assert log.actor == master_user
+
+
+@pytest.mark.django_db
+def test_revoke_is_idempotent(master_user, staff_user):
+    client = auth_client(master_user)
+
+    client.delete(grant_url(staff_user))
+    response = client.delete(grant_url(staff_user))
+
+    assert response.status_code == status.HTTP_200_OK
+    assert AdminPermissionLog.objects.filter(target=staff_user).count() == 1
+
+
+@pytest.mark.django_db
+def test_staff_user_cannot_revoke(staff_user, second_master):
+    client = auth_client(staff_user)
+
+    response = client.delete(grant_url(second_master))
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.django_db
-def test_unauthenticated_cannot_revoke_admin(api_client, second_admin):
-    response = api_client.delete(grant_url(second_admin))
+def test_regular_user_cannot_revoke(regular_user, second_master):
+    client = auth_client(regular_user)
 
-    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    response = client.delete(grant_url(second_master))
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.django_db
-def test_revoke_is_idempotent(admin_user, second_admin):
-    client = auth_client(admin_user)
+def test_unauthenticated_cannot_revoke(api_client, second_master):
+    response = api_client.delete(grant_url(second_master))
 
-    client.delete(grant_url(second_admin))
-    response = client.delete(grant_url(second_admin))
-
-    assert response.status_code == status.HTTP_200_OK
-    assert AdminPermissionLog.objects.filter(target=second_admin).count() == 1
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
