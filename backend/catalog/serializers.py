@@ -4,11 +4,15 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from rest_framework import serializers
 
+from cineprime_api.genre_translation import translate_genre_name
 from cineprime_api.localization import (
+    DEFAULT_LOCALE,
     available_translation_locales,
     get_context_locale,
     get_translation_value,
+    normalize_locale,
     normalize_translation_payload,
+    SUPPORTED_LOCALES,
 )
 from catalog.models import CastMember, Genre, Movie, MovieInterest, Room, RoomTypePricing, Session
 from reservations.models import SessionSeat, SessionSeatStatus, Seat
@@ -73,12 +77,19 @@ class TranslatedCatalogSerializerMixin(serializers.Serializer):
 class GenreSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializer):
     translation_fields = ("name",)
 
+    source_language = serializers.CharField(
+        required=False,
+        write_only=True,
+        allow_blank=False,
+    )
+
     class Meta:
         model = Genre
         fields = [
             "id",
             "name",
             "translations",
+            "source_language",
             "locale",
             "available_locales",
             "created_at",
@@ -87,13 +98,56 @@ class GenreSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSeriali
         read_only_fields = ["id", "locale", "available_locales", "created_at", "updated_at"]
 
     def validate_name(self, value):
-        value = value.strip()
-        qs = Genre.objects.filter(name__iexact=value)
-        if self.instance:
-            qs = qs.exclude(pk=self.instance.pk)
+        return value.strip()
+
+    def validate_source_language(self, value):
+        normalized = normalize_locale(value)
+        if normalized is None:
+            supported = ", ".join(SUPPORTED_LOCALES)
+            raise serializers.ValidationError(
+                f"Unsupported locale. Expected one of: {supported}."
+            )
+        return normalized
+
+    def _check_name_unique(self, name: str, exclude_pk=None) -> None:
+        qs = Genre.objects.filter(name__iexact=name)
+        if exclude_pk:
+            qs = qs.exclude(pk=exclude_pk)
         if qs.exists():
-            raise serializers.ValidationError("A genre with this name already exists.")
-        return value
+            raise serializers.ValidationError({"name": "A genre with this name already exists."})
+
+    def _resolve_primary_name(self, input_name: str, source_locale: str, translated: dict[str, str]) -> str:
+        if source_locale == DEFAULT_LOCALE:
+            return input_name
+        return translated.get(DEFAULT_LOCALE, input_name)
+
+    def _apply_translation(self, validated_data: dict, source_language: str, instance=None) -> None:
+        input_name = validated_data.get("name", instance.name if instance else "")
+        translated = translate_genre_name(input_name, source_language)
+        if translated:
+            validated_data["name"] = self._resolve_primary_name(input_name, source_language, translated)
+            validated_data["translations"] = {
+                loc: {"name": n}
+                for loc, n in translated.items()
+                if loc != DEFAULT_LOCALE
+            }
+        elif source_language != DEFAULT_LOCALE:
+            validated_data["translations"] = {source_language: {"name": input_name}}
+
+    def create(self, validated_data):
+        source_language = validated_data.pop("source_language", None)
+        if source_language:
+            self._apply_translation(validated_data, source_language)
+        self._check_name_unique(validated_data["name"])
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        source_language = validated_data.pop("source_language", None)
+        if source_language:
+            self._apply_translation(validated_data, source_language, instance)
+        if "name" in validated_data:
+            self._check_name_unique(validated_data["name"], exclude_pk=instance.pk)
+        return super().update(instance, validated_data)
 
 
 class GenreSummarySerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializer):
