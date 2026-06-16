@@ -56,7 +56,23 @@ export type AdminRoomWritePayload = {
   display_name?: string;
   experience_type?: CatalogRoomExperienceType;
   name: string;
+  source_language?: string;
   translations?: CatalogRoomTranslations;
+};
+
+export type AdminBulkLayoutRowSeat = {
+  is_accessible?: boolean;
+  number: number;
+};
+
+export type AdminBulkLayoutRow = {
+  name: string;
+  seats: AdminBulkLayoutRowSeat[];
+};
+
+export type AdminBulkLayoutPayload = {
+  room: string;
+  rows: AdminBulkLayoutRow[];
 };
 
 export type RoomTypePricingWritePayload = {
@@ -69,6 +85,7 @@ export type AdminSeatRowWritePayload = {
 };
 
 export type AdminSeatWritePayload = {
+  companion_seat?: string | null;
   is_accessible?: boolean;
   number: number;
   row: string;
@@ -490,6 +507,14 @@ export const adminApi = {
     });
   },
 
+  async bulkCreateLayout(payload: AdminBulkLayoutPayload): Promise<void> {
+    await apiRequest<unknown>("/api/v1/reservation/bulk-create-layout/", {
+      auth: "required",
+      json: payload,
+      method: "POST",
+    });
+  },
+
   async listSessions(params: ListSessionsParams = {}) {
     const query = buildSessionsQuery(params);
     const response = await apiRequest<unknown>(
@@ -662,7 +687,8 @@ function isAdminSeat(value: unknown): value is AdminSeat {
     typeof value.id === "string" &&
     typeof value.row === "string" &&
     typeof value.number === "number" &&
-    typeof value.is_accessible === "boolean"
+    typeof value.is_accessible === "boolean" &&
+    (value.companion_seat === null || typeof value.companion_seat === "string")
   );
 }
 

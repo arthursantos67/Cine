@@ -7,6 +7,7 @@ import { ApiError } from "@/api/client";
 import type { AdminRoom, AdminSeat, AdminSeatRow } from "@/types/catalog";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { AdminConfirmDialog, AdminToolbar } from "@/components/admin";
+import { AdminBatchSeatWizard } from "@/components/admin/AdminBatchSeatWizard";
 import { cn } from "@/components/ui/classNames";
 import { useI18n } from "@/i18n";
 
@@ -23,6 +24,12 @@ type LayoutState =
 type DeleteTarget =
   | { kind: "row"; row: AdminSeatRow }
   | { kind: "seat"; seat: AdminSeat; rowName: string };
+
+type CompanionPairingTarget = {
+  accessibleSeat: AdminSeat;
+  rowId: string;
+  rowSeats: AdminSeat[];
+};
 
 type AdminRoomLayoutEditorProps = {
   roomId: string;
@@ -65,14 +72,22 @@ function extractConstraintMessage(error: unknown, t: Translate): string | null {
 
 function SeatPreviewCell({
   seat,
+  allSeats,
   disabled,
   onClick,
 }: {
   seat: AdminSeat;
+  allSeats: AdminSeat[];
   disabled?: boolean;
   onClick: () => void;
 }) {
   const { t } = useI18n();
+  const companionOf = allSeats.find((s) => s.companion_seat === seat.id);
+  const isCompanion = Boolean(companionOf);
+  const pairedCompanion = seat.is_accessible && seat.companion_seat
+    ? allSeats.find((s) => s.id === seat.companion_seat)
+    : null;
+
   const accessibleSuffix = seat.is_accessible
     ? t("admin.layout.accessibleSeatSuffix")
     : "";
@@ -84,9 +99,11 @@ function SeatPreviewCell({
         number: seat.number,
       })}
       className={cn(
-        "flex h-7 w-7 items-center justify-center rounded-[4px] text-[10px] font-bold transition",
+        "relative flex h-7 w-7 items-center justify-center rounded-[4px] text-[10px] font-bold transition",
         seat.is_accessible
           ? "border-2 border-brand bg-brand/20 text-brand"
+          : isCompanion
+          ? "border-2 border-brand/50 bg-brand/10 text-brand/70"
           : "border border-white/[0.25] bg-white/[0.06] text-white/60 hover:border-white/50 hover:text-white",
         disabled && "cursor-wait opacity-50"
       )}
@@ -94,12 +111,24 @@ function SeatPreviewCell({
       onClick={onClick}
       title={
         seat.is_accessible
-          ? t("admin.layout.accessibleToggleTitle")
+          ? pairedCompanion
+            ? t("admin.layout.accessibleWithCompanionTitle", { number: pairedCompanion.number })
+            : t("admin.layout.accessibleToggleTitle")
+          : isCompanion
+          ? t("admin.layout.companionSeatTitle", { number: companionOf!.number })
           : t("admin.layout.markAccessibleTitle")
       }
       type="button"
     >
-      {seat.is_accessible ? "♿" : seat.number}
+      {seat.is_accessible ? "♿" : isCompanion ? "AC" : seat.number}
+      {seat.is_accessible && pairedCompanion ? (
+        <span
+          aria-hidden="true"
+          className="absolute -right-1 -top-1 flex h-3 w-3 items-center justify-center rounded-full bg-brand text-[6px] text-white"
+        >
+          🔗
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -122,6 +151,8 @@ function SeatMapPreview({
     );
   }
 
+  const lastRow = rows[rows.length - 1];
+
   return (
     <div
       aria-label={t("admin.layout.mapPreviewA11y")}
@@ -137,6 +168,7 @@ function SeatMapPreview({
           const seats = [...(seatsByRow[row.id] ?? [])].sort(
             (a, b) => a.number - b.number
           );
+          const isLastRow = lastRow?.id === row.id;
 
           if (seats.length === 0) {
             return (
@@ -158,7 +190,10 @@ function SeatMapPreview({
           return (
             <div
               aria-label={t("admin.layout.rowA11y", { row: row.name })}
-              className="flex items-center gap-2"
+              className={cn(
+                "flex items-center gap-2",
+                isLastRow && "px-6"
+              )}
               key={row.id}
               role="group"
             >
@@ -169,18 +204,37 @@ function SeatMapPreview({
                 {row.name}
               </span>
               <div className="flex gap-1">
+                {isLastRow ? (
+                  <>
+                    <div className="flex gap-1 opacity-30">
+                      {[1, 2, 3].map((n) => (
+                        <div
+                          className="flex h-6 w-6 items-center justify-center rounded-[3px] border border-dashed border-white/[0.20] text-[9px] text-white/30"
+                          key={`extra-left-${n}`}
+                        />
+                      ))}
+                    </div>
+                    <div className="w-1" />
+                  </>
+                ) : null}
                 {leftSeats.map((seat) => (
                   <div
                     className={cn(
                       "flex h-6 w-6 items-center justify-center rounded-[3px] text-[9px] font-bold",
                       seat.is_accessible
                         ? "border border-brand/50 bg-brand/20 text-brand"
+                        : allSeats.some((s) => s.companion_seat === seat.id)
+                        ? "border border-brand/30 bg-brand/10 text-brand/60"
                         : "border border-white/[0.20] bg-white/[0.05] text-white/50"
                     )}
                     key={seat.id}
                     title={`${row.name}${seat.number}${seat.is_accessible ? " ♿" : ""}`}
                   >
-                    {seat.is_accessible ? "♿" : seat.number}
+                    {seat.is_accessible
+                      ? "♿"
+                      : allSeats.some((s) => s.companion_seat === seat.id)
+                      ? "AC"
+                      : seat.number}
                   </div>
                 ))}
               </div>
@@ -192,14 +246,33 @@ function SeatMapPreview({
                       "flex h-6 w-6 items-center justify-center rounded-[3px] text-[9px] font-bold",
                       seat.is_accessible
                         ? "border border-brand/50 bg-brand/20 text-brand"
+                        : allSeats.some((s) => s.companion_seat === seat.id)
+                        ? "border border-brand/30 bg-brand/10 text-brand/60"
                         : "border border-white/[0.20] bg-white/[0.05] text-white/50"
                     )}
                     key={seat.id}
                     title={`${row.name}${seat.number}${seat.is_accessible ? " ♿" : ""}`}
                   >
-                    {seat.is_accessible ? "♿" : seat.number}
+                    {seat.is_accessible
+                      ? "♿"
+                      : allSeats.some((s) => s.companion_seat === seat.id)
+                      ? "AC"
+                      : seat.number}
                   </div>
                 ))}
+                {isLastRow ? (
+                  <>
+                    <div className="w-1" />
+                    <div className="flex gap-1 opacity-30">
+                      {[1, 2, 3].map((n) => (
+                        <div
+                          className="flex h-6 w-6 items-center justify-center rounded-[3px] border border-dashed border-white/[0.20] text-[9px] text-white/30"
+                          key={`extra-right-${n}`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                ) : null}
               </div>
               <span
                 aria-hidden="true"
@@ -226,6 +299,108 @@ function SeatMapPreview({
             </span>
             {t("admin.layout.accessible")}
           </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-3.5 w-3.5 rounded-[2px] border border-brand/30 bg-brand/10 text-[8px] text-brand/60">
+              AC
+            </span>
+            {t("admin.layout.companionSeat")}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CompanionPickerDialog({
+  target,
+  onCancel,
+  onPair,
+  onUnpair,
+}: {
+  target: CompanionPairingTarget;
+  onCancel: () => void;
+  onPair: (companionSeatId: string) => void;
+  onUnpair: () => void;
+}) {
+  const { t } = useI18n();
+  const { accessibleSeat, rowSeats } = target;
+
+  const candidates = rowSeats.filter(
+    (s) =>
+      s.id !== accessibleSeat.id &&
+      !s.is_accessible &&
+      s.companion_seat === null
+  );
+
+  const hasCurrent = accessibleSeat.companion_seat !== null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-sm rounded-[12px] border border-white/[0.08] bg-[#1a1a2e] p-6 shadow-2xl">
+        <h2 className="mb-1 text-base font-extrabold text-white">
+          {t("admin.layout.companionPickerTitle")}
+        </h2>
+        <p className="mb-4 text-sm text-white/50">
+          {t("admin.layout.companionPickerDescription", {
+            seat: accessibleSeat.number,
+          })}
+        </p>
+
+        {hasCurrent ? (
+          <div className="mb-4 rounded-[6px] border border-brand/20 bg-brand/5 px-3 py-2 text-xs text-brand">
+            {t("admin.layout.companionCurrentPaired", {
+              companion: rowSeats.find((s) => s.id === accessibleSeat.companion_seat)?.number ?? "?",
+            })}
+          </div>
+        ) : null}
+
+        {candidates.length > 0 ? (
+          <div className="mb-4 grid gap-2">
+            <p className="text-xs font-bold text-white/40 uppercase tracking-wider">
+              {t("admin.layout.companionPickSeats")}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {candidates.map((seat) => (
+                <button
+                  className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-[5px] border",
+                    "text-sm font-bold transition",
+                    "border-white/[0.20] bg-white/[0.05] text-white/70 hover:border-brand hover:bg-brand/20 hover:text-brand"
+                  )}
+                  key={seat.id}
+                  onClick={() => onPair(seat.id)}
+                  type="button"
+                >
+                  {seat.number}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="mb-4 text-sm text-white/40 italic">
+            {t("admin.layout.companionNoEligible")}
+          </p>
+        )}
+
+        <div className="flex justify-end gap-2">
+          {hasCurrent ? (
+            <Button
+              onClick={onUnpair}
+              size="sm"
+              type="button"
+              variant="danger"
+            >
+              {t("admin.layout.companionUnpair")}
+            </Button>
+          ) : null}
+          <Button
+            onClick={onCancel}
+            size="sm"
+            type="button"
+            variant="ghost"
+          >
+            {t("admin.cancel")}
+          </Button>
         </div>
       </div>
     </div>
@@ -235,19 +410,23 @@ function SeatMapPreview({
 function RowEditor({
   row,
   seats,
+  allSeats,
   totalSeats,
   capacity,
   onSeatAdded,
   onSeatUpdated,
   onSeatDelete,
+  onCompanionPair,
 }: {
   row: AdminSeatRow;
   seats: AdminSeat[];
+  allSeats: AdminSeat[];
   totalSeats: number;
   capacity: number;
   onSeatAdded: (seat: AdminSeat) => void;
   onSeatUpdated: (seat: AdminSeat) => void;
   onSeatDelete: (seat: AdminSeat) => void;
+  onCompanionPair: (seat: AdminSeat) => void;
 }) {
   const { t } = useI18n();
   const [isAdding, setIsAdding] = useState(false);
@@ -289,8 +468,11 @@ function RowEditor({
         is_accessible: !seat.is_accessible,
       });
       onSeatUpdated(updated);
+      if (updated.is_accessible) {
+        onCompanionPair(updated);
+      }
     } catch {
-      // silently ignore — the UI will revert since we don't optimistically update
+      // revert on failure — no optimistic update
     } finally {
       setTogglingId(null);
     }
@@ -305,8 +487,15 @@ function RowEditor({
             key={seat.id}
           >
             <SeatPreviewCell
+              allSeats={allSeats}
               disabled={togglingId === seat.id}
-              onClick={() => handleToggleAccessible(seat)}
+              onClick={() => {
+                if (seat.is_accessible) {
+                  onCompanionPair(seat);
+                } else {
+                  void handleToggleAccessible(seat);
+                }
+              }}
               seat={seat}
             />
             <button
@@ -355,6 +544,7 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
   const { t } = useI18n();
   const [state, setState] = useState<LayoutState>({ status: "loading" });
   const [showPreview, setShowPreview] = useState(false);
+  const [showBatchWizard, setShowBatchWizard] = useState(false);
 
   const [newRowName, setNewRowName] = useState("");
   const [isCreatingRow, setIsCreatingRow] = useState(false);
@@ -364,6 +554,9 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const [companionTarget, setCompanionTarget] = useState<CompanionPairingTarget | null>(null);
+  const [isPairingCompanion, setIsPairingCompanion] = useState(false);
 
   const createRowInputRef = useRef<HTMLInputElement>(null);
 
@@ -495,6 +688,62 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
     }
   }
 
+  async function handlePairCompanion(companionSeatId: string) {
+    if (!companionTarget) return;
+    setIsPairingCompanion(true);
+    try {
+      const updated = await adminApi.updateSeat(companionTarget.accessibleSeat.id, {
+        companion_seat: companionSeatId,
+      });
+      setState((prev) => {
+        if (prev.status !== "ready") return prev;
+        const rowId = companionTarget.accessibleSeat.row;
+        return {
+          ...prev,
+          seatsByRow: {
+            ...prev.seatsByRow,
+            [rowId]: (prev.seatsByRow[rowId] ?? []).map((s) =>
+              s.id === updated.id ? updated : s
+            ),
+          },
+        };
+      });
+      setCompanionTarget(null);
+    } catch {
+      // silently ignore
+    } finally {
+      setIsPairingCompanion(false);
+    }
+  }
+
+  async function handleUnpairCompanion() {
+    if (!companionTarget) return;
+    setIsPairingCompanion(true);
+    try {
+      const updated = await adminApi.updateSeat(companionTarget.accessibleSeat.id, {
+        companion_seat: null,
+      });
+      setState((prev) => {
+        if (prev.status !== "ready") return prev;
+        const rowId = companionTarget.accessibleSeat.row;
+        return {
+          ...prev,
+          seatsByRow: {
+            ...prev.seatsByRow,
+            [rowId]: (prev.seatsByRow[rowId] ?? []).map((s) =>
+              s.id === updated.id ? updated : s
+            ),
+          },
+        };
+      });
+      setCompanionTarget(null);
+    } catch {
+      // silently ignore
+    } finally {
+      setIsPairingCompanion(false);
+    }
+  }
+
   function handleSeatAdded(rowId: string, seat: AdminSeat) {
     setState((prev) => {
       if (prev.status !== "ready") return prev;
@@ -555,10 +804,8 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
   }
 
   const { room, rows, seatsByRow } = state;
-  const totalSeats = rows.reduce(
-    (sum, row) => sum + (seatsByRow[row.id]?.length ?? 0),
-    0
-  );
+  const allSeats = rows.flatMap((r) => seatsByRow[r.id] ?? []);
+  const totalSeats = allSeats.length;
   const capacityUsed = Math.round((totalSeats / room.capacity) * 100);
   const isNearCapacity = totalSeats >= room.capacity;
 
@@ -580,6 +827,19 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
 
   return (
     <div className="grid gap-6">
+      {isPairingCompanion && (
+        <div className="fixed inset-0 z-40 bg-black/20" />
+      )}
+
+      {companionTarget ? (
+        <CompanionPickerDialog
+          onCancel={() => setCompanionTarget(null)}
+          onPair={handlePairCompanion}
+          onUnpair={handleUnpairCompanion}
+          target={companionTarget}
+        />
+      ) : null}
+
       <AdminToolbar
         actions={
           <div className="flex items-center gap-2">
@@ -662,18 +922,44 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
           <h2 className="text-sm font-extrabold uppercase tracking-wider text-white/60">
             {t("admin.layout.rows")}
           </h2>
-          <Button
-            onClick={() => {
-              setShowCreateRow(true);
-              setNewRowName("");
-              setCreateRowError(null);
-            }}
-            size="sm"
-            variant="secondary"
-          >
-            {t("admin.layout.addRow")}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => {
+                setShowBatchWizard(true);
+                setShowCreateRow(false);
+              }}
+              size="sm"
+              variant="secondary"
+            >
+              {t("admin.layout.batchCreate")}
+            </Button>
+            <Button
+              onClick={() => {
+                setShowCreateRow(true);
+                setShowBatchWizard(false);
+                setNewRowName("");
+                setCreateRowError(null);
+              }}
+              size="sm"
+              variant="secondary"
+            >
+              {t("admin.layout.addRow")}
+            </Button>
+          </div>
         </div>
+
+        {showBatchWizard ? (
+          <AdminBatchSeatWizard
+            capacity={room.capacity}
+            onCancel={() => setShowBatchWizard(false)}
+            onSuccess={() => {
+              setShowBatchWizard(false);
+              loadLayout();
+            }}
+            roomId={roomId}
+            totalSeats={totalSeats}
+          />
+        ) : null}
 
         {showCreateRow ? (
           <div className="flex flex-col gap-2 rounded-[8px] border border-brand/30 bg-brand/5 p-4">
@@ -738,7 +1024,7 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
           </div>
         ) : null}
 
-        {rows.length === 0 && !showCreateRow ? (
+        {rows.length === 0 && !showCreateRow && !showBatchWizard ? (
           <div className="flex flex-col items-center gap-2 rounded-[8px] border border-dashed border-white/[0.10] py-10 text-center">
             <p className="text-sm font-bold text-white/50">
               {t("admin.layout.noRowsTitle")}
@@ -758,7 +1044,10 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
             >
               <div className="mb-3 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-[5px] bg-white/[0.08] text-sm font-extrabold text-white">
+                  <span className={cn(
+                    "flex h-7 w-7 items-center justify-center rounded-[5px] text-sm font-extrabold text-white",
+                    row.name === "A" ? "bg-brand/30" : "bg-white/[0.08]"
+                  )}>
                     {row.name}
                   </span>
                   <span className="text-xs text-white/40">
@@ -770,6 +1059,11 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
                           : t("admin.layout.seatPlural"),
                     })}
                   </span>
+                  {row.name === "A" ? (
+                    <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-bold text-brand/70">
+                      {t("admin.layout.rowAHint")}
+                    </span>
+                  ) : null}
                 </div>
                 <Button
                   onClick={() => setDeleteTarget({ kind: "row", row })}
@@ -781,7 +1075,15 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
               </div>
 
               <RowEditor
+                allSeats={allSeats}
                 capacity={room.capacity}
+                onCompanionPair={(seat) =>
+                  setCompanionTarget({
+                    accessibleSeat: seat,
+                    rowId: row.id,
+                    rowSeats: seats,
+                  })
+                }
                 onSeatAdded={(seat) => handleSeatAdded(row.id, seat)}
                 onSeatDelete={(seat) =>
                   setDeleteTarget({ kind: "seat", rowName: row.name, seat })

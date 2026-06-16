@@ -112,6 +112,7 @@ const session: CatalogSession = {
 
 const seatMap: SessionSeatMapItem[] = [
   {
+    companion_seat_id: null,
     is_accessible: false,
     lock_expires_at: null,
     number: 7,
@@ -122,6 +123,7 @@ const seatMap: SessionSeatMapItem[] = [
     status: "AVAILABLE",
   },
   {
+    companion_seat_id: null,
     is_accessible: true,
     lock_expires_at: null,
     number: 8,
@@ -132,6 +134,7 @@ const seatMap: SessionSeatMapItem[] = [
     status: "AVAILABLE",
   },
   {
+    companion_seat_id: null,
     is_accessible: false,
     lock_expires_at: null,
     number: 9,

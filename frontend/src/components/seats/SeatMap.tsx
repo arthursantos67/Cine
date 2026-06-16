@@ -234,6 +234,18 @@ export function SeatMapView({
     [currentSeats, reservedSeatsForSession]
   );
 
+  // Maps companion seat_id → its paired accessible SessionSeatMapItem.
+  // Used to auto-select the accessible seat when a companion is clicked.
+  const companionSeatIdToAccessible = useMemo(() => {
+    const map = new Map<string, SessionSeatMapItem>();
+    for (const s of currentSeats) {
+      if (s.is_accessible && s.companion_seat_id) {
+        map.set(s.companion_seat_id, s);
+      }
+    }
+    return map;
+  }, [currentSeats]);
+
   useEffect(() => {
     if (!reservation.expirationNotice) {
       return;
@@ -283,22 +295,61 @@ export function SeatMapView({
       return;
     }
 
+    // If this is a companion seat, auto-select its paired accessible seat too.
+    const pairedAccessible = companionSeatIdToAccessible.get(seat.seat_id);
+    if (pairedAccessible) {
+      const accessibleState = getSeatVisualState(pairedAccessible, selectedSeatIds);
+      if (accessibleState === "available") {
+        guardAction(() => {
+          void reserveSeats([pairedAccessible, seat]);
+        });
+        return;
+      }
+    }
+
+    // If this is an accessible seat with a companion, auto-select companion too.
+    if (seat.is_accessible && seat.companion_seat_id) {
+      const companion = currentSeats.find(
+        (s) => s.seat_id === seat.companion_seat_id
+      );
+      const companionState = companion
+        ? getSeatVisualState(companion, selectedSeatIds)
+        : null;
+      if (companion && companionState === "available") {
+        guardAction(() => {
+          void reserveSeats([seat, companion]);
+        });
+        return;
+      }
+    }
+
     guardAction(() => {
       void reserveSeat(seat);
     });
   }
 
   async function reserveSeat(seat: SessionSeatMapItem) {
+    await reserveSeats([seat]);
+  }
+
+  async function reserveSeats(seatsToReserve: SessionSeatMapItem[]) {
     setErrorMessage(null);
-    setPendingSeatIds((current) => addToSet(current, seat.session_seat_id));
+
+    for (const seat of seatsToReserve) {
+      setPendingSeatIds((current) => addToSet(current, seat.session_seat_id));
+    }
     setCurrentSeats((current) =>
-      markSeatsAsReservedBySeatIds(current, [seat.seat_id])
+      markSeatsAsReservedBySeatIds(
+        current,
+        seatsToReserve.map((s) => s.seat_id)
+      )
     );
 
     try {
-      const response = await reservationApi.reserveSeats(sessionId, [
-        seat.seat_id,
-      ]);
+      const response = await reservationApi.reserveSeats(
+        sessionId,
+        seatsToReserve.map((s) => s.seat_id)
+      );
       const nextSeats = buildReservedSeatsFromReservation(
         response,
         currentSeats,
@@ -316,32 +367,56 @@ export function SeatMapView({
       );
     } catch (error) {
       setCurrentSeats((current) =>
-        restoreSeatSnapshots(current, [seat])
+        restoreSeatSnapshots(current, seatsToReserve)
       );
       setErrorMessage(getSeatInteractionErrorMessage(error, locale, t));
     } finally {
-      setPendingSeatIds((current) =>
-        removeFromSet(current, seat.session_seat_id)
-      );
+      for (const seat of seatsToReserve) {
+        setPendingSeatIds((current) =>
+          removeFromSet(current, seat.session_seat_id)
+        );
+      }
     }
   }
 
   async function releaseSeat(seat: SessionSeatMapItem) {
-    const reservedSeat = reservedSeatsForSession.find(
-      (currentSeat) => currentSeat.sessionSeatId === seat.session_seat_id
-    );
+    const seatsToRelease = [seat];
+
+    // When releasing an accessible seat, also release its companion if selected.
+    if (seat.is_accessible && seat.companion_seat_id) {
+      const companion = currentSeats.find(
+        (s) => s.seat_id === seat.companion_seat_id
+      );
+      if (companion && selectedSeatIds.has(companion.session_seat_id)) {
+        seatsToRelease.push(companion);
+      }
+    }
+
+    const reservedSeats = seatsToRelease
+      .map((s) =>
+        reservedSeatsForSession.find(
+          (r) => r.sessionSeatId === s.session_seat_id
+        )
+      )
+      .filter((r): r is NonNullable<typeof r> => r !== undefined);
 
     setErrorMessage(null);
-    setPendingSeatIds((current) => addToSet(current, seat.session_seat_id));
-    reservation.removeSeat(seat.session_seat_id);
+    for (const s of seatsToRelease) {
+      setPendingSeatIds((current) => addToSet(current, s.session_seat_id));
+      reservation.removeSeat(s.session_seat_id);
+    }
     setCurrentSeats((current) =>
-      markSeatsAsAvailableBySessionSeatIds(current, [seat.session_seat_id])
+      markSeatsAsAvailableBySessionSeatIds(
+        current,
+        seatsToRelease.map((s) => s.session_seat_id)
+      )
     );
 
     try {
-      const response = await reservationApi.releaseReservations(sessionId, [
-        seat.session_seat_id,
-      ]);
+      const response = await reservationApi.releaseReservations(
+        sessionId,
+        seatsToRelease.map((s) => s.session_seat_id)
+      );
       const releasedSessionSeatIds = response.seats.map(
         (responseSeat) => responseSeat.session_seat_id
       );
@@ -351,18 +426,20 @@ export function SeatMapView({
       );
     } catch (error) {
       setCurrentSeats((current) =>
-        restoreSeatSnapshots(current, [seat])
+        restoreSeatSnapshots(current, seatsToRelease)
       );
 
-      if (reservedSeat) {
-        reservation.addSeats([reservedSeat], { sessionId });
+      if (reservedSeats.length > 0) {
+        reservation.addSeats(reservedSeats, { sessionId });
       }
 
       setErrorMessage(getSeatInteractionErrorMessage(error, locale, t));
     } finally {
-      setPendingSeatIds((current) =>
-        removeFromSet(current, seat.session_seat_id)
-      );
+      for (const s of seatsToRelease) {
+        setPendingSeatIds((current) =>
+          removeFromSet(current, s.session_seat_id)
+        );
+      }
     }
   }
 
@@ -459,55 +536,66 @@ export function SeatMapLayout({
           </div>
 
           <div className="seat-map__rows">
-            {layout.rows.map((row) => (
-              <div className="seat-map__row" key={row.rowLabel}>
-                <span
-                  aria-hidden="true"
-                  className="seat-map__row-label"
-                >
-                  {row.rowLabel}
-                </span>
+            {layout.rows.map((row, index) => {
+              const isLastRow = index === layout.rows.length - 1;
+              return (
                 <div
-                  aria-label={t("seats.rowA11y", { row: row.rowLabel })}
-                  className="seat-map__seat-list"
-                  role="group"
+                  className={[
+                    "seat-map__row",
+                    isLastRow ? "seat-map__row--last" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  key={row.rowLabel}
                 >
-                  <div className="seat-map__seat-group seat-map__seat-group--left">
-                    {row.leftSeats.map((seat) =>
-                      renderSeatButton({
-                        displayNumber: seat.displayNumber,
-                        key: seat.seat.session_seat_id,
-                        onSeatToggle,
-                        pendingSeatIds,
-                        seat: seat.seat,
-                        selectedSeatIds,
-                        t,
-                      })
-                    )}
+                  <span
+                    aria-hidden="true"
+                    className="seat-map__row-label"
+                  >
+                    {row.rowLabel}
+                  </span>
+                  <div
+                    aria-label={t("seats.rowA11y", { row: row.rowLabel })}
+                    className="seat-map__seat-list"
+                    role="group"
+                  >
+                    <div className="seat-map__seat-group seat-map__seat-group--left">
+                      {row.leftSeats.map((seat) =>
+                        renderSeatButton({
+                          displayNumber: seat.displayNumber,
+                          key: seat.seat.session_seat_id,
+                          onSeatToggle,
+                          pendingSeatIds,
+                          seat: seat.seat,
+                          selectedSeatIds,
+                          t,
+                        })
+                      )}
+                    </div>
+                    <span aria-hidden="true" className="seat-map__center-aisle" />
+                    <div className="seat-map__seat-group seat-map__seat-group--right">
+                      {row.rightSeats.map((seat) =>
+                        renderSeatButton({
+                          displayNumber: seat.displayNumber,
+                          key: seat.seat.session_seat_id,
+                          onSeatToggle,
+                          pendingSeatIds,
+                          seat: seat.seat,
+                          selectedSeatIds,
+                          t,
+                        })
+                      )}
+                    </div>
                   </div>
-                  <span aria-hidden="true" className="seat-map__center-aisle" />
-                  <div className="seat-map__seat-group seat-map__seat-group--right">
-                    {row.rightSeats.map((seat) =>
-                      renderSeatButton({
-                        displayNumber: seat.displayNumber,
-                        key: seat.seat.session_seat_id,
-                        onSeatToggle,
-                        pendingSeatIds,
-                        seat: seat.seat,
-                        selectedSeatIds,
-                        t,
-                      })
-                    )}
-                  </div>
+                  <span
+                    aria-hidden="true"
+                    className="seat-map__row-label"
+                  >
+                    {row.rowLabel}
+                  </span>
                 </div>
-                <span
-                  aria-hidden="true"
-                  className="seat-map__row-label"
-                >
-                  {row.rowLabel}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="seat-map__back-label">{t("seats.backOfRoom")}</div>
@@ -1000,11 +1088,22 @@ function pairAccessibleSeatsWithCompanions(
   selectedSeatIds: ReadonlySet<string>
 ): SeatMapAccessiblePair[] {
   const usedSeatIds = new Set(selectedSeatIds);
+  const seatBySeatId = new Map(seats.map((s) => [s.seat_id, s]));
 
   return accessibleSeats.map((accessibleSeat) => {
-    const companionSeat =
-      findAdjacentCompanionSeat(accessibleSeat.seat, seats, usedSeatIds) ??
-      findFallbackCompanionSeat(accessibleSeat.seat, seats, usedSeatIds);
+    let companionSeat: SessionSeatMapItem | undefined;
+
+    const explicitCompanionId = accessibleSeat.seat.companion_seat_id;
+    if (explicitCompanionId) {
+      const candidate = seatBySeatId.get(explicitCompanionId);
+      if (candidate && !usedSeatIds.has(candidate.session_seat_id)) {
+        companionSeat = candidate;
+      }
+    } else {
+      companionSeat =
+        findAdjacentCompanionSeat(accessibleSeat.seat, seats, usedSeatIds) ??
+        findFallbackCompanionSeat(accessibleSeat.seat, seats, usedSeatIds);
+    }
 
     if (companionSeat) {
       usedSeatIds.add(companionSeat.session_seat_id);

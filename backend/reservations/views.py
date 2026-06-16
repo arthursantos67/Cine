@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import status
@@ -15,7 +16,7 @@ from rest_framework.response import Response
 from cineprime_api.localization import get_request_locale
 from cineprime_api.throttling import ReservationRateThrottle
 
-from catalog.models import Session
+from catalog.models import Room, Session
 from reservations.exceptions import (
     InvalidSeatSelectionError,
     SeatAlreadyReservedApiException,
@@ -24,6 +25,8 @@ from reservations.exceptions import (
 )
 from reservations.models import Seat, SeatRow, SessionSeat, Ticket
 from reservations.serializers import (
+    BulkLayoutRequestSerializer,
+    BulkLayoutRowResultSerializer,
     CheckoutRequestSerializer,
     CheckoutResponseSerializer,
     SeatRowSerializer,
@@ -307,3 +310,61 @@ class CheckoutView(GenericAPIView):
 
         response_serializer = CheckoutResponseSerializer(checkout_result)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema(tags=["Reservations"], summary="Bulk create seat rows and seats for a room")
+class BulkLayoutView(GenericAPIView):
+    permission_classes = [IsAdminUser]
+    serializer_class = BulkLayoutRequestSerializer
+
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        room_id = serializer.validated_data["room"]
+        rows_data = serializer.validated_data["rows"]
+
+        room = get_object_or_404(Room, pk=room_id)
+
+        validate_room_layout_changes_are_allowed({room.id})
+
+        existing_row_names = set(
+            SeatRow.objects.filter(room=room).values_list("name", flat=True)
+        )
+        conflict_names = [r["name"] for r in rows_data if r["name"] in existing_row_names]
+        if conflict_names:
+            raise ValidationError(
+                {"rows": f"Row(s) already exist in this room: {', '.join(conflict_names)}."}
+            )
+
+        existing_seat_count = Seat.objects.filter(row__room=room).count()
+        new_seat_count = sum(len(r["seats"]) for r in rows_data)
+        if existing_seat_count + new_seat_count > room.capacity:
+            raise ValidationError(
+                {
+                    "rows": (
+                        f"Adding {new_seat_count} seats would exceed room capacity of {room.capacity} "
+                        f"(currently {existing_seat_count} seats registered)."
+                    )
+                }
+            )
+
+        created_rows = []
+        for row_data in rows_data:
+            row = SeatRow(room=room, name=row_data["name"])
+            row.save()
+
+            seats = [
+                Seat(row=row, number=s["number"], is_accessible=s["is_accessible"])
+                for s in row_data["seats"]
+            ]
+            Seat.objects.bulk_create(seats)
+            created_rows.append(row)
+
+        result_rows = (
+            SeatRow.objects.filter(id__in=[r.id for r in created_rows])
+            .prefetch_related("seats")
+        )
+        result_serializer = BulkLayoutRowResultSerializer(result_rows, many=True)
+        return Response(result_serializer.data, status=status.HTTP_201_CREATED)

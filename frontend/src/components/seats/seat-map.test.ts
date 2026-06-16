@@ -33,6 +33,7 @@ function seat(
   const number = overrides.number ?? 1;
 
   return {
+    companion_seat_id: null,
     is_accessible: false,
     number,
     row,

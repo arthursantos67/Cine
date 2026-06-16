@@ -8,7 +8,9 @@ import { ApiError, getApiErrorUserMessage } from "@/api/client";
 import type { AdminRoom, CatalogRoomExperienceType } from "@/types/catalog";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
+import { AdminConfirmDialog } from "@/components/admin/AdminConfirmDialog";
 import { useI18n } from "@/i18n";
+import { SUPPORTED_LOCALES, type Locale } from "@/i18n/locales";
 
 type FieldErrors = Partial<
   Record<keyof AdminRoomWritePayload | "non_field_errors", string>
@@ -118,36 +120,22 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
   const [capacity, setCapacity] = useState(
     room?.capacity ? String(room.capacity) : ""
   );
-  const [experienceType, setExperienceType] = useState<
-    CatalogRoomExperienceType
-  >((room?.experience_type as CatalogRoomExperienceType) ?? "");
+  const [experienceType, setExperienceType] = useState<CatalogRoomExperienceType>(
+    (room?.experience_type as CatalogRoomExperienceType) ?? ""
+  );
   const [displayName, setDisplayName] = useState(room?.display_name ?? "");
+  const [displayNameLocale, setDisplayNameLocale] = useState<Locale>(locale);
   const [description, setDescription] = useState(room?.description ?? "");
-  const [ptDisplayName, setPtDisplayName] = useState(
-    room?.translations?.["pt-BR"]?.display_name ?? ""
-  );
-  const [ptDescription, setPtDescription] = useState(
-    room?.translations?.["pt-BR"]?.description ?? ""
-  );
-  const [englishDisplayName, setEnglishDisplayName] = useState(
-    room?.translations?.["en-US"]?.display_name ?? ""
-  );
-  const [englishDescription, setEnglishDescription] = useState(
-    room?.translations?.["en-US"]?.description ?? ""
-  );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [pendingPayload, setPendingPayload] = useState<AdminRoomWritePayload | null>(null);
 
   const nameId = useId();
   const capacityId = useId();
   const displayNameId = useId();
   const descriptionId = useId();
-  const ptDisplayNameId = useId();
-  const ptDescriptionId = useId();
-  const englishDisplayNameId = useId();
-  const englishDescriptionId = useId();
 
   const experienceOptions = [
     { label: t("domain.roomExperience.standard"), value: "standard" },
@@ -156,29 +144,15 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
     { label: t("domain.roomExperience.imax"), value: "imax" },
   ];
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  const localeSelectClass = [
+    "min-h-[var(--control-height-lg)] rounded-control border border-border bg-surface px-2 py-1.5",
+    "text-sm text-white outline-none transition focus:border-brand focus:shadow-focus",
+  ].join(" ");
+
+  async function submitPayload(payload: AdminRoomWritePayload) {
     setFieldErrors({});
     setGlobalError(null);
     setIsSubmitting(true);
-
-    const payload: AdminRoomWritePayload = {
-      capacity: Number(capacity),
-      description: description || undefined,
-      display_name: displayName || undefined,
-      experience_type: experienceType || undefined,
-      name,
-      translations: {
-        "pt-BR": {
-          description: ptDescription,
-          display_name: ptDisplayName,
-        },
-        "en-US": {
-          description: englishDescription,
-          display_name: englishDisplayName,
-        },
-      },
-    };
 
     try {
       if (isEditing) {
@@ -199,6 +173,26 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const payload: AdminRoomWritePayload = {
+      capacity: Number(capacity),
+      description: description || undefined,
+      display_name: displayName || undefined,
+      experience_type: experienceType || undefined,
+      name,
+      source_language: displayName ? displayNameLocale : undefined,
+    };
+
+    if (isEditing && displayName && displayName !== (room.display_name ?? "")) {
+      setPendingPayload(payload);
+      return;
+    }
+
+    void submitPayload(payload);
   }
 
   return (
@@ -271,14 +265,30 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
         label={t("admin.room.displayName")}
         labelFor={displayNameId}
       >
-        <TextInput
-          disabled={isSubmitting}
-          error={fieldErrors.display_name}
-          id={displayNameId}
-          onChange={(e) => setDisplayName(e.target.value)}
-          placeholder={t("admin.room.displayNamePlaceholder")}
-          value={displayName}
-        />
+        <div className="flex gap-2">
+          <TextInput
+            disabled={isSubmitting}
+            error={fieldErrors.display_name}
+            id={displayNameId}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder={t("admin.room.displayNamePlaceholder")}
+            value={displayName}
+          />
+          <select
+            aria-label={t("admin.room.sourceLanguage")}
+            className={localeSelectClass}
+            disabled={isSubmitting || !displayName}
+            onChange={(e) => setDisplayNameLocale(e.target.value as Locale)}
+            value={displayNameLocale}
+          >
+            {SUPPORTED_LOCALES.map((loc) => (
+              <option key={loc} value={loc}>
+                {t(`language.${loc}`)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="text-[11px] text-white/35">{t("admin.room.autoTranslateHint")}</p>
       </FormField>
 
       <FormField
@@ -296,68 +306,6 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
         />
       </FormField>
 
-      <fieldset className="grid gap-4 rounded-[8px] border border-white/[0.08] p-4">
-        <legend className="px-1 text-sm font-extrabold text-white">
-          {t("admin.room.translations")}
-        </legend>
-        <FormField
-          error={fieldErrors.translations}
-          label={t("admin.room.translationPtDisplayName")}
-          labelFor={ptDisplayNameId}
-        >
-          <TextInput
-            disabled={isSubmitting}
-            error={fieldErrors.translations}
-            id={ptDisplayNameId}
-            onChange={(e) => setPtDisplayName(e.target.value)}
-            placeholder={t("admin.room.displayNamePlaceholder")}
-            value={ptDisplayName}
-          />
-        </FormField>
-        <FormField
-          error={fieldErrors.translations}
-          label={t("admin.room.translationPtDescription")}
-          labelFor={ptDescriptionId}
-        >
-          <Textarea
-            disabled={isSubmitting}
-            error={fieldErrors.translations}
-            id={ptDescriptionId}
-            onChange={(e) => setPtDescription(e.target.value)}
-            placeholder={t("admin.room.descriptionPlaceholder")}
-            value={ptDescription}
-          />
-        </FormField>
-        <FormField
-          error={fieldErrors.translations}
-          label={t("admin.room.translationEnDisplayName")}
-          labelFor={englishDisplayNameId}
-        >
-          <TextInput
-            disabled={isSubmitting}
-            error={fieldErrors.translations}
-            id={englishDisplayNameId}
-            onChange={(e) => setEnglishDisplayName(e.target.value)}
-            placeholder={t("admin.room.translationEnDisplayNamePlaceholder")}
-            value={englishDisplayName}
-          />
-        </FormField>
-        <FormField
-          error={fieldErrors.translations}
-          label={t("admin.room.translationEnDescription")}
-          labelFor={englishDescriptionId}
-        >
-          <Textarea
-            disabled={isSubmitting}
-            error={fieldErrors.translations}
-            id={englishDescriptionId}
-            onChange={(e) => setEnglishDescription(e.target.value)}
-            placeholder={t("admin.room.translationEnDescriptionPlaceholder")}
-            value={englishDescription}
-          />
-        </FormField>
-      </fieldset>
-
       <div className="flex justify-end gap-2 border-t border-white/[0.07] pt-4">
         <Button
           disabled={isSubmitting}
@@ -371,6 +319,20 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
           {isEditing ? t("admin.saveChanges") : t("admin.room.create")}
         </Button>
       </div>
+
+      <AdminConfirmDialog
+        confirmLabel={t("admin.room.retranslateConfirm")}
+        description={t("admin.room.retranslateDescription")}
+        isOpen={pendingPayload !== null}
+        onCancel={() => setPendingPayload(null)}
+        onConfirm={() => {
+          const p = pendingPayload;
+          setPendingPayload(null);
+          if (p) void submitPayload(p);
+        }}
+        title={t("admin.room.retranslateTitle")}
+        tone="default"
+      />
     </form>
   );
 }

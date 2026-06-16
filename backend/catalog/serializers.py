@@ -4,10 +4,14 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from rest_framework import serializers
 
+from cineprime_api.catalog_translation import translate_text
 from cineprime_api.localization import (
+    DEFAULT_LOCALE,
+    SUPPORTED_LOCALES,
     available_translation_locales,
     get_context_locale,
     get_translation_value,
+    normalize_locale,
     normalize_translation_payload,
 )
 from catalog.models import CastMember, Genre, Movie, MovieInterest, Room, RoomTypePricing, Session
@@ -108,6 +112,12 @@ class GenreSummarySerializer(TranslatedCatalogSerializerMixin, serializers.Model
 class RoomSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializer):
     translation_fields = ("display_name", "description")
 
+    source_language = serializers.CharField(
+        required=False,
+        write_only=True,
+        allow_blank=False,
+    )
+
     class Meta:
         model = Room
         fields = [
@@ -118,6 +128,7 @@ class RoomSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializ
             "display_name",
             "description",
             "translations",
+            "source_language",
             "locale",
             "available_locales",
             "base_price",
@@ -133,6 +144,15 @@ class RoomSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializ
             "updated_at",
         ]
 
+    def validate_source_language(self, value):
+        normalized = normalize_locale(value)
+        if normalized is None:
+            supported = ", ".join(SUPPORTED_LOCALES)
+            raise serializers.ValidationError(
+                f"Unsupported locale. Expected one of: {supported}."
+            )
+        return normalized
+
     def validate_capacity(self, value):
         if self.instance is None:
             return value
@@ -145,7 +165,36 @@ class RoomSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializ
 
         return value
 
+    def _apply_display_name_translation(self, validated_data: dict, source_language: str) -> None:
+        input_display_name = validated_data.get("display_name", "")
+        if not input_display_name:
+            return
+
+        translated = translate_text(input_display_name, source_language)
+        if not translated:
+            return
+
+        existing_translations = dict(validated_data.get("translations") or {})
+
+        for loc, text in translated.items():
+            if loc == DEFAULT_LOCALE:
+                if source_language == DEFAULT_LOCALE:
+                    validated_data["display_name"] = text
+            else:
+                locale_entry = dict(existing_translations.get(loc) or {})
+                locale_entry["display_name"] = text
+                existing_translations[loc] = locale_entry
+
+        if source_language != DEFAULT_LOCALE and DEFAULT_LOCALE in translated:
+            validated_data["display_name"] = translated[DEFAULT_LOCALE]
+
+        validated_data["translations"] = existing_translations
+
     def create(self, validated_data):
+        source_language = validated_data.pop("source_language", None)
+        if source_language:
+            self._apply_display_name_translation(validated_data, source_language)
+
         room = Room(**validated_data)
 
         try:
@@ -156,6 +205,10 @@ class RoomSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializ
         return room
 
     def update(self, instance, validated_data):
+        source_language = validated_data.pop("source_language", None)
+        if source_language:
+            self._apply_display_name_translation(validated_data, source_language)
+
         for field, value in validated_data.items():
             setattr(instance, field, value)
 

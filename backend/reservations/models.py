@@ -53,6 +53,13 @@ class Seat(models.Model):
     )
     number = models.PositiveIntegerField()
     is_accessible = models.BooleanField(default=False)
+    companion_seat = models.OneToOneField(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="paired_by",
+    )
 
     class Meta:
         db_table = "reservation_seats"
@@ -87,6 +94,16 @@ class Seat(models.Model):
             raise ValidationError(
                 {"row": ("Room capacity cannot be exceeded by adding another seat.")}
             )
+
+        if self.companion_seat_id:
+            if self.companion_seat_id == self.pk:
+                raise ValidationError(
+                    {"companion_seat": "A seat cannot be its own companion."}
+                )
+            if self.companion_seat.row.room_id != room.pk:
+                raise ValidationError(
+                    {"companion_seat": "Companion seat must belong to the same room."}
+                )
 
     def save(self, *args, **kwargs):
         self.full_clean()

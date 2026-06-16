@@ -94,6 +94,7 @@ def test_session_seat_map_returns_full_seat_map():
             "number": 1,
             "status": "AVAILABLE",
             "is_accessible": False,
+            "companion_seat_id": None,
         },
         {
             "session_seat_id": str(session_seats[1].id),
@@ -102,6 +103,7 @@ def test_session_seat_map_returns_full_seat_map():
             "number": 2,
             "status": "RESERVED",
             "is_accessible": True,
+            "companion_seat_id": None,
         },
         {
             "session_seat_id": str(session_seats[2].id),
@@ -110,6 +112,7 @@ def test_session_seat_map_returns_full_seat_map():
             "number": 1,
             "status": "PURCHASED",
             "is_accessible": False,
+            "companion_seat_id": None,
         },
     ]
     assert "reserved_by_current_user" not in response.data[1]

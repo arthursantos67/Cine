@@ -6,7 +6,7 @@ from django.utils import timezone
 from cineprime_api.localization import DEFAULT_LOCALE, get_translation_value, normalize_locale
 from cineprime_api.logging_context import get_correlation_id
 from reservations.locks import SeatLockManager
-from reservations.models import SessionSeat, SessionSeatStatus, Ticket
+from reservations.models import Seat, SessionSeat, SessionSeatStatus, Ticket
 
 
 class CheckoutError(Exception):
@@ -39,6 +39,9 @@ class CheckoutService:
     EXPIRED_MESSAGE = "One or more selected seats have expired reservations."
     INVALID_STATE_MESSAGE = "One or more selected seats are not available for checkout."
     INVALID_TOTAL_MESSAGE = "Submitted total does not match the computed total."
+    COMPANION_WITHOUT_ACCESSIBLE_MESSAGE = (
+        "Companion seat must be purchased together with its paired accessible seat."
+    )
 
     def __init__(self):
         self.lock_manager = SeatLockManager()
@@ -56,9 +59,10 @@ class CheckoutService:
         now = timezone.now()
 
         session_seats = list(
-            SessionSeat.objects.select_for_update()
+            SessionSeat.objects.select_for_update(of=("self",))
             .select_related(
-                "seat", "seat__row", "session", "session__movie", "session__room"
+                "seat", "seat__row", "seat__companion_seat",
+                "session", "session__movie", "session__room",
             )
             .filter(id__in=ordered_session_seat_ids)
             .order_by("id")
@@ -66,6 +70,8 @@ class CheckoutService:
 
         if len(session_seats) != len(ordered_session_seat_ids):
             raise InvalidSeatSelectionError(self.INVALID_SELECTION_MESSAGE)
+
+        self._validate_companion_seat_rules(session_seats)
 
         purchased_seats = []
         computed_amount_by_session_seat_id = {}
@@ -198,6 +204,20 @@ class CheckoutService:
                 for ticket in tickets
             ],
         }
+
+    def _validate_companion_seat_rules(self, session_seats):
+        checkout_seat_ids = {ss.seat_id for ss in session_seats}
+        companion_seat_ids = set(
+            Seat.objects.filter(companion_seat__in=checkout_seat_ids)
+            .values_list("companion_seat_id", flat=True)
+        )
+        for session_seat in session_seats:
+            seat = session_seat.seat
+            if seat.id in companion_seat_ids:
+                accessible_seat_qs = Seat.objects.filter(companion_seat_id=seat.id)
+                accessible_seat = accessible_seat_qs.first()
+                if accessible_seat and accessible_seat.id not in checkout_seat_ids:
+                    raise InvalidSeatSelectionError(self.COMPANION_WITHOUT_ACCESSIBLE_MESSAGE)
 
     def _release_redis_locks(self, *, session_seats):
         for session_seat in session_seats:

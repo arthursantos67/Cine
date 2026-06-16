@@ -62,14 +62,15 @@ export type CheckoutResponse = {
 };
 
 export type SessionSeatMapItem = {
-  session_seat_id: string;
-  seat_id: string;
-  row: string;
-  number: number;
-  status: SessionSeatStatus;
+  companion_seat_id: string | null;
   is_accessible: boolean;
-  reserved_by_current_user?: boolean;
   lock_expires_at?: string | null;
+  number: number;
+  reserved_by_current_user?: boolean;
+  row: string;
+  seat_id: string;
+  session_seat_id: string;
+  status: SessionSeatStatus;
 };
 
 export type SessionSeatMapResponse = SessionSeatMapItem[];

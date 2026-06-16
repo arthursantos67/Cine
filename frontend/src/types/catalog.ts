@@ -117,6 +117,7 @@ export type AdminSeatRow = {
 };
 
 export type AdminSeat = {
+  companion_seat: string | null;
   id: string;
   is_accessible: boolean;
   number: number;
