@@ -99,8 +99,10 @@ export function AdminGenreList() {
 
   function startEdit(genre: AdminGenre) {
     setEditingId(genre.id);
+    const hasLocaleTranslation = locale === "pt-BR" || !!genre.translations?.[locale]?.name;
+    const effectiveLocale = hasLocaleTranslation ? locale : "pt-BR";
     setEditName(getLocalizedName(genre, locale));
-    setEditLocale(locale);
+    setEditLocale(effectiveLocale);
     setEditError(null);
   }
 

@@ -14,20 +14,31 @@ logger = logging.getLogger(__name__)
 _MYMEMORY_URL = "https://api.mymemory.translated.net/get"
 _REQUEST_TIMEOUT = 5
 _MAX_WORKERS = 4
+_MAX_RETRIES = 2
 
 
 def _translate_one(name: str, source_locale: str, target_locale: str) -> tuple[str, str]:
     params = urllib.parse.urlencode({"q": name, "langpair": f"{source_locale}|{target_locale}"})
     url = f"{_MYMEMORY_URL}?{params}"
 
-    with urllib.request.urlopen(url, timeout=_REQUEST_TIMEOUT) as response:  # noqa: S310
-        data = json.loads(response.read())
+    for attempt in range(_MAX_RETRIES):
+        try:
+            with urllib.request.urlopen(url, timeout=_REQUEST_TIMEOUT) as response:  # noqa: S310 — URL base is constant; user params are URL-encoded
+                data = json.loads(response.read())
 
-    translated = data["responseData"]["translatedText"]
-    if not isinstance(translated, str) or not translated.strip():
-        raise ValueError(f"Empty translation received for {target_locale}")
+            if data.get("responseStatus") == 429:
+                raise ValueError(f"MyMemory daily limit reached for {target_locale}")
 
-    return target_locale, translated.strip()
+            translated = data["responseData"]["translatedText"]
+            if not isinstance(translated, str) or not translated.strip():
+                raise ValueError(f"Empty translation received for {target_locale}")
+
+            return target_locale, translated.strip()
+        except ValueError:
+            raise
+        except Exception:
+            if attempt == _MAX_RETRIES - 1:
+                raise
 
 
 def translate_genre_name(name: str, source_locale: str) -> dict[str, str]:

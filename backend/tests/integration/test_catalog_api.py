@@ -1670,6 +1670,27 @@ class TestGenreAutoTranslation:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
+    def test_update_genre_source_language_without_name_retranslates_existing(
+        self, api_client, genre
+    ):
+        fake = self._mock_translations("Action")
+
+        with unittest.mock.patch(
+            "catalog.serializers.translate_genre_name",
+            return_value=fake,
+        ):
+            response = api_client.patch(
+                f"/api/v1/catalog/genres/{genre.id}/",
+                {"source_language": "en-US"},
+                format="json",
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        genre.refresh_from_db()
+        assert genre.name == "Action_pt"
+        assert genre.translations["fr-FR"]["name"] == "Action_fr"
+        assert "pt-BR" not in genre.translations
+
     def test_genre_list_returns_name_in_requested_locale(self, api_client, genre):
         response = api_client.get(
             "/api/v1/catalog/genres/",

@@ -1,4 +1,5 @@
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
 
 from catalog.models import Genre
 from cineprime_api.genre_translation import translate_genre_name
@@ -35,13 +36,10 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         source_language = normalize_locale(options["source_language"])
         if source_language is None:
-            self.stderr.write(
-                self.style.ERROR(
-                    f"Unsupported locale '{options['source_language']}'. "
-                    f"Expected one of: {', '.join(SUPPORTED_LOCALES)}."
-                )
+            raise CommandError(
+                f"Unsupported locale '{options['source_language']}'. "
+                f"Expected one of: {', '.join(SUPPORTED_LOCALES)}."
             )
-            return
 
         dry_run: bool = options["dry_run"]
         force: bool = options["force"]
@@ -60,6 +58,8 @@ class Command(BaseCommand):
         )
 
         ok = failed = 0
+        genres_to_save: list[tuple[Genre, list[str]]] = []
+
         for genre in genres:
             self.stdout.write(f"  {genre.name!r} ... ", ending="")
             try:
@@ -85,7 +85,7 @@ class Command(BaseCommand):
                 if dry_run:
                     self.stdout.write(self.style.SUCCESS(f"OK → name={genre.name!r}"))
                 else:
-                    genre.save(update_fields=update_fields)
+                    genres_to_save.append((genre, update_fields))
                     self.stdout.write(self.style.SUCCESS("OK"))
 
                 ok += 1
@@ -93,6 +93,11 @@ class Command(BaseCommand):
             except Exception as exc:
                 self.stdout.write(self.style.ERROR(f"ERROR: {exc}"))
                 failed += 1
+
+        if not dry_run and genres_to_save:
+            with transaction.atomic():
+                for genre, update_fields in genres_to_save:
+                    genre.save(update_fields=update_fields)
 
         self.stdout.write("")
         self.stdout.write(f"Done. {ok} translated, {failed} failed.")

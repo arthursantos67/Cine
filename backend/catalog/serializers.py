@@ -98,13 +98,7 @@ class GenreSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSeriali
         read_only_fields = ["id", "locale", "available_locales", "created_at", "updated_at"]
 
     def validate_name(self, value):
-        value = value.strip()
-        qs = Genre.objects.filter(name__iexact=value)
-        if self.instance:
-            qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
-            raise serializers.ValidationError("A genre with this name already exists.")
-        return value
+        return value.strip()
 
     def validate_source_language(self, value):
         normalized = normalize_locale(value)
@@ -115,62 +109,44 @@ class GenreSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSeriali
             )
         return normalized
 
-    def _build_translations(self, name: str, source_locale: str) -> dict:
-        translated = translate_genre_name(name, source_locale)
-        if not translated:
-            return {source_locale: {"name": name}} if source_locale != DEFAULT_LOCALE else {}
-
-        result = {}
-        for locale, translated_name in translated.items():
-            if locale != DEFAULT_LOCALE:
-                result[locale] = {"name": translated_name}
-        return result
+    def _check_name_unique(self, name: str, exclude_pk=None) -> None:
+        qs = Genre.objects.filter(name__iexact=name)
+        if exclude_pk:
+            qs = qs.exclude(pk=exclude_pk)
+        if qs.exists():
+            raise serializers.ValidationError({"name": "A genre with this name already exists."})
 
     def _resolve_primary_name(self, input_name: str, source_locale: str, translated: dict[str, str]) -> str:
         if source_locale == DEFAULT_LOCALE:
             return input_name
         return translated.get(DEFAULT_LOCALE, input_name)
 
+    def _apply_translation(self, validated_data: dict, source_language: str, instance=None) -> None:
+        input_name = validated_data.get("name", instance.name if instance else "")
+        translated = translate_genre_name(input_name, source_language)
+        if translated:
+            validated_data["name"] = self._resolve_primary_name(input_name, source_language, translated)
+            validated_data["translations"] = {
+                loc: {"name": n}
+                for loc, n in translated.items()
+                if loc != DEFAULT_LOCALE
+            }
+        elif source_language != DEFAULT_LOCALE:
+            validated_data["translations"] = {source_language: {"name": input_name}}
+
     def create(self, validated_data):
         source_language = validated_data.pop("source_language", None)
-
         if source_language:
-            input_name = validated_data["name"]
-            translated = translate_genre_name(input_name, source_language)
-
-            if translated:
-                validated_data["name"] = self._resolve_primary_name(
-                    input_name, source_language, translated
-                )
-                validated_data["translations"] = {
-                    loc: {"name": n}
-                    for loc, n in translated.items()
-                    if loc != DEFAULT_LOCALE
-                }
-            elif source_language != DEFAULT_LOCALE:
-                validated_data["translations"] = {source_language: {"name": input_name}}
-
+            self._apply_translation(validated_data, source_language)
+        self._check_name_unique(validated_data["name"])
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
         source_language = validated_data.pop("source_language", None)
-
         if source_language:
-            input_name = validated_data.get("name", instance.name)
-            translated = translate_genre_name(input_name, source_language)
-
-            if translated:
-                validated_data["name"] = self._resolve_primary_name(
-                    input_name, source_language, translated
-                )
-                validated_data["translations"] = {
-                    loc: {"name": n}
-                    for loc, n in translated.items()
-                    if loc != DEFAULT_LOCALE
-                }
-            elif source_language != DEFAULT_LOCALE:
-                validated_data["translations"] = {source_language: {"name": input_name}}
-
+            self._apply_translation(validated_data, source_language, instance)
+        if "name" in validated_data:
+            self._check_name_unique(validated_data["name"], exclude_pk=instance.pk)
         return super().update(instance, validated_data)
 
 
