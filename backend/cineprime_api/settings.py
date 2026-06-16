@@ -456,3 +456,6 @@ LOGGING = {
         "level": LOG_LEVEL,
     },
 }
+
+# Username that cannot be demoted or have permissions revoked via the API.
+PROTECTED_SUPERUSER_USERNAME = os.getenv("PROTECTED_SUPERUSER_USERNAME") or None

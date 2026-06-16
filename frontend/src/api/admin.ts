@@ -101,6 +101,8 @@ export type AdminUser = {
   email: string;
   username: string;
   is_staff: boolean;
+  is_protected: boolean;
+  role: "user" | "staff" | "master";
   created_at: string;
 };
 
@@ -108,6 +110,7 @@ export type AdminPermissionLogEntry = {
   actor: string;
   target: string;
   action: "granted" | "revoked";
+  role?: "staff" | "master" | null;
   created_at: string;
 };
 
@@ -135,10 +138,10 @@ export const adminApi = {
     return response satisfies PaginatedResponse<AdminUser>;
   },
 
-  async grantAdmin(userId: string) {
+  async grantAdmin(userId: string, role: "staff" | "master") {
     const response = await apiRequest<unknown>(
       `${USERS_PATH}${userId}/admin/`,
-      { auth: "required", method: "POST" }
+      { auth: "required", method: "POST", json: { role } }
     );
 
     if (!isAdminUser(response)) {
@@ -731,6 +734,8 @@ function isAdminUser(value: unknown): value is AdminUser {
     typeof value.email === "string" &&
     typeof value.username === "string" &&
     typeof value.is_staff === "boolean" &&
+    typeof value.is_protected === "boolean" &&
+    (value.role === "user" || value.role === "staff" || value.role === "master") &&
     typeof value.created_at === "string"
   );
 }
@@ -741,6 +746,7 @@ function isAdminPermissionLogEntry(value: unknown): value is AdminPermissionLogE
     typeof value.actor === "string" &&
     typeof value.target === "string" &&
     (value.action === "granted" || value.action === "revoked") &&
+    (value.role === "staff" || value.role === "master" || value.role === null || value.role === undefined) &&
     typeof value.created_at === "string"
   );
 }
