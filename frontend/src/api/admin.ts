@@ -12,7 +12,6 @@ import type {
   CatalogRoomExperienceType,
   CatalogRoomTranslations,
   CatalogSessionType,
-  CatalogGenreTranslations,
   MovieStatus,
   RoomTypePricing,
 } from "@/types/catalog";
@@ -47,7 +46,7 @@ export type AdminMovieWritePayload = {
 
 export type AdminGenreWritePayload = {
   name: string;
-  translations?: CatalogGenreTranslations;
+  source_language?: string;
 };
 
 export type AdminRoomWritePayload = {

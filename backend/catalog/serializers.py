@@ -4,11 +4,15 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from rest_framework import serializers
 
+from cineprime_api.genre_translation import translate_genre_name
 from cineprime_api.localization import (
+    DEFAULT_LOCALE,
     available_translation_locales,
     get_context_locale,
     get_translation_value,
+    normalize_locale,
     normalize_translation_payload,
+    SUPPORTED_LOCALES,
 )
 from catalog.models import CastMember, Genre, Movie, MovieInterest, Room, RoomTypePricing, Session
 from reservations.models import SessionSeat, SessionSeatStatus, Seat
@@ -73,12 +77,19 @@ class TranslatedCatalogSerializerMixin(serializers.Serializer):
 class GenreSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializer):
     translation_fields = ("name",)
 
+    source_language = serializers.CharField(
+        required=False,
+        write_only=True,
+        allow_blank=False,
+    )
+
     class Meta:
         model = Genre
         fields = [
             "id",
             "name",
             "translations",
+            "source_language",
             "locale",
             "available_locales",
             "created_at",
@@ -94,6 +105,73 @@ class GenreSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSeriali
         if qs.exists():
             raise serializers.ValidationError("A genre with this name already exists.")
         return value
+
+    def validate_source_language(self, value):
+        normalized = normalize_locale(value)
+        if normalized is None:
+            supported = ", ".join(SUPPORTED_LOCALES)
+            raise serializers.ValidationError(
+                f"Unsupported locale. Expected one of: {supported}."
+            )
+        return normalized
+
+    def _build_translations(self, name: str, source_locale: str) -> dict:
+        translated = translate_genre_name(name, source_locale)
+        if not translated:
+            return {source_locale: {"name": name}} if source_locale != DEFAULT_LOCALE else {}
+
+        result = {}
+        for locale, translated_name in translated.items():
+            if locale != DEFAULT_LOCALE:
+                result[locale] = {"name": translated_name}
+        return result
+
+    def _resolve_primary_name(self, input_name: str, source_locale: str, translated: dict[str, str]) -> str:
+        if source_locale == DEFAULT_LOCALE:
+            return input_name
+        return translated.get(DEFAULT_LOCALE, input_name)
+
+    def create(self, validated_data):
+        source_language = validated_data.pop("source_language", None)
+
+        if source_language:
+            input_name = validated_data["name"]
+            translated = translate_genre_name(input_name, source_language)
+
+            if translated:
+                validated_data["name"] = self._resolve_primary_name(
+                    input_name, source_language, translated
+                )
+                validated_data["translations"] = {
+                    loc: {"name": n}
+                    for loc, n in translated.items()
+                    if loc != DEFAULT_LOCALE
+                }
+            elif source_language != DEFAULT_LOCALE:
+                validated_data["translations"] = {source_language: {"name": input_name}}
+
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        source_language = validated_data.pop("source_language", None)
+
+        if source_language:
+            input_name = validated_data.get("name", instance.name)
+            translated = translate_genre_name(input_name, source_language)
+
+            if translated:
+                validated_data["name"] = self._resolve_primary_name(
+                    input_name, source_language, translated
+                )
+                validated_data["translations"] = {
+                    loc: {"name": n}
+                    for loc, n in translated.items()
+                    if loc != DEFAULT_LOCALE
+                }
+            elif source_language != DEFAULT_LOCALE:
+                validated_data["translations"] = {source_language: {"name": input_name}}
+
+        return super().update(instance, validated_data)
 
 
 class GenreSummarySerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializer):

@@ -1,4 +1,5 @@
 import pytest
+import unittest.mock
 from decimal import Decimal
 from datetime import datetime, timedelta
 from django.conf import settings
@@ -1512,3 +1513,179 @@ class TestCatalogApi:
         second_response = api_client.get("/api/v1/catalog/sessions/")
         assert second_response.status_code == status.HTTP_200_OK
         assert second_response.data["results"][0]["end_time"] == new_end_time
+
+
+@pytest.mark.django_db
+class TestGenreAutoTranslation:
+    """Tests for genre auto-translation via source_language field."""
+
+    @pytest.fixture
+    def admin_user(self):
+        return User.objects.create_user(
+            email="genre-trans-admin@example.com",
+            username="genre_trans_admin",
+            password="StrongPass123",
+            is_staff=True,
+        )
+
+    @pytest.fixture
+    def api_client(self, admin_user):
+        client = APIClient()
+        client.force_authenticate(user=admin_user)
+        return client
+
+    @pytest.fixture
+    def genre(self):
+        return Genre.objects.create(
+            name="Ação",
+            translations={"en-US": {"name": "Action"}, "es-ES": {"name": "Acción"}},
+        )
+
+    def _mock_translations(self, name: str = "Action") -> dict:
+        return {
+            "pt-BR": f"{name}_pt",
+            "en-US": name,
+            "es-ES": f"{name}_es",
+            "fr-FR": f"{name}_fr",
+            "de-DE": f"{name}_de",
+            "it-IT": f"{name}_it",
+            "zh-CN": f"{name}_zh",
+            "ja-JP": f"{name}_ja",
+        }
+
+    def test_create_genre_with_pt_br_source_language_auto_translates(self, api_client):
+        fake_translations = self._mock_translations("Drama")
+
+        with unittest.mock.patch(
+            "catalog.serializers.translate_genre_name",
+            return_value=fake_translations,
+        ):
+            response = api_client.post(
+                "/api/v1/catalog/genres/",
+                {"name": "Drama_pt", "source_language": "pt-BR"},
+                format="json",
+            )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        genre = Genre.objects.get(pk=response.data["id"])
+        assert genre.name == "Drama_pt"
+        assert genre.translations["en-US"]["name"] == "Drama"
+        assert genre.translations["es-ES"]["name"] == "Drama_es"
+        assert "pt-BR" not in genre.translations
+
+    def test_create_genre_with_non_pt_br_source_language_sets_pt_name(self, api_client):
+        fake_translations = self._mock_translations("Action")
+
+        with unittest.mock.patch(
+            "catalog.serializers.translate_genre_name",
+            return_value=fake_translations,
+        ):
+            response = api_client.post(
+                "/api/v1/catalog/genres/",
+                {"name": "Action", "source_language": "en-US"},
+                format="json",
+            )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        genre = Genre.objects.get(pk=response.data["id"])
+        assert genre.name == "Action_pt"
+        assert genre.translations["en-US"]["name"] == "Action"
+        assert "pt-BR" not in genre.translations
+
+    def test_update_genre_with_source_language_replaces_all_translations(
+        self, api_client, genre
+    ):
+        fake_translations = self._mock_translations("Comedy")
+
+        with unittest.mock.patch(
+            "catalog.serializers.translate_genre_name",
+            return_value=fake_translations,
+        ):
+            response = api_client.patch(
+                f"/api/v1/catalog/genres/{genre.id}/",
+                {"name": "Comedy_pt", "source_language": "pt-BR"},
+                format="json",
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        genre.refresh_from_db()
+        assert genre.name == "Comedy_pt"
+        assert genre.translations["en-US"]["name"] == "Comedy"
+        assert genre.translations["fr-FR"]["name"] == "Comedy_fr"
+        assert genre.translations["de-DE"]["name"] == "Comedy_de"
+
+    def test_create_genre_without_source_language_uses_manual_translations(self, api_client):
+        response = api_client.post(
+            "/api/v1/catalog/genres/",
+            {
+                "name": "Terror",
+                "translations": {"en-US": {"name": "Horror"}},
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        genre = Genre.objects.get(pk=response.data["id"])
+        assert genre.name == "Terror"
+        assert genre.translations["en-US"]["name"] == "Horror"
+
+    def test_create_genre_translation_fails_gracefully(self, api_client):
+        with unittest.mock.patch(
+            "catalog.serializers.translate_genre_name",
+            return_value={},
+        ):
+            response = api_client.post(
+                "/api/v1/catalog/genres/",
+                {"name": "Suspense", "source_language": "pt-BR"},
+                format="json",
+            )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        genre = Genre.objects.get(pk=response.data["id"])
+        assert genre.name == "Suspense"
+        assert genre.translations == {}
+
+    def test_create_genre_non_pt_br_source_translation_fails_stores_source(self, api_client):
+        with unittest.mock.patch(
+            "catalog.serializers.translate_genre_name",
+            return_value={},
+        ):
+            response = api_client.post(
+                "/api/v1/catalog/genres/",
+                {"name": "Thriller", "source_language": "en-US"},
+                format="json",
+            )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        genre = Genre.objects.get(pk=response.data["id"])
+        assert genre.name == "Thriller"
+        assert genre.translations == {"en-US": {"name": "Thriller"}}
+
+    def test_create_genre_invalid_source_language_returns_400(self, api_client):
+        response = api_client.post(
+            "/api/v1/catalog/genres/",
+            {"name": "Drama", "source_language": "xx-XX"},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_genre_list_returns_name_in_requested_locale(self, api_client, genre):
+        response = api_client.get(
+            "/api/v1/catalog/genres/",
+            HTTP_ACCEPT_LANGUAGE="en-US",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        result = next(r for r in response.data["results"] if r["id"] == str(genre.id))
+        assert result["name"] == "Action"
+
+    def test_genre_list_falls_back_to_primary_name_when_locale_missing(self, api_client, genre):
+        response = api_client.get(
+            "/api/v1/catalog/genres/",
+            HTTP_ACCEPT_LANGUAGE="ja-JP",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        result = next(r for r in response.data["results"] if r["id"] == str(genre.id))
+        assert result["name"] == "Ação"
