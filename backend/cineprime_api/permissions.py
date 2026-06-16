@@ -7,3 +7,14 @@ class IsAdminUserOrReadOnly(BasePermission):
             return True
 
         return bool(request.user and request.user.is_staff)
+
+
+class IsMasterUser(BasePermission):
+    """Allows access only to master users (is_superuser=True)."""
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.is_superuser
+        )

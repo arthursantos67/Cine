@@ -16,6 +16,7 @@ const user = {
   email: "orlando@gmail.com",
   id: "user-1",
   is_staff: false,
+  role: "user" as const,
   username: "pablo2265",
 };
 
@@ -24,6 +25,7 @@ const adminUser = {
   email: "admin@gmail.com",
   id: "user-admin",
   is_staff: true,
+  role: "staff" as const,
   username: "adminuser",
 };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { adminApi, type AdminPermissionLogEntry, type AdminUser } from "@/api/admin";
 import { Badge } from "@/components/ui/Badge";
@@ -9,12 +9,27 @@ import { AdminConfirmDialog, AdminTable, AdminToolbar } from "@/components/admin
 import type { AdminTableColumn } from "@/components/admin";
 import { useI18n } from "@/i18n";
 
-type PermissionAction = "grant" | "revoke";
+type GrantRole = "staff" | "master";
+type PermissionAction = { kind: "grant"; role: GrantRole } | { kind: "revoke" };
 
 type PendingAction = {
   action: PermissionAction;
   user: AdminUser;
 };
+
+function getAuditLabel(
+  entry: AdminPermissionLogEntry,
+  t: (key: string) => string
+): string {
+  if (entry.action === "granted") {
+    if (entry.role === "master") return t("admin.user.permissionGrantedMaster");
+    if (entry.role === "staff") return t("admin.user.permissionGrantedStaff");
+    return t("admin.user.permissionGranted");
+  }
+  if (entry.role === "master") return t("admin.user.permissionRevokedMaster");
+  if (entry.role === "staff") return t("admin.user.permissionRevokedStaff");
+  return t("admin.user.permissionRevoked");
+}
 
 type AuditPanelProps = {
   logs: AdminPermissionLogEntry[];
@@ -47,9 +62,7 @@ function AuditPanel({ logs, onClose, username }: AuditPanelProps) {
           {logs.map((entry) => (
             <li className="flex flex-wrap items-center gap-2 text-sm" key={`${entry.created_at}-${entry.action}`}>
               <Badge size="sm" tone={entry.action === "granted" ? "success" : "danger"}>
-                {entry.action === "granted"
-                  ? t("admin.user.permissionGranted")
-                  : t("admin.user.permissionRevoked")}
+                {getAuditLabel(entry, t)}
               </Badge>
               <span className="text-white/60">
                 {t("admin.user.byActor", { actor: entry.actor })}
@@ -62,6 +75,32 @@ function AuditPanel({ logs, onClose, username }: AuditPanelProps) {
         </ul>
       )}
     </div>
+  );
+}
+
+function RoleBadge({ role }: { role: AdminUser["role"] }) {
+  const { t } = useI18n();
+
+  if (role === "master") {
+    return (
+      <Badge size="sm" tone="accent">
+        {t("admin.user.roleMaster")}
+      </Badge>
+    );
+  }
+
+  if (role === "staff") {
+    return (
+      <Badge size="sm" tone="brand">
+        {t("admin.user.roleStaff")}
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge size="sm" tone="neutral">
+      {t("admin.user.roleUser")}
+    </Badge>
   );
 }
 
@@ -78,10 +117,10 @@ export function AdminUserList() {
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [isActing, setIsActing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [totalCount, setTotalCount] = useState(0);
   const [auditUser, setAuditUser] = useState<AdminUser | null>(null);
   const [auditLogs, setAuditLogs] = useState<AdminPermissionLogEntry[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
+  const fetchEpochRef = useRef(0);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput), 350);
@@ -89,25 +128,30 @@ export function AdminUserList() {
   }, [searchInput]);
 
   const fetchPage = useCallback(async (pageNum: number, replace: boolean) => {
+    const epoch = ++fetchEpochRef.current;
     if (replace) {
       setLoading(true);
+      setLoadingMore(false);
     } else {
       setLoadingMore(true);
     }
     setErrorMessage(null);
     try {
       const result = await adminApi.listUsers({ page: pageNum, search: search || undefined });
+      if (epoch !== fetchEpochRef.current) return;
       setUsers((prev) => (replace ? result.results : [...prev, ...result.results]));
       setHasMore(result.next !== null);
-      setTotalCount(result.count);
       setPage(pageNum);
     } catch {
+      if (epoch !== fetchEpochRef.current) return;
       setErrorMessage(t("admin.user.loadError"));
     } finally {
-      if (replace) {
-        setLoading(false);
-      } else {
-        setLoadingMore(false);
+      if (epoch === fetchEpochRef.current) {
+        if (replace) {
+          setLoading(false);
+        } else {
+          setLoadingMore(false);
+        }
       }
     }
   }, [search, t]);
@@ -131,9 +175,6 @@ export function AdminUserList() {
     }
   }
 
-  const adminCount = users.filter((u) => u.is_staff).length;
-  const allUsersLoaded = totalCount <= users.length;
-
   function requestAction(user: AdminUser, action: PermissionAction) {
     setActionError(null);
     setPendingAction({ action, user });
@@ -145,22 +186,26 @@ export function AdminUserList() {
     setActionError(null);
     try {
       const updated =
-        pendingAction.action === "grant"
-          ? await adminApi.grantAdmin(pendingAction.user.id)
+        pendingAction.action.kind === "grant"
+          ? await adminApi.grantAdmin(pendingAction.user.id, pendingAction.action.role)
           : await adminApi.revokeAdmin(pendingAction.user.id);
 
       setUsers((prev) =>
-        prev.map((u) => (u.id === updated.id ? { ...u, is_staff: updated.is_staff } : u))
+        prev.map((u) =>
+          u.id === updated.id
+            ? { ...u, is_staff: updated.is_staff, role: updated.role }
+            : u
+        )
       );
       setPendingAction(null);
 
       if (auditUser?.id === updated.id) {
-        openAuditPanel({ ...auditUser, is_staff: updated.is_staff });
+        openAuditPanel({ ...auditUser, is_staff: updated.is_staff, role: updated.role });
       }
     } catch (err: unknown) {
       const msg =
-        err instanceof Error && err.message.includes("last active administrator")
-          ? t("admin.user.lastAdmin")
+        err instanceof Error && err.message.includes("primary admin account")
+          ? t("admin.user.masterProtected")
           : t("admin.user.operationError");
       setActionError(msg);
     } finally {
@@ -181,57 +226,80 @@ export function AdminUserList() {
       label: "E-mail",
     },
     {
-      key: "is_staff",
+      key: "role",
       label: t("admin.user.profile"),
-      render: (row) =>
-        row.is_staff ? (
-          <Badge size="sm" tone="brand">
-            {t("admin.user.roleAdmin")}
-          </Badge>
-        ) : (
-          <Badge size="sm" tone="neutral">
-            {t("admin.user.roleUser")}
-          </Badge>
-        ),
+      render: (row) => <RoleBadge role={(row as AdminUser).role} />,
     },
     {
       key: "actions",
       label: "",
       className: "text-right",
       render: (row) => {
-        const isLastAdmin = row.is_staff && allUsersLoaded && adminCount <= 1;
+        const user = row as AdminUser;
         return (
           <div className="flex items-center justify-end gap-2">
             <button
-              aria-label={t("admin.user.viewAuditFor", { username: row.username })}
+              aria-label={t("admin.user.viewAuditFor", { username: row.username as string })}
               className="text-xs text-white/40 hover:text-white/70 transition"
-              onClick={() => openAuditPanel(row as AdminUser)}
+              onClick={() => openAuditPanel(user)}
               type="button"
             >
               {t("admin.user.auditLabel")}
             </button>
-            {row.is_staff ? (
-              <Button
-                disabled={isLastAdmin}
-                onClick={() => requestAction(row as AdminUser, "revoke")}
-                size="sm"
-                title={
-                  isLastAdmin
-                    ? t("admin.user.lastAdminTitle")
-                    : undefined
-                }
-                variant="danger"
-              >
-                {t("admin.user.revoke")}
-              </Button>
+
+            {user.role === "master" ? (
+              user.is_protected ? null : (
+                <>
+                  <Button
+                    onClick={() => requestAction(user, { kind: "grant", role: "staff" })}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    {t("admin.user.grantStaff")}
+                  </Button>
+                  <Button
+                    onClick={() => requestAction(user, { kind: "revoke" })}
+                    size="sm"
+                    variant="danger"
+                  >
+                    {t("admin.user.revoke")}
+                  </Button>
+                </>
+              )
+            ) : user.role === "staff" ? (
+              <>
+                <Button
+                  onClick={() => requestAction(user, { kind: "grant", role: "master" })}
+                  size="sm"
+                  variant="secondary"
+                >
+                  {t("admin.user.grantMaster")}
+                </Button>
+                <Button
+                  onClick={() => requestAction(user, { kind: "revoke" })}
+                  size="sm"
+                  variant="danger"
+                >
+                  {t("admin.user.revoke")}
+                </Button>
+              </>
             ) : (
-              <Button
-                onClick={() => requestAction(row as AdminUser, "grant")}
-                size="sm"
-                variant="secondary"
-              >
-                {t("admin.user.grant")}
-              </Button>
+              <>
+                <Button
+                  onClick={() => requestAction(user, { kind: "grant", role: "staff" })}
+                  size="sm"
+                  variant="secondary"
+                >
+                  {t("admin.user.grantStaff")}
+                </Button>
+                <Button
+                  onClick={() => requestAction(user, { kind: "grant", role: "master" })}
+                  size="sm"
+                  variant="secondary"
+                >
+                  {t("admin.user.grantMaster")}
+                </Button>
+              </>
             )}
           </div>
         );
@@ -239,15 +307,27 @@ export function AdminUserList() {
     },
   ];
 
-  const confirmTitle =
-    pendingAction?.action === "grant"
-      ? t("admin.user.grantTitle", { username: pendingAction.user.username })
-      : t("admin.user.revokeTitle", { username: pendingAction?.user.username ?? "" });
+  const confirmTitle = pendingAction
+    ? pendingAction.action.kind === "grant"
+      ? pendingAction.action.role === "master"
+        ? t("admin.user.grantMasterTitle", { username: pendingAction.user.username })
+        : t("admin.user.grantStaffTitle", { username: pendingAction.user.username })
+      : t("admin.user.revokeTitle", { username: pendingAction.user.username })
+    : "";
 
-  const confirmDescription =
-    pendingAction?.action === "grant"
-      ? t("admin.user.grantDescription")
-      : t("admin.user.revokeDescription");
+  const confirmDescription = pendingAction
+    ? pendingAction.action.kind === "grant"
+      ? pendingAction.action.role === "master"
+        ? t("admin.user.grantMasterDescription")
+        : t("admin.user.grantStaffDescription")
+      : t("admin.user.revokeDescription")
+    : "";
+
+  const confirmLabel = isActing
+    ? t("admin.user.wait")
+    : pendingAction?.action.kind === "revoke"
+      ? t("admin.user.revoke")
+      : t("admin.user.grantConfirm");
 
   return (
     <div className="grid gap-6">
@@ -299,13 +379,7 @@ export function AdminUserList() {
 
       {pendingAction ? (
         <AdminConfirmDialog
-          confirmLabel={
-            isActing
-              ? t("admin.user.wait")
-              : pendingAction.action === "grant"
-                ? t("admin.user.grantConfirm")
-                : t("admin.user.revoke")
-          }
+          confirmLabel={confirmLabel}
           description={confirmDescription}
           isOpen
           onCancel={() => {
@@ -315,7 +389,7 @@ export function AdminUserList() {
           }}
           onConfirm={confirmAction}
           title={confirmTitle}
-          tone={pendingAction.action === "revoke" ? "danger" : "default"}
+          tone={pendingAction.action.kind === "revoke" ? "danger" : "default"}
         />
       ) : null}
 
