@@ -43,7 +43,7 @@ export function addSeatsToReservation(
 
   for (const seat of seats) {
     nextSeatsById.set(seat.sessionSeatId, seat);
-    nextTicketTypes[seat.sessionSeatId] ??= defaultTicketType;
+    nextTicketTypes[seat.sessionSeatId] ??= seat.isCompanion ? "gratuito" : defaultTicketType;
 
     if (!nextExpiresAt || seat.expiresAt < nextExpiresAt) {
       nextExpiresAt = seat.expiresAt;

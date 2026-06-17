@@ -70,6 +70,7 @@ export type CatalogMovieDetail = CatalogMovie & {
 export type CatalogRoomSummary = {
   base_price?: string;
   capacity: number;
+  max_center_seats_per_row?: number | null;
   description?: string | null;
   display_name?: string | null;
   experience_type?: CatalogRoomExperienceType | null;
@@ -93,6 +94,7 @@ export type CatalogSession = {
 };
 
 export type AdminRoom = CatalogRoomSummary & {
+  accessible_row_index?: number;
   created_at?: string;
   updated_at?: string;
 };
@@ -112,6 +114,7 @@ export type AdminSession = CatalogSession & {
 
 export type AdminSeatRow = {
   id: string;
+  is_accessible_row: boolean;
   name: string;
   room: string;
 };

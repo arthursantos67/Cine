@@ -1,6 +1,6 @@
 export type SessionSeatStatus = "AVAILABLE" | "RESERVED" | "PURCHASED";
 
-export type TicketType = "inteira" | "meia";
+export type TicketType = "inteira" | "meia" | "gratuito";
 
 export type PaymentMethod = "cartao_credito" | "pix";
 
@@ -110,6 +110,7 @@ export type ReservedSeat = {
   row: string;
   number: number;
   isAccessible: boolean;
+  isCompanion: boolean;
   basePrice: number;
   expiresAt: Date;
 };

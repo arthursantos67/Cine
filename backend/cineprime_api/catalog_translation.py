@@ -5,16 +5,17 @@ import logging
 import urllib.error
 import urllib.parse
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError, as_completed
 
 from cineprime_api.localization import SUPPORTED_LOCALES
 
 logger = logging.getLogger(__name__)
 
 _MYMEMORY_URL = "https://api.mymemory.translated.net/get"
-_REQUEST_TIMEOUT = 5
+_REQUEST_TIMEOUT = 3
 _MAX_WORKERS = 4
-_MAX_RETRIES = 2
+_MAX_RETRIES = 1
+_TOTAL_TRANSLATE_TIMEOUT = 5
 
 
 def _translate_one(text: str, source_locale: str, target_locale: str) -> tuple[str, str]:
@@ -58,13 +59,20 @@ def translate_text(text: str, source_locale: str) -> dict[str, str]:
                 executor.submit(_translate_one, text, source_locale, loc): loc
                 for loc in target_locales
             }
-            for future in as_completed(futures):
-                loc = futures[future]
-                try:
-                    locale, translated = future.result()
-                    result[locale] = translated
-                except Exception:
-                    logger.warning("Translation to %s failed for %r", loc, text)
+            try:
+                for future in as_completed(futures, timeout=_TOTAL_TRANSLATE_TIMEOUT):
+                    loc = futures[future]
+                    try:
+                        locale, translated = future.result()
+                        result[locale] = translated
+                    except Exception:
+                        logger.warning("Translation to %s failed for %r", loc, text)
+            except FutureTimeoutError:
+                logger.warning(
+                    "Translation timed out after %ss for %r; partial results returned",
+                    _TOTAL_TRANSLATE_TIMEOUT,
+                    text,
+                )
 
         return result
 

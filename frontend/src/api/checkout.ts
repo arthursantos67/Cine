@@ -89,7 +89,7 @@ function isCheckoutTicketResponse(
 }
 
 function isTicketType(value: unknown): value is TicketType {
-  return value === "inteira" || value === "meia";
+  return value === "inteira" || value === "meia" || value === "gratuito";
 }
 
 function isPaymentMethod(value: unknown): value is PaymentMethod {

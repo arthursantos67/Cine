@@ -20,6 +20,7 @@ export type TicketTypeOption = {
 export type TicketTypeSelectionRow = {
   fullPrice: number;
   halfPrice: number;
+  isCompanion: boolean;
   seat: ReservedSeat;
   seatLabel: string;
   selectedTicketType: TicketType;
@@ -61,12 +62,14 @@ export function buildTicketTypeSelectionRows(
   ticketTypes: Record<string, TicketType>
 ): TicketTypeSelectionRow[] {
   return reservedSeats.map((seat) => {
-    const selectedTicketType =
-      ticketTypes[seat.sessionSeatId] ?? DEFAULT_TICKET_TYPE;
+    const selectedTicketType = seat.isCompanion
+      ? "gratuito"
+      : (ticketTypes[seat.sessionSeatId] ?? DEFAULT_TICKET_TYPE);
 
     return {
       fullPrice: calculateTicketUnitPrice(seat.basePrice, "inteira"),
       halfPrice: calculateTicketUnitPrice(seat.basePrice, "meia"),
+      isCompanion: seat.isCompanion,
       seat,
       seatLabel: formatSeatLabel(seat),
       selectedTicketType,

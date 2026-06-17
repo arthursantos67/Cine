@@ -37,7 +37,7 @@ def validate_room_layout_changes_are_allowed(room_ids):
 class SeatRowSerializer(serializers.ModelSerializer):
     class Meta:
         model = SeatRow
-        fields = ["id", "room", "name"]
+        fields = ["id", "room", "name", "is_accessible_row"]
         read_only_fields = ["id"]
 
     def validate(self, attrs):
@@ -229,7 +229,6 @@ class SessionSeatMapItemSerializer(serializers.ModelSerializer):
 
 class BulkLayoutRowSeatSerializer(serializers.Serializer):
     number = serializers.IntegerField(min_value=1)
-    is_accessible = serializers.BooleanField(default=False)
 
 
 class BulkLayoutRowSerializer(serializers.Serializer):
@@ -271,7 +270,13 @@ class BulkLayoutRowResultSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SeatRow
-        fields = ["id", "room", "name", "seats"]
+        fields = ["id", "room", "name", "is_accessible_row", "seats"]
+
+
+class AccessibleRowRequestSerializer(serializers.Serializer):
+    room = serializers.UUIDField()
+    name = serializers.CharField(max_length=10)
+    accessible_seat_count = serializers.IntegerField(min_value=1, max_value=50)
 
 
 class TemporaryReservationRequestSerializer(serializers.Serializer):

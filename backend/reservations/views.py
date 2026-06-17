@@ -1,4 +1,4 @@
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import status
@@ -25,6 +25,7 @@ from reservations.exceptions import (
 )
 from reservations.models import Seat, SeatRow, SessionSeat, Ticket
 from reservations.serializers import (
+    AccessibleRowRequestSerializer,
     BulkLayoutRequestSerializer,
     BulkLayoutRowResultSerializer,
     CheckoutRequestSerializer,
@@ -312,6 +313,81 @@ class CheckoutView(GenericAPIView):
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
 
+@extend_schema(
+    tags=["Reservations"],
+    summary="Create an accessible priority row with companion seat pairs",
+    description=(
+        "Creates a seat row marked as accessible with N accessible seats and N companion seats, "
+        "each pair linked and interleaved: accessible at 2k-1, companion at 2k."
+    ),
+)
+class AccessibleRowView(GenericAPIView):
+    permission_classes = [IsAdminUser]
+    serializer_class = AccessibleRowRequestSerializer
+
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        room_id = serializer.validated_data["room"]
+        row_name = serializer.validated_data["name"].strip().upper()
+        accessible_count = serializer.validated_data["accessible_seat_count"]
+
+        room = get_object_or_404(Room, pk=room_id)
+
+        validate_room_layout_changes_are_allowed({room.id})
+
+        if SeatRow.objects.filter(room=room, name=row_name).exists():
+            raise ValidationError(
+                {"name": f"Row '{row_name}' already exists in this room."}
+            )
+
+        if SeatRow.objects.filter(room=room, is_accessible_row=True).exists():
+            raise ValidationError(
+                {"name": "This room already has an accessible priority row."}
+            )
+
+        total_new_seats = accessible_count * 2
+        existing_seat_count = Seat.objects.filter(row__room=room).count()
+        if existing_seat_count + total_new_seats > room.capacity:
+            raise ValidationError(
+                {
+                    "accessible_seat_count": (
+                        f"Adding {total_new_seats} seats would exceed room capacity of "
+                        f"{room.capacity} (currently {existing_seat_count} seats)."
+                    )
+                }
+            )
+
+        row = SeatRow(room=room, name=row_name, is_accessible_row=True)
+        try:
+            row.save()
+        except IntegrityError:
+            raise ValidationError({"name": "This room already has an accessible priority row."})
+
+        pairs = [
+            (
+                Seat(row=row, number=2 * i + 1, is_accessible=True),
+                Seat(row=row, number=2 * i + 2, is_accessible=False),
+            )
+            for i in range(accessible_count)
+        ]
+        all_seats = [seat for accessible, companion in pairs for seat in (accessible, companion)]
+        Seat.objects.bulk_create(all_seats)
+
+        for accessible, companion in pairs:
+            Seat.objects.filter(pk=accessible.pk).update(companion_seat=companion)
+
+        result_row = (
+            SeatRow.objects.filter(pk=row.pk)
+            .prefetch_related("seats")
+            .first()
+        )
+        result_serializer = BulkLayoutRowResultSerializer(result_row)
+        return Response(result_serializer.data, status=status.HTTP_201_CREATED)
+
+
 @extend_schema(tags=["Reservations"], summary="Bulk create seat rows and seats for a room")
 class BulkLayoutView(GenericAPIView):
     permission_classes = [IsAdminUser]
@@ -356,7 +432,7 @@ class BulkLayoutView(GenericAPIView):
             row.save()
 
             seats = [
-                Seat(row=row, number=s["number"], is_accessible=s["is_accessible"])
+                Seat(row=row, number=s["number"])
                 for s in row_data["seats"]
             ]
             Seat.objects.bulk_create(seats)

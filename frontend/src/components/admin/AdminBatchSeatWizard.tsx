@@ -2,17 +2,16 @@
 
 import { useState } from "react";
 
-import { adminApi } from "@/api/admin";
+import { adminApi, type AdminBulkLayoutCreatedRow } from "@/api/admin";
 import { ApiError } from "@/api/client";
 import { Button } from "@/components/ui/Button";
-import { cn } from "@/components/ui/classNames";
 import { useI18n } from "@/i18n";
 
 type Step = "configure" | "preview";
 
 type BatchWizardProps = {
   onCancel: () => void;
-  onSuccess: () => void;
+  onSuccess: (createdRows: AdminBulkLayoutCreatedRow[]) => void;
   roomId: string;
   totalSeats: number;
   capacity: number;
@@ -28,7 +27,6 @@ function rowLettersRange(first: string, last: string): string[] {
 }
 
 type RowPreviewEntry = {
-  accessibleSeats: number[];
   name: string;
   seats: number[];
 };
@@ -47,8 +45,6 @@ export function AdminBatchSeatWizard({
   const [lastRow, setLastRow] = useState("E");
   const [seatsPerRow, setSeatsPerRow] = useState("10");
   const [startNumber, setStartNumber] = useState("1");
-  const [accessibleRowsInput, setAccessibleRowsInput] = useState("A");
-  const [accessibleSeatNumbers, setAccessibleSeatNumbers] = useState("1 2");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,19 +52,6 @@ export function AdminBatchSeatWizard({
   const rows = rowLettersRange(firstRow, lastRow);
   const seatCount = Number(seatsPerRow);
   const start = Number(startNumber);
-  const accessibleRows = new Set(
-    accessibleRowsInput
-      .toUpperCase()
-      .split(/[,\s]+/)
-      .map((s) => s.trim())
-      .filter(Boolean)
-  );
-  const accessibleNums = new Set(
-    accessibleSeatNumbers
-      .split(/[,\s]+/)
-      .map((s) => Number(s.trim()))
-      .filter((n) => !isNaN(n) && n > 0)
-  );
 
   const newSeatCount = rows.length * (Number.isFinite(seatCount) && seatCount > 0 ? seatCount : 0);
   const wouldExceedCapacity = totalSeats + newSeatCount > capacity;
@@ -78,10 +61,7 @@ export function AdminBatchSeatWizard({
       { length: Number.isFinite(seatCount) && seatCount > 0 ? seatCount : 0 },
       (_, i) => start + i
     );
-    const accessible = accessibleRows.has(name)
-      ? seats.filter((n) => accessibleNums.has(n))
-      : [];
-    return { accessibleSeats: accessible, name, seats };
+    return { name, seats };
   });
 
   async function handleCreate() {
@@ -90,18 +70,15 @@ export function AdminBatchSeatWizard({
 
     const payload = {
       room: roomId,
-      rows: preview.map(({ name, seats, accessibleSeats }) => ({
+      rows: preview.map(({ name, seats }) => ({
         name,
-        seats: seats.map((number) => ({
-          number,
-          is_accessible: accessibleSeats.includes(number),
-        })),
+        seats: seats.map((number) => ({ number })),
       })),
     };
 
     try {
-      await adminApi.bulkCreateLayout(payload);
-      onSuccess();
+      const createdRows = await adminApi.bulkCreateLayout(payload);
+      onSuccess(createdRows);
     } catch (err) {
       if (err instanceof ApiError) {
         const details = err.details as Record<string, unknown> | null;
@@ -168,23 +145,17 @@ export function AdminBatchSeatWizard({
               </tr>
             </thead>
             <tbody>
-              {preview.map(({ name, seats, accessibleSeats }) => (
+              {preview.map(({ name, seats }) => (
                 <tr className="border-b border-white/[0.05] last:border-0" key={name}>
                   <td className="px-3 py-2 font-bold text-white">{name}</td>
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap gap-1">
                       {seats.map((n) => (
                         <span
-                          className={cn(
-                            "inline-flex h-5 w-5 items-center justify-center rounded-[3px] text-[9px] font-bold",
-                            accessibleSeats.includes(n)
-                              ? "border border-brand/50 bg-brand/20 text-brand"
-                              : "border border-white/[0.20] bg-white/[0.05] text-white/50"
-                          )}
+                          className="inline-flex h-5 w-5 items-center justify-center rounded-[3px] text-[9px] font-bold border border-white/[0.20] bg-white/[0.05] text-white/50"
                           key={n}
-                          title={accessibleSeats.includes(n) ? "♿" : undefined}
                         >
-                          {accessibleSeats.includes(n) ? "♿" : n}
+                          {n}
                         </span>
                       ))}
                     </div>
@@ -290,36 +261,6 @@ export function AdminBatchSeatWizard({
             value={startNumber}
           />
         </div>
-      </div>
-
-      <div className="grid gap-1.5">
-        <label className="text-xs font-bold text-white/60">
-          {t("admin.layout.batchAccessibleRows")}
-        </label>
-        <p className="text-[11px] text-white/35">
-          {t("admin.layout.batchAccessibleRowsHint")}
-        </p>
-        <input
-          className={inputClass}
-          onChange={(e) => setAccessibleRowsInput(e.target.value)}
-          placeholder="A"
-          value={accessibleRowsInput}
-        />
-      </div>
-
-      <div className="grid gap-1.5">
-        <label className="text-xs font-bold text-white/60">
-          {t("admin.layout.batchAccessibleSeats")}
-        </label>
-        <p className="text-[11px] text-white/35">
-          {t("admin.layout.batchAccessibleSeatsHint")}
-        </p>
-        <input
-          className={inputClass}
-          onChange={(e) => setAccessibleSeatNumbers(e.target.value)}
-          placeholder="1 2"
-          value={accessibleSeatNumbers}
-        />
       </div>
 
       {rows.length > 0 && newSeatCount > 0 ? (

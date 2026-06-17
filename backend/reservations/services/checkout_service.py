@@ -211,12 +211,17 @@ class CheckoutService:
             Seat.objects.filter(companion_seat__in=checkout_seat_ids)
             .values_list("companion_seat_id", flat=True)
         )
+        if not companion_seat_ids:
+            return
+
+        accessible_by_companion = {
+            seat.companion_seat_id: seat.id
+            for seat in Seat.objects.filter(companion_seat_id__in=companion_seat_ids)
+        }
         for session_seat in session_seats:
-            seat = session_seat.seat
-            if seat.id in companion_seat_ids:
-                accessible_seat_qs = Seat.objects.filter(companion_seat_id=seat.id)
-                accessible_seat = accessible_seat_qs.first()
-                if accessible_seat and accessible_seat.id not in checkout_seat_ids:
+            if session_seat.seat_id in companion_seat_ids:
+                accessible_id = accessible_by_companion.get(session_seat.seat_id)
+                if accessible_id is not None and accessible_id not in checkout_seat_ids:
                     raise InvalidSeatSelectionError(self.COMPANION_WITHOUT_ACCESSIBLE_MESSAGE)
 
     def _release_redis_locks(self, *, session_seats):

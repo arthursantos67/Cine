@@ -19,7 +19,7 @@ import type {
 type SeatMapLoadState =
   | { status: "error"; errorMessage?: string }
   | { status: "loading" }
-  | { seats: SessionSeatMapItem[]; sessionBasePrice: number; status: "success" };
+  | { maxCenterSeatsPerRow: number | null; seats: SessionSeatMapItem[]; sessionBasePrice: number; status: "success" };
 
 export type SeatMapRow = {
   rowLabel: string;
@@ -39,11 +39,15 @@ export type SeatMapAccessiblePair = {
 export type SeatMapRenderedRow = SeatMapRow & {
   leftSeats: SeatMapDisplaySeat[];
   rightSeats: SeatMapDisplaySeat[];
+  leftNamoradeiras: SeatMapDisplaySeat[];
+  rightNamoradeiras: SeatMapDisplaySeat[];
 };
 
 export type SeatMapLayoutModel = {
   accessibleLeftPairs: SeatMapAccessiblePair[];
   accessibleRightPairs: SeatMapAccessiblePair[];
+  accessibleRowLabel: string | null;
+  maxCenterSeatsPerRow: number | null;
   rows: SeatMapRenderedRow[];
 };
 
@@ -64,6 +68,7 @@ type SeatMapProps = {
 };
 
 type SeatMapViewProps = {
+  maxCenterSeatsPerRow?: number | null;
   sessionBasePrice: number;
   sessionId: string;
   seats: SessionSeatMapItem[];
@@ -71,6 +76,7 @@ type SeatMapViewProps = {
 
 type SeatMapLayoutProps = {
   errorMessage?: string | null;
+  maxCenterSeatsPerRow?: number | null;
   onSeatToggle?: (seat: SessionSeatMapItem) => void;
   pendingSeatIds?: ReadonlySet<string>;
   seats: SessionSeatMapItem[];
@@ -127,6 +133,7 @@ export function SeatMap({ sessionId }: SeatMapProps) {
             sessionBasePrice: Number.isFinite(sessionBasePrice)
               ? sessionBasePrice
               : 0,
+            maxCenterSeatsPerRow: session.room.max_center_seats_per_row ?? null,
             status: "success",
           });
         }
@@ -181,6 +188,7 @@ export function SeatMap({ sessionId }: SeatMapProps) {
 
   return (
     <SeatMapView
+      maxCenterSeatsPerRow={state.maxCenterSeatsPerRow}
       seats={state.seats}
       sessionBasePrice={state.sessionBasePrice}
       sessionId={sessionId.trim()}
@@ -189,6 +197,7 @@ export function SeatMap({ sessionId }: SeatMapProps) {
 }
 
 export function SeatMapView({
+  maxCenterSeatsPerRow,
   seats,
   sessionBasePrice,
   sessionId,
@@ -446,6 +455,7 @@ export function SeatMapView({
   return (
     <SeatMapLayout
       errorMessage={errorMessage}
+      maxCenterSeatsPerRow={maxCenterSeatsPerRow}
       onSeatToggle={toggleSeat}
       pendingSeatIds={pendingSeatIds}
       seats={currentSeats}
@@ -456,13 +466,17 @@ export function SeatMapView({
 
 export function SeatMapLayout({
   errorMessage,
+  maxCenterSeatsPerRow,
   onSeatToggle,
   pendingSeatIds = new Set(),
   seats,
   selectedSeatIds = new Set(),
 }: SeatMapLayoutProps) {
   const { t } = useI18n();
-  const layout = useMemo(() => buildSeatMapLayout(seats), [seats]);
+  const layout = useMemo(
+    () => buildSeatMapLayout(seats, maxCenterSeatsPerRow ?? null),
+    [seats, maxCenterSeatsPerRow]
+  );
 
   if (seats.length === 0) {
     return (
@@ -506,7 +520,9 @@ export function SeatMapLayout({
             className="seat-map__accessible-row"
             role="group"
           >
-            <span aria-hidden="true" className="seat-map__row-label" />
+            <span aria-hidden="true" className="seat-map__row-label">
+              {layout.accessibleRowLabel}
+            </span>
             <div className="seat-map__accessible-list">
               <div className="seat-map__accessible-group seat-map__accessible-group--left">
                 {layout.accessibleLeftPairs.map((pair) =>
@@ -532,20 +548,21 @@ export function SeatMapLayout({
                 )}
               </div>
             </div>
-            <span aria-hidden="true" className="seat-map__row-label" />
+            <span aria-hidden="true" className="seat-map__row-label">
+              {layout.accessibleRowLabel}
+            </span>
           </div>
 
           <div className="seat-map__rows">
             {layout.rows.map((row, index) => {
               const isLastRow = index === layout.rows.length - 1;
+              const hasNamoradeiras =
+                !isLastRow &&
+                (row.leftNamoradeiras.length > 0 || row.rightNamoradeiras.length > 0);
+
               return (
                 <div
-                  className={[
-                    "seat-map__row",
-                    isLastRow ? "seat-map__row--last" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
+                  className="seat-map__row"
                   key={row.rowLabel}
                 >
                   <span
@@ -560,6 +577,20 @@ export function SeatMapLayout({
                     role="group"
                   >
                     <div className="seat-map__seat-group seat-map__seat-group--left">
+                      {hasNamoradeiras && row.leftNamoradeiras.map((seat) =>
+                        renderSeatButton({
+                          displayNumber: seat.displayNumber,
+                          key: seat.seat.session_seat_id,
+                          onSeatToggle,
+                          pendingSeatIds,
+                          seat: seat.seat,
+                          selectedSeatIds,
+                          t,
+                        })
+                      )}
+                      {hasNamoradeiras && (
+                        <span aria-hidden="true" className="block w-5 flex-shrink-0" />
+                      )}
                       {row.leftSeats.map((seat) =>
                         renderSeatButton({
                           displayNumber: seat.displayNumber,
@@ -575,6 +606,20 @@ export function SeatMapLayout({
                     <span aria-hidden="true" className="seat-map__center-aisle" />
                     <div className="seat-map__seat-group seat-map__seat-group--right">
                       {row.rightSeats.map((seat) =>
+                        renderSeatButton({
+                          displayNumber: seat.displayNumber,
+                          key: seat.seat.session_seat_id,
+                          onSeatToggle,
+                          pendingSeatIds,
+                          seat: seat.seat,
+                          selectedSeatIds,
+                          t,
+                        })
+                      )}
+                      {hasNamoradeiras && (
+                        <span aria-hidden="true" className="block w-5 flex-shrink-0" />
+                      )}
+                      {hasNamoradeiras && row.rightNamoradeiras.map((seat) =>
                         renderSeatButton({
                           displayNumber: seat.displayNumber,
                           key: seat.seat.session_seat_id,
@@ -811,7 +856,8 @@ export function groupSeatMapRows(
 }
 
 export function buildSeatMapLayout(
-  seats: SessionSeatMapItem[]
+  seats: SessionSeatMapItem[],
+  maxCenterSeatsPerRow: number | null = null
 ): SeatMapLayoutModel {
   const accessibleSeats = getAccessibleDisplaySeats(seats);
   const accessibleSeatIds = new Set(
@@ -832,14 +878,25 @@ export function buildSeatMapLayout(
   const roomRows = groupSeatMapRows(
     seats.filter((seat) => !reservedFrontSeatIds.has(seat.session_seat_id))
   );
+  const accessibleRowLabel = accessibleSeats[0]?.row ?? null;
+  const lastRowIndex = roomRows.length - 1;
 
   return {
     accessibleLeftPairs: accessiblePairs.slice(0, ACCESSIBLE_SEATS_PER_SIDE),
     accessibleRightPairs: accessiblePairs.slice(ACCESSIBLE_SEATS_PER_SIDE),
-    rows: roomRows.map((row) => ({
-      ...row,
-      ...splitRowSeats(withDisplayNumbers(row.seats)),
-    })),
+    accessibleRowLabel,
+    maxCenterSeatsPerRow,
+    rows: roomRows.map((row, index) => {
+      const isLastRow = index === lastRowIndex;
+      const displaySeats = withDisplayNumbers(row.seats);
+
+      if (!isLastRow && maxCenterSeatsPerRow !== null && displaySeats.length > maxCenterSeatsPerRow) {
+        return { ...row, ...splitRowSeatsWithNamoradeiras(displaySeats, maxCenterSeatsPerRow) };
+      }
+
+      const { leftSeats, rightSeats } = splitRowSeats(displaySeats);
+      return { ...row, leftSeats, rightSeats, leftNamoradeiras: [], rightNamoradeiras: [] };
+    }),
   };
 }
 
@@ -946,6 +1003,11 @@ export function buildReservedSeatsFromReservation(
 ): ReservedSeat[] {
   const expiresAt = new Date(expiresAtValue);
   const seatsBySeatId = new Map(seatMap.map((seat) => [seat.seat_id, seat]));
+  const companionSeatIds = new Set(
+    seatMap
+      .filter((s) => s.is_accessible && s.companion_seat_id)
+      .map((s) => s.companion_seat_id!)
+  );
 
   return response.seats.map((reservedSeat) => {
     const originalSeat = seatsBySeatId.get(reservedSeat.seat_id);
@@ -958,6 +1020,7 @@ export function buildReservedSeatsFromReservation(
       basePrice,
       expiresAt,
       isAccessible: originalSeat.is_accessible,
+      isCompanion: companionSeatIds.has(reservedSeat.seat_id),
       number: reservedSeat.number,
       row: reservedSeat.row,
       seatId: reservedSeat.seat_id,
@@ -1227,6 +1290,23 @@ function splitRowSeats(seats: SeatMapDisplaySeat[]) {
     leftSeats: seats.slice(0, leftSeatCount),
     rightSeats: seats.slice(leftSeatCount),
   };
+}
+
+function splitRowSeatsWithNamoradeiras(
+  seats: SeatMapDisplaySeat[],
+  maxCenter: number
+) {
+  const excess = seats.length - maxCenter;
+  const centerSeats = seats.slice(0, maxCenter);
+  const excessSeats = seats.slice(maxCenter);
+  const rightExcess = Math.floor(excess / 2);
+
+  const rightNamoradeiras = excessSeats.slice(0, rightExcess);
+  const leftNamoradeiras = excessSeats.slice(rightExcess);
+
+  const { leftSeats, rightSeats } = splitRowSeats(centerSeats);
+
+  return { leftNamoradeiras, leftSeats, rightNamoradeiras, rightSeats };
 }
 
 function withDisplayNumbers(

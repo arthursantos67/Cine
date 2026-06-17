@@ -51,7 +51,9 @@ export type AdminGenreWritePayload = {
 };
 
 export type AdminRoomWritePayload = {
+  accessible_row_index?: number;
   capacity: number;
+  max_center_seats_per_row?: number | null;
   description?: string;
   display_name?: string;
   experience_type?: CatalogRoomExperienceType;
@@ -60,8 +62,13 @@ export type AdminRoomWritePayload = {
   translations?: CatalogRoomTranslations;
 };
 
+export type AdminAccessibleRowWritePayload = {
+  room: string;
+  name: string;
+  accessible_seat_count: number;
+};
+
 export type AdminBulkLayoutRowSeat = {
-  is_accessible?: boolean;
   number: number;
 };
 
@@ -73,6 +80,10 @@ export type AdminBulkLayoutRow = {
 export type AdminBulkLayoutPayload = {
   room: string;
   rows: AdminBulkLayoutRow[];
+};
+
+export type AdminBulkLayoutCreatedRow = AdminSeatRow & {
+  seats: AdminSeat[];
 };
 
 export type RoomTypePricingWritePayload = {
@@ -507,12 +518,24 @@ export const adminApi = {
     });
   },
 
-  async bulkCreateLayout(payload: AdminBulkLayoutPayload): Promise<void> {
-    await apiRequest<unknown>("/api/v1/reservation/bulk-create-layout/", {
+  async bulkCreateLayout(payload: AdminBulkLayoutPayload): Promise<AdminBulkLayoutCreatedRow[]> {
+    const response = await apiRequest<unknown[]>("/api/v1/reservation/bulk-create-layout/", {
       auth: "required",
       json: payload,
       method: "POST",
     });
+    return response as AdminBulkLayoutCreatedRow[];
+  },
+
+  async createAccessibleRow(
+    payload: AdminAccessibleRowWritePayload
+  ): Promise<AdminBulkLayoutCreatedRow> {
+    const response = await apiRequest<unknown>("/api/v1/reservation/accessible-row/", {
+      auth: "required",
+      json: payload,
+      method: "POST",
+    });
+    return response as AdminBulkLayoutCreatedRow;
   },
 
   async listSessions(params: ListSessionsParams = {}) {

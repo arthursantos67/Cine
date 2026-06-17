@@ -781,6 +781,7 @@ function cloneRecoverableOrderState(reservedSeats: ReservedSeat[]) {
     basePrice: seat.basePrice,
     expiresAt: seat.expiresAt.toISOString(),
     isAccessible: seat.isAccessible,
+    isCompanion: seat.isCompanion,
     number: seat.number,
     row: seat.row,
     seatId: seat.seatId,

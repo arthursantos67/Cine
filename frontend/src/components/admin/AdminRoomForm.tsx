@@ -120,6 +120,9 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
   const [capacity, setCapacity] = useState(
     room?.capacity ? String(room.capacity) : ""
   );
+  const [maxCenterSeats, setMaxCenterSeats] = useState(
+    room?.max_center_seats_per_row != null ? String(room.max_center_seats_per_row) : ""
+  );
   const [experienceType, setExperienceType] = useState<CatalogRoomExperienceType>(
     (room?.experience_type as CatalogRoomExperienceType) ?? ""
   );
@@ -134,6 +137,7 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
 
   const nameId = useId();
   const capacityId = useId();
+  const maxCenterSeatsId = useId();
   const displayNameId = useId();
   const descriptionId = useId();
 
@@ -180,6 +184,7 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
 
     const payload: AdminRoomWritePayload = {
       capacity: Number(capacity),
+      max_center_seats_per_row: maxCenterSeats && Number(maxCenterSeats) > 0 ? Number(maxCenterSeats) : null,
       description: description || undefined,
       display_name: displayName || undefined,
       experience_type: experienceType || undefined,
@@ -258,6 +263,22 @@ export function AdminRoomForm({ room }: AdminRoomFormProps) {
           value={experienceType}
         />
       </div>
+
+      <FormField
+        hint={t("admin.room.maxCenterSeatsHint")}
+        label={t("admin.room.maxCenterSeats")}
+        labelFor={maxCenterSeatsId}
+      >
+        <TextInput
+          disabled={isSubmitting}
+          id={maxCenterSeatsId}
+          min={1}
+          onChange={(e) => setMaxCenterSeats(e.target.value)}
+          placeholder={t("admin.room.maxCenterSeatsPlaceholder")}
+          type="number"
+          value={maxCenterSeats}
+        />
+      </FormField>
 
       <FormField
         error={fieldErrors.display_name}

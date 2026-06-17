@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -5,6 +6,8 @@ from django.db import transaction
 from rest_framework import serializers
 
 from cineprime_api.catalog_translation import translate_text
+
+logger = logging.getLogger(__name__)
 from cineprime_api.localization import (
     DEFAULT_LOCALE,
     SUPPORTED_LOCALES,
@@ -124,6 +127,8 @@ class RoomSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializ
             "id",
             "name",
             "capacity",
+            "max_center_seats_per_row",
+            "accessible_row_index",
             "experience_type",
             "display_name",
             "description",
@@ -173,6 +178,15 @@ class RoomSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializ
         translated = translate_text(input_display_name, source_language)
         if not translated:
             return
+
+        expected_locales = set(SUPPORTED_LOCALES) - {source_language}
+        missing = expected_locales - set(translated.keys())
+        if missing:
+            logger.warning(
+                "Auto-translation incomplete for display_name %r: missing locales %s",
+                input_display_name,
+                sorted(missing),
+            )
 
         existing_translations = dict(validated_data.get("translations") or {})
 
@@ -229,6 +243,7 @@ class RoomSummarySerializer(TranslatedCatalogSerializerMixin, serializers.ModelS
             "id",
             "name",
             "capacity",
+            "max_center_seats_per_row",
             "experience_type",
             "display_name",
             "description",
