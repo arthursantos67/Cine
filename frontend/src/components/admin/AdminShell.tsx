@@ -19,6 +19,7 @@ import {
   ADMIN_NAV_LINKS,
   isAdminNavItemActive,
 } from "./admin-nav-utils";
+import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n";
 
 export { isAdminNavItemActive } from "./admin-nav-utils";
@@ -69,8 +70,14 @@ type AdminShellProps = {
 export function AdminShell({ children }: AdminShellProps) {
   const pathname = usePathname();
   const { t } = useI18n();
+  const { user } = useAuth();
+  const isMaster = user?.role === "master";
 
-  const navItems = ADMIN_NAV_LINKS.map((item) => (
+  const visibleLinks = ADMIN_NAV_LINKS.filter(
+    (item) => item.href !== "/admin/users" || isMaster
+  );
+
+  const navItems = visibleLinks.map((item) => (
     <AdminNavItem
       active={isAdminNavItemActive(pathname, item.href)}
       href={item.href}

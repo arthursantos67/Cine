@@ -149,10 +149,16 @@ class UserTicketSerializer(serializers.ModelSerializer):
 
 
 class UserListSerializer(serializers.ModelSerializer):
+    role = serializers.CharField(read_only=True)
+    is_protected = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ("id", "email", "username", "is_staff", "created_at")
+        fields = ("id", "email", "username", "is_staff", "role", "is_protected", "created_at")
         read_only_fields = fields
+
+    def get_is_protected(self, obj) -> bool:
+        return obj.is_protected
 
 
 class AdminPermissionLogSerializer(serializers.ModelSerializer):
@@ -161,4 +167,4 @@ class AdminPermissionLogSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AdminPermissionLog
-        fields = ("actor", "target", "action", "created_at")
+        fields = ("actor", "target", "action", "role", "created_at")

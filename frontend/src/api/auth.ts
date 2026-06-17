@@ -28,6 +28,7 @@ export type CurrentUserResponse = {
   email: string;
   id: string;
   is_staff: boolean;
+  role: "user" | "staff" | "master";
   username: string;
 };
 

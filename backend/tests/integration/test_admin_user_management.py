@@ -81,6 +81,7 @@ def test_user_list_returns_expected_fields(admin_user):
     assert "email" in first
     assert "username" in first
     assert "is_staff" in first
+    assert "role" in first
     assert "created_at" in first
 
 
@@ -121,6 +122,21 @@ def test_user_list_empty_search_returns_all(admin_user, regular_user):
 @pytest.mark.django_db
 def test_regular_user_cannot_list_users(regular_user, admin_user):
     client = auth_client(regular_user)
+
+    response = client.get(USERS_LIST_URL)
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
+def test_staff_user_cannot_list_users(db):
+    staff = User.objects.create_user(
+        email="staff@cineprime.local",
+        username="staff",
+        password="StaffPass123!",
+        is_staff=True,
+    )
+    client = auth_client(staff)
 
     response = client.get(USERS_LIST_URL)
 
@@ -193,7 +209,7 @@ def test_unauthenticated_cannot_retrieve_permission_logs(api_client, regular_use
 @pytest.mark.django_db
 def test_permission_logs_ordered_newest_first(admin_user, regular_user, second_admin):
     client_admin = auth_client(admin_user)
-    client_admin.post(f"/api/v1/users/{regular_user.id}/admin/")
+    client_admin.post(f"/api/v1/users/{regular_user.id}/admin/", {"role": "staff"}, format="json")
     client_admin.delete(f"/api/v1/users/{regular_user.id}/admin/")
 
     response = client_admin.get(logs_url(regular_user))

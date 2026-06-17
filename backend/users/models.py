@@ -1,5 +1,6 @@
 import uuid
 
+from django.conf import settings
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
@@ -59,6 +60,19 @@ class User(AbstractBaseUser, PermissionsMixin):
         db_table = "users"
         ordering = ["-created_at"]
 
+    @property
+    def role(self):
+        if self.is_superuser:
+            return "master"
+        if self.is_staff:
+            return "staff"
+        return "user"
+
+    @property
+    def is_protected(self):
+        protected = getattr(settings, "PROTECTED_SUPERUSER_USERNAME", None)
+        return bool(protected and self.username == protected)
+
     def save(self, *args, **kwargs):
         self.email = self.email.strip().lower()
         super().save(*args, **kwargs)
@@ -72,6 +86,10 @@ class AdminPermissionLog(models.Model):
         GRANTED = "granted", "Granted"
         REVOKED = "revoked", "Revoked"
 
+    class Role(models.TextChoices):
+        STAFF = "staff", "Staff"
+        MASTER = "master", "Master"
+
     actor = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -84,6 +102,7 @@ class AdminPermissionLog(models.Model):
         related_name="admin_permission_logs",
     )
     action = models.CharField(max_length=10, choices=Action.choices)
+    role = models.CharField(max_length=10, choices=Role.choices, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

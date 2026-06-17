@@ -17,6 +17,7 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from cineprime_api.permissions import IsMasterUser
 from cineprime_api.throttling import LoginRateThrottle
 from reservations.models import Ticket
 from users.models import AdminPermissionLog, User
@@ -44,6 +45,7 @@ class CurrentUserResponseSerializer(serializers.Serializer):
     username = serializers.CharField()
     created_at = serializers.DateTimeField()
     is_staff = serializers.BooleanField()
+    role = serializers.CharField()
 
 
 @extend_schema_view(
@@ -134,6 +136,7 @@ class CurrentUserView(APIView):
                 "username": request.user.username,
                 "created_at": request.user.created_at,
                 "is_staff": request.user.is_staff,
+                "role": request.user.role,
             },
             status=status.HTTP_200_OK,
         )
@@ -201,58 +204,99 @@ class AdminGrantResponseSerializer(serializers.Serializer):
     email = serializers.EmailField()
     username = serializers.CharField()
     is_staff = serializers.BooleanField()
+    is_protected = serializers.BooleanField()
+    role = serializers.CharField()
+    created_at = serializers.DateTimeField()
+
+
+class RoleGrantBodySerializer(serializers.Serializer):
+    role = serializers.ChoiceField(choices=["staff", "master"], default="staff", required=False)
 
 
 @extend_schema(
     tags=["Admin"],
     responses={
         200: AdminGrantResponseSerializer,
-        400: OpenApiResponse(description="Cannot demote the last active administrator."),
-        403: OpenApiResponse(description="Admin access required."),
+        400: OpenApiResponse(description="Cannot modify your own permissions or the protected admin account."),
+        403: OpenApiResponse(description="Master access required."),
         404: OpenApiResponse(description="User not found."),
     },
 )
 class AdminGrantView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsMasterUser]
 
     @extend_schema(
-        summary="Grant admin permission",
-        description="Promote a user to administrator. Only admins can call this endpoint.",
-        request=None,
+        summary="Grant staff or master permission",
+        description=(
+            "Promote a user to staff or master. "
+            "Only masters can call this endpoint. "
+            "Pass {\"role\": \"master\"} to promote to master; defaults to staff."
+        ),
+        request=RoleGrantBodySerializer,
     )
     def post(self, request, user_id, *args, **kwargs):
         target = self._get_target(user_id)
 
-        if not target.is_staff:
-            target.is_staff = True
-            target.is_superuser = True
-            target.save(update_fields=["is_staff", "is_superuser", "updated_at"])
+        self._check_not_protected(target)
+
+        body = RoleGrantBodySerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        requested_role = body.validated_data["role"]
+
+        grant_master = requested_role == "master"
+
+        already_master = target.is_superuser
+        already_staff = target.is_staff and not target.is_superuser
+
+        # No-op if target already has the exact requested role
+        if grant_master and already_master:
+            return Response(self._serialize(target), status=status.HTTP_200_OK)
+
+        if not grant_master and already_staff:
+            return Response(self._serialize(target), status=status.HTTP_200_OK)
+
+        if not grant_master and already_master:
+            # Downgrade master → staff: revoke superuser, keep is_staff
+            target.is_superuser = False
+            target.save(update_fields=["is_superuser", "updated_at"])
             AdminPermissionLog.objects.create(
                 actor=request.user,
                 target=target,
-                action=AdminPermissionLog.Action.GRANTED,
+                action=AdminPermissionLog.Action.REVOKED,
+                role=AdminPermissionLog.Role.MASTER,
             )
+            return Response(self._serialize(target), status=status.HTTP_200_OK)
+
+        target.is_staff = True
+        target.is_superuser = grant_master
+        target.save(update_fields=["is_staff", "is_superuser", "updated_at"])
+        AdminPermissionLog.objects.create(
+            actor=request.user,
+            target=target,
+            action=AdminPermissionLog.Action.GRANTED,
+            role=AdminPermissionLog.Role.MASTER if grant_master else AdminPermissionLog.Role.STAFF,
+        )
 
         return Response(self._serialize(target), status=status.HTTP_200_OK)
 
     @extend_schema(
         summary="Revoke admin permission",
         description=(
-            "Demote a user from administrator. "
-            "Blocked if the target is the last active administrator."
+            "Fully demote a user (staff or master) back to regular user. "
+            "Blocked only for the protected primary admin account."
         ),
         request=None,
     )
     def delete(self, request, user_id, *args, **kwargs):
         target = self._get_target(user_id)
+        self._check_not_protected(target)
 
-        if target.is_staff:
-            active_admins = User.objects.filter(is_staff=True, is_active=True).count()
-            if active_admins <= 1:
-                raise ValidationError(
-                    "Cannot revoke the last active administrator."
-                )
-
+        if target.is_staff or target.is_superuser:
+            revoked_role = (
+                AdminPermissionLog.Role.MASTER
+                if target.is_superuser
+                else AdminPermissionLog.Role.STAFF
+            )
             target.is_staff = False
             target.is_superuser = False
             target.save(update_fields=["is_staff", "is_superuser", "updated_at"])
@@ -260,6 +304,7 @@ class AdminGrantView(APIView):
                 actor=request.user,
                 target=target,
                 action=AdminPermissionLog.Action.REVOKED,
+                role=revoked_role,
             )
 
         return Response(self._serialize(target), status=status.HTTP_200_OK)
@@ -270,12 +315,21 @@ class AdminGrantView(APIView):
         except (User.DoesNotExist, ValueError):
             raise NotFound("User not found.")
 
+    def _check_not_protected(self, target):
+        if target == self.request.user:
+            raise ValidationError("You cannot modify your own admin permissions.")
+        if target.is_protected:
+            raise ValidationError("Cannot modify the primary admin account.")
+
     def _serialize(self, user):
         return {
             "id": str(user.id),
             "email": user.email,
             "username": user.username,
             "is_staff": user.is_staff,
+            "is_protected": user.is_protected,
+            "role": user.role,
+            "created_at": user.created_at,
         }
 
 
@@ -295,7 +349,7 @@ class AdminGrantView(APIView):
     )
 )
 class UserListView(ListAPIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsMasterUser]
     serializer_class = UserListSerializer
 
     def get_queryset(self):
@@ -321,7 +375,7 @@ class UserListView(ListAPIView):
     )
 )
 class UserPermissionLogsView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsMasterUser]
 
     def get(self, request, user_id, *args, **kwargs):
         try:
