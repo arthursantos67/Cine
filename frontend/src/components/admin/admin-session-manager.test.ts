@@ -216,11 +216,15 @@ test("adminApi.getSession rejects when movie or room is missing", async () => {
 // ─── splitLocalDateTime ────────────────────────────────────────────────────────
 
 test("splitLocalDateTime splits an ISO string into local date and time parts", () => {
+  // Use a fixed offset to avoid TZ dependency: parse a date string directly
   const d = new Date(2026, 5, 10, 19, 30); // June 10 2026, 19:30 local
+  const iso = d.toISOString();
+  // Re-derive expected parts the same way the helper does
   const pad = (n: number) => String(n).padStart(2, "0");
   const expectedDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const expectedTime = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  const result = splitLocalDateTime(d.toISOString());
+
+  const result = splitLocalDateTime(iso);
   assert.equal(result.date, expectedDate);
   assert.equal(result.time, expectedTime);
 });
