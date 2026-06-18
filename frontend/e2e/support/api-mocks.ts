@@ -75,11 +75,11 @@ export function createMockApiState(options: MockOptions = {}) {
   ];
 
   const mockSeatRows: MockSeatRow[] = [
-    { id: "row-a", name: "A", room: "room-1" },
+    { id: "row-a", is_accessible_row: false, name: "A", room: "room-1" },
   ];
   const mockSeats: MockSeat[] = [
-    { id: "seat-a1", is_accessible: false, number: 1, row: "row-a" },
-    { id: "seat-a2", is_accessible: false, number: 2, row: "row-a" },
+    { companion_seat: null, id: "seat-a1", is_accessible: false, number: 1, row: "row-a" },
+    { companion_seat: null, id: "seat-a2", is_accessible: false, number: 2, row: "row-a" },
   ];
 
   return {
@@ -116,11 +116,13 @@ export async function setupMockApi(page: Page, options: MockOptions = {}) {
 
 type MockSeatRow = {
   id: string;
+  is_accessible_row: boolean;
   name: string;
   room: string;
 };
 
 type MockSeat = {
+  companion_seat: string | null;
   id: string;
   is_accessible: boolean;
   number: number;
@@ -279,6 +281,7 @@ async function handleApiRoute(route: Route, state: ApiRouteState) {
       }
     }
     const newSeat: MockSeat = {
+      companion_seat: null,
       id: `seat-${payload.row}-${seatsInRow.length + 1}`,
       is_accessible: payload.is_accessible ?? false,
       number: payload.number,
