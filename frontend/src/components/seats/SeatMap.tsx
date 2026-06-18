@@ -487,7 +487,7 @@ export function SeatMapLayout({
   }
 
   return (
-    <section aria-labelledby="mapa-assentos" className="seat-map-section">
+    <section aria-labelledby="mapa-assentos" className="seat-map-section min-w-0">
       <div className="seat-map-section__header">
         <h2 id="mapa-assentos">{t("seats.title")}</h2>
         <p className="sr-only" id="mapa-assentos-instrucoes">
@@ -506,7 +506,7 @@ export function SeatMapLayout({
       <div
         aria-describedby="mapa-assentos-instrucoes"
         aria-label={t("seats.scrollAreaA11y")}
-        className="seat-map-scroll"
+        className="seat-map-scroll min-w-0"
         tabIndex={0}
       >
         <div
