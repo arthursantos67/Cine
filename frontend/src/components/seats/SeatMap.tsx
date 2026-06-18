@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+
+import { ZoomIn, ZoomOut } from "lucide-react";
 
 import { ApiError, getApiErrorUserMessage } from "@/api/client";
 import { catalogApi } from "@/api/catalog";
@@ -464,6 +466,9 @@ export function SeatMapView({
   );
 }
 
+const ZOOM_FACTOR = 1.15;
+const MAX_ZOOM_STEPS = 4;
+
 export function SeatMapLayout({
   errorMessage,
   maxCenterSeatsPerRow,
@@ -478,6 +483,53 @@ export function SeatMapLayout({
     [seats, maxCenterSeatsPerRow]
   );
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const naturalWidthRef = useRef(0);
+  const [fitZoom, setFitZoom] = useState(1);
+  const [zoomOffset, setZoomOffset] = useState(0);
+
+  const effectiveZoom = fitZoom * Math.pow(ZOOM_FACTOR, zoomOffset);
+  const canZoomIn = zoomOffset < MAX_ZOOM_STEPS;
+  const canZoomOut = zoomOffset > 0;
+
+  useLayoutEffect(() => {
+    const map = mapRef.current;
+    const scroll = scrollRef.current;
+    if (!map || !scroll) return;
+
+    const prevZoom = map.style.zoom;
+    map.style.zoom = "1";
+    const naturalWidth = map.offsetWidth;
+    map.style.zoom = prevZoom;
+    naturalWidthRef.current = naturalWidth;
+
+    if (naturalWidth > 0) {
+      const cs = window.getComputedStyle(scroll);
+      const padding = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+      const available = scroll.clientWidth - padding;
+      setFitZoom(Math.min(1, available / naturalWidth));
+      setZoomOffset(0);
+    }
+  }, [seats.length]);
+
+  useEffect(() => {
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+
+    const ro = new ResizeObserver(() => {
+      const naturalWidth = naturalWidthRef.current;
+      if (naturalWidth > 0) {
+        const cs = window.getComputedStyle(scroll);
+        const padding = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+        const available = scroll.clientWidth - padding;
+        setFitZoom(Math.min(1, available / naturalWidth));
+      }
+    });
+    ro.observe(scroll);
+    return () => ro.disconnect();
+  }, []);
+
   if (seats.length === 0) {
     return (
       <StateMessage title={t("seats.emptyTitle")}>
@@ -488,11 +540,43 @@ export function SeatMapLayout({
 
   return (
     <section aria-labelledby="mapa-assentos" className="seat-map-section min-w-0">
-      <div className="seat-map-section__header">
-        <h2 id="mapa-assentos">{t("seats.title")}</h2>
-        <p className="sr-only" id="mapa-assentos-instrucoes">
-          {t("seats.instructions")}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="seat-map-section__header">
+          <h2 id="mapa-assentos">{t("seats.title")}</h2>
+          <p className="sr-only" id="mapa-assentos-instrucoes">
+            {t("seats.instructions")}
+          </p>
+        </div>
+        <div
+          aria-label={t("seats.zoomControls")}
+          className="flex shrink-0 items-center gap-1"
+          role="group"
+        >
+          <button
+            aria-label={t("seats.zoomOut")}
+            className="inline-flex h-8 w-8 items-center justify-center rounded border border-white/15 bg-white/5 text-text/60 transition hover:bg-white/10 hover:text-text disabled:pointer-events-none disabled:opacity-30"
+            disabled={!canZoomOut}
+            onClick={() => setZoomOffset((o) => Math.max(o - 1, 0))}
+            type="button"
+          >
+            <ZoomOut size={14} />
+          </button>
+          <span
+            aria-hidden="true"
+            className="w-10 text-center text-xs font-bold tabular-nums text-text/50"
+          >
+            {Math.round(effectiveZoom * 100)}%
+          </span>
+          <button
+            aria-label={t("seats.zoomIn")}
+            className="inline-flex h-8 w-8 items-center justify-center rounded border border-white/15 bg-white/5 text-text/60 transition hover:bg-white/10 hover:text-text disabled:pointer-events-none disabled:opacity-30"
+            disabled={!canZoomIn}
+            onClick={() => setZoomOffset((o) => Math.min(o + 1, MAX_ZOOM_STEPS))}
+            type="button"
+          >
+            <ZoomIn size={14} />
+          </button>
+        </div>
       </div>
 
       <SeatMapLegend />
@@ -505,13 +589,17 @@ export function SeatMapLayout({
 
       <div
         aria-describedby="mapa-assentos-instrucoes"
-        aria-label={t("seats.scrollAreaA11y")}
+        aria-label={t("seats.mapContainerA11y")}
         className="seat-map-scroll min-w-0"
+        ref={scrollRef}
+        style={{ overflowX: "hidden" }}
         tabIndex={0}
       >
         <div
           aria-label={t("seats.interactiveMapA11y")}
           className="seat-map"
+          ref={mapRef}
+          style={{ zoom: effectiveZoom }}
         >
           <div className="seat-map__screen">{t("seats.screen")}</div>
 
