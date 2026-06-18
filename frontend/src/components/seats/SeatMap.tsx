@@ -467,7 +467,8 @@ export function SeatMapView({
 }
 
 const ZOOM_FACTOR = 1.15;
-const MAX_ZOOM_STEPS = 4;
+const MAX_ZOOM_STEPS = 8;
+const MIN_DEFAULT_ZOOM = 0.75;
 
 export function SeatMapLayout({
   errorMessage,
@@ -486,8 +487,14 @@ export function SeatMapLayout({
   const scrollRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<HTMLDivElement>(null);
   const naturalWidthRef = useRef(0);
+  const prevEffectiveZoomRef = useRef(1);
+  const hasInitializedZoomRef = useRef(false);
+  const isMouseDownRef = useRef(false);
+  const dragStartRef = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
+
   const [fitZoom, setFitZoom] = useState(1);
   const [zoomOffset, setZoomOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
 
   const effectiveZoom = fitZoom * Math.pow(ZOOM_FACTOR, zoomOffset);
   const canZoomIn = zoomOffset < MAX_ZOOM_STEPS;
@@ -508,8 +515,17 @@ export function SeatMapLayout({
       const cs = window.getComputedStyle(scroll);
       const padding = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
       const available = scroll.clientWidth - padding;
-      setFitZoom(Math.min(1, available / naturalWidth));
-      setZoomOffset(0);
+      const newFitZoom = Math.min(1, available / naturalWidth);
+      const defaultOffset =
+        newFitZoom < MIN_DEFAULT_ZOOM
+          ? Math.min(
+              Math.ceil(Math.log(MIN_DEFAULT_ZOOM / newFitZoom) / Math.log(ZOOM_FACTOR)),
+              MAX_ZOOM_STEPS
+            )
+          : 0;
+      hasInitializedZoomRef.current = false;
+      setFitZoom(newFitZoom);
+      setZoomOffset(defaultOffset);
     }
   }, [seats.length]);
 
@@ -529,6 +545,92 @@ export function SeatMapLayout({
     ro.observe(scroll);
     return () => ro.disconnect();
   }, []);
+
+  // Center viewport on user-initiated zoom (skip on first initialization)
+  useEffect(() => {
+    if (!hasInitializedZoomRef.current) {
+      hasInitializedZoomRef.current = true;
+      prevEffectiveZoomRef.current = effectiveZoom;
+      return;
+    }
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+    const prev = prevEffectiveZoomRef.current;
+    const ratio = effectiveZoom / prev;
+    scroll.scrollLeft = Math.max(
+      0,
+      (scroll.scrollLeft + scroll.clientWidth / 2) * ratio - scroll.clientWidth / 2
+    );
+    scroll.scrollTop = Math.max(
+      0,
+      (scroll.scrollTop + scroll.clientHeight / 2) * ratio - scroll.clientHeight / 2
+    );
+    prevEffectiveZoomRef.current = effectiveZoom;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoomOffset]);
+
+  // Keep prevEffectiveZoomRef in sync for resize-induced zoom changes
+  useEffect(() => {
+    prevEffectiveZoomRef.current = effectiveZoom;
+  });
+
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    isMouseDownRef.current = true;
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+    dragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      scrollLeft: scroll.scrollLeft,
+      scrollTop: scroll.scrollTop,
+    };
+  }, []);
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!isMouseDownRef.current) return;
+      const scroll = scrollRef.current;
+      if (!scroll) return;
+      const dx = e.clientX - dragStartRef.current.x;
+      const dy = e.clientY - dragStartRef.current.y;
+      if (!isDragging && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) setIsDragging(true);
+      scroll.scrollLeft = dragStartRef.current.scrollLeft - dx;
+      scroll.scrollTop = dragStartRef.current.scrollTop - dy;
+    },
+    [isDragging]
+  );
+
+  const stopDragging = useCallback(() => {
+    isMouseDownRef.current = false;
+    setIsDragging(false);
+  }, []);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+    isMouseDownRef.current = true;
+    dragStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      scrollLeft: scroll.scrollLeft,
+      scrollTop: scroll.scrollTop,
+    };
+  }, []);
+
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent<HTMLDivElement>) => {
+      if (!isMouseDownRef.current || e.touches.length !== 1) return;
+      const scroll = scrollRef.current;
+      if (!scroll) return;
+      const touch = e.touches[0];
+      scroll.scrollLeft = dragStartRef.current.scrollLeft - (touch.clientX - dragStartRef.current.x);
+      scroll.scrollTop = dragStartRef.current.scrollTop - (touch.clientY - dragStartRef.current.y);
+    },
+    []
+  );
 
   if (seats.length === 0) {
     return (
@@ -590,9 +692,19 @@ export function SeatMapLayout({
       <div
         aria-describedby="mapa-assentos-instrucoes"
         aria-label={t("seats.mapContainerA11y")}
-        className="seat-map-scroll min-w-0"
+        className={[
+          "seat-map-scroll min-w-0 [&::-webkit-scrollbar]:hidden",
+          isDragging ? "cursor-grabbing select-none" : "cursor-grab",
+        ].join(" ")}
+        onMouseDown={handleMouseDown}
+        onMouseLeave={stopDragging}
+        onMouseMove={handleMouseMove}
+        onMouseUp={stopDragging}
+        onTouchEnd={stopDragging}
+        onTouchMove={handleTouchMove}
+        onTouchStart={handleTouchStart}
         ref={scrollRef}
-        style={{ overflowX: "hidden" }}
+        style={{ overflow: "scroll", scrollbarWidth: "none" }}
         tabIndex={0}
       >
         <div
