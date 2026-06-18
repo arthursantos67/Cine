@@ -225,6 +225,7 @@ async function handleApiRoute(route: Route, state: ApiRouteState) {
     const payload = request.postDataJSON() as { name: string; room: string };
     const newRow: MockSeatRow = {
       id: `row-${payload.name.toLowerCase()}`,
+      is_accessible_row: false,
       name: payload.name,
       room: payload.room,
     };
