@@ -203,7 +203,7 @@ function PreviewRow({
 
   const leftPad = maxLeftNam - leftNam.length;
   const rightPad = maxRightNam - rightNam.length;
-  const hasAnyNam = !isLast && !isAccessible && (maxLeftNam > 0 || maxRightNam > 0);
+  const hasAnyNam = !isLast && (maxLeftNam > 0 || maxRightNam > 0);
 
   const halfIndex = Math.ceil(centerSeats.length / 2);
   const leftCenter = centerSeats.slice(0, halfIndex);
@@ -267,7 +267,7 @@ function PreviewRow({
           ) : null}
           {leftCenter.map((seat) => <SeatCell allSeats={allSeats} key={seat.id} rowName={row.name} seat={seat} />)}
         </div>
-        <div className="w-3 flex-shrink-0" />
+        <div className="w-5 flex-shrink-0" />
         <div className="flex gap-1">
           {rightCenter.map((seat) => <SeatCell allSeats={allSeats} key={seat.id} rowName={row.name} seat={seat} />)}
           {isLast ? (

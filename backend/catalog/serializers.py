@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -296,6 +297,7 @@ class RoomSummarySerializer(TranslatedCatalogSerializerMixin, serializers.ModelS
             "name",
             "capacity",
             "max_center_seats_per_row",
+            "accessible_row_index",
             "experience_type",
             "display_name",
             "description",
@@ -491,6 +493,27 @@ class SessionWriteSerializer(serializers.ModelSerializer):
                             for field in changed_protected_fields
                         }
                     )
+
+        movie = attrs.get("movie") or (self.instance.movie if self.instance else None)
+        start_time = attrs.get("start_time") or (
+            self.instance.start_time if self.instance else None
+        )
+        end_time = attrs.get("end_time") or (
+            self.instance.end_time if self.instance else None
+        )
+
+        if movie and start_time and end_time:
+            min_end = start_time + timedelta(minutes=movie.duration_minutes)
+            tolerance = timedelta(minutes=5)
+            if end_time < min_end - tolerance:
+                raise serializers.ValidationError(
+                    {
+                        "end_time": (
+                            f"End time must be at least {movie.duration_minutes} minutes after start time "
+                            f"(movie runtime). Minimum end time: {min_end.isoformat()}."
+                        )
+                    }
+                )
 
         return attrs
 

@@ -68,6 +68,7 @@ export type CatalogMovieDetail = CatalogMovie & {
 };
 
 export type CatalogRoomSummary = {
+  accessible_row_index?: number | null;
   base_price?: string;
   capacity: number;
   max_center_seats_per_row?: number | null;

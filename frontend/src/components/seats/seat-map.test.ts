@@ -35,6 +35,7 @@ function seat(
   return {
     companion_seat_id: null,
     is_accessible: false,
+    is_accessible_row: false,
     number,
     row,
     seat_id: `seat-${row}-${number}`,
