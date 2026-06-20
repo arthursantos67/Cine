@@ -251,27 +251,37 @@ function MovieDetailSuccess({
 
   return (
     <div className="movie-detail">
-      <div className="movie-detail__poster-frame">
-        {movie.poster_url ? (
-          <ResponsiveImage
-            alt={t("movie.posterAlt", { title: movie.title })}
-            className="movie-detail__poster"
-            height={720}
-            priority
-            src={movie.poster_url}
-            sizes="(max-width: 820px) 100vw, 340px"
-            unoptimized
-            width={480}
-          />
-        ) : (
-          <div
-            aria-label={t("movie.posterUnavailableAlt", { title: movie.title })}
-            className="movie-detail__poster-placeholder"
-            role="img"
-          >
-            {t("movie.posterUnavailable")}
-          </div>
-        )}
+      {/* Left column: poster + reviews stacked so reviews sit directly below the poster */}
+      <div className="flex flex-col gap-4 max-[820px]:[grid-row:span_3]">
+        <div className="movie-detail__poster-frame">
+          {movie.poster_url ? (
+            <ResponsiveImage
+              alt={t("movie.posterAlt", { title: movie.title })}
+              className="movie-detail__poster"
+              height={720}
+              priority
+              src={movie.poster_url}
+              sizes="(max-width: 820px) 100vw, 340px"
+              unoptimized
+              width={480}
+            />
+          ) : (
+            <div
+              aria-label={t("movie.posterUnavailableAlt", { title: movie.title })}
+              className="movie-detail__poster-placeholder"
+              role="img"
+            >
+              {t("movie.posterUnavailable")}
+            </div>
+          )}
+        </div>
+
+        <MovieReviewsPanel
+          currentUserId={currentUserId}
+          isAdmin={isAdmin}
+          isAuthenticated={isAuthenticated}
+          movie={movie}
+        />
       </div>
 
       <article className="movie-detail__content">
@@ -326,15 +336,6 @@ function MovieDetailSuccess({
           <MovieSessionSelector movieId={movie.id} />
         )}
       </article>
-
-      <div className="max-[820px]:col-span-full border-t border-white/10 pt-[18px] self-start">
-        <MovieReviewsPanel
-          currentUserId={currentUserId}
-          isAdmin={isAdmin}
-          isAuthenticated={isAuthenticated}
-          movie={movie}
-        />
-      </div>
     </div>
   );
 }
