@@ -10,6 +10,7 @@ from rest_framework.generics import (
     RetrieveUpdateDestroyAPIView,
     RetrieveDestroyAPIView,
 )
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
@@ -61,11 +62,23 @@ from reservations.services.release_service import (
 )
 
 
+class AdminLayoutPagination(PageNumberPagination):
+    page_size = 500
+
+
 @extend_schema(tags=["Reservations"], summary="List or create seat rows")
 class SeatRowListCreateView(ListCreateAPIView):
     queryset = SeatRow.objects.select_related("room").all()
     serializer_class = SeatRowSerializer
     permission_classes = [IsAdminUser]
+    pagination_class = AdminLayoutPagination
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        room_id = self.request.query_params.get("room")
+        if room_id:
+            qs = qs.filter(room_id=room_id)
+        return qs
 
 
 @extend_schema(tags=["Reservations"], summary="Get, update or delete seat row")
@@ -84,6 +97,14 @@ class SeatListCreateView(ListCreateAPIView):
     queryset = Seat.objects.select_related("row", "row__room").all()
     serializer_class = SeatSerializer
     permission_classes = [IsAdminUser]
+    pagination_class = AdminLayoutPagination
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        room_id = self.request.query_params.get("room")
+        if room_id:
+            qs = qs.filter(row__room_id=room_id)
+        return qs
 
 
 @extend_schema(tags=["Reservations"], summary="Get, update or delete seat")

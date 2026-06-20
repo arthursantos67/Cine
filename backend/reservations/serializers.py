@@ -178,6 +178,9 @@ class SessionSeatMapItemSerializer(serializers.ModelSerializer):
     is_accessible = serializers.BooleanField(
         source="seat.is_accessible", read_only=True
     )
+    is_accessible_row = serializers.BooleanField(
+        source="seat.row.is_accessible_row", read_only=True
+    )
     companion_seat_id = serializers.UUIDField(
         source="seat.companion_seat_id", read_only=True, allow_null=True
     )
@@ -193,6 +196,7 @@ class SessionSeatMapItemSerializer(serializers.ModelSerializer):
             "number",
             "status",
             "is_accessible",
+            "is_accessible_row",
             "companion_seat_id",
             "reserved_by_current_user",
             "lock_expires_at",
