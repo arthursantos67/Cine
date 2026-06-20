@@ -6,8 +6,10 @@ import {
   addMinutesToLocalDateTime,
   combineLocalDateTime,
   extractSessionFieldErrors,
+  getSessionPriceMultiplier,
+  isConflictError,
   splitLocalDateTime,
-} from "./AdminSessionForm";
+} from "./session-utils";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -216,11 +218,16 @@ test("adminApi.getSession rejects when movie or room is missing", async () => {
 // ─── splitLocalDateTime ────────────────────────────────────────────────────────
 
 test("splitLocalDateTime splits an ISO string into local date and time parts", () => {
+  // Both sides use local-time arithmetic (Date constructor + getFullYear/getMonth/...),
+  // so they cancel out — the result is TZ-stable without any fixed-offset trick.
   const d = new Date(2026, 5, 10, 19, 30); // June 10 2026, 19:30 local
+  const iso = d.toISOString();
+  // Re-derive expected parts the same way the helper does
   const pad = (n: number) => String(n).padStart(2, "0");
   const expectedDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const expectedTime = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  const result = splitLocalDateTime(d.toISOString());
+
+  const result = splitLocalDateTime(iso);
   assert.equal(result.date, expectedDate);
   assert.equal(result.time, expectedTime);
 });
@@ -257,4 +264,79 @@ test("addMinutesToLocalDateTime handles zero-minute addition", () => {
   const result = addMinutesToLocalDateTime("2026-06-10", "15:00", 0);
   assert.equal(result.date, "2026-06-10");
   assert.equal(result.time, "15:00");
+});
+
+// ─── auto end-time pipeline ───────────────────────────────────────────────────
+
+test("auto end-time: 120-min movie at 19:30 produces 21:30 end, same day", () => {
+  const { date, time } = addMinutesToLocalDateTime("2026-07-01", "19:30", 120);
+  const endIso = combineLocalDateTime(date, time);
+  const recovered = splitLocalDateTime(endIso);
+  assert.equal(recovered.date, "2026-07-01");
+  assert.equal(recovered.time, "21:30");
+});
+
+test("auto end-time: midnight overflow submits next-day ISO correctly", () => {
+  const { date, time } = addMinutesToLocalDateTime("2026-07-01", "23:00", 90);
+  const endIso = combineLocalDateTime(date, time);
+  const recovered = splitLocalDateTime(endIso);
+  assert.equal(recovered.date, "2026-07-02");
+  assert.equal(recovered.time, "00:30");
+});
+
+// ─── isConflictError ─────────────────────────────────────────────────────────
+
+test("isConflictError returns true for 409 status", () => {
+  assert.equal(
+    isConflictError(new ApiError("Conflict", 409, { code: "CONFLICT", details: null })),
+    true
+  );
+});
+
+test("isConflictError returns true for 400 with overlap keyword", () => {
+  assert.equal(
+    isConflictError(new ApiError("Session overlap detected", 400, { code: "VALIDATION_FAILED", details: null })),
+    true
+  );
+});
+
+test("isConflictError returns true for 400 with Portuguese conflict phrase", () => {
+  assert.equal(
+    isConflictError(new ApiError("Conflito de horário com outra sessão já existe.", 400, { code: "VALIDATION_FAILED", details: null })),
+    true
+  );
+});
+
+test("isConflictError returns false for generic 400 validation error", () => {
+  assert.equal(
+    isConflictError(new ApiError("Validation failed", 400, { code: "VALIDATION_FAILED", details: null })),
+    false
+  );
+});
+
+test("isConflictError returns false for non-ApiError", () => {
+  assert.equal(isConflictError(new Error("network error")), false);
+  assert.equal(isConflictError(null), false);
+});
+
+// ─── getSessionPriceMultiplier ───────────────────────────────────────────────
+
+test("getSessionPriceMultiplier returns 1.0 on a weekday (Wednesday)", () => {
+  // 2026-07-01 is a Wednesday
+  assert.equal(getSessionPriceMultiplier("2026-07-01", "19:30"), 1.0);
+});
+
+test("getSessionPriceMultiplier returns 1.24 on Friday", () => {
+  // 2026-07-03 is a Friday
+  assert.equal(getSessionPriceMultiplier("2026-07-03", "19:30"), 1.24);
+});
+
+test("getSessionPriceMultiplier returns 1.24 on Saturday", () => {
+  // 2026-07-04 is a Saturday
+  assert.equal(getSessionPriceMultiplier("2026-07-04", "19:30"), 1.24);
+});
+
+test("getSessionPriceMultiplier returns 1.24 on Sunday", () => {
+  // 2026-07-05 is a Sunday
+  assert.equal(getSessionPriceMultiplier("2026-07-05", "19:30"), 1.24);
 });
