@@ -55,6 +55,7 @@ export type CatalogMovie = {
   id: string;
   is_featured: boolean;
   poster_url: string;
+  spotlight_url?: string | null;
   release_date?: string | null;
   status: MovieStatus;
   title: string;

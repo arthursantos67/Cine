@@ -63,6 +63,7 @@ class Movie(models.Model):
     duration_minutes = models.PositiveIntegerField()
     release_date = models.DateField()
     poster_url = models.URLField(max_length=500)
+    spotlight_url = models.URLField(max_length=500, null=True, blank=True)
     status = models.CharField(
         max_length=20,
         choices=MovieStatus.choices,

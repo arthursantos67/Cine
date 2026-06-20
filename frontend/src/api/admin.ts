@@ -37,6 +37,7 @@ export type AdminMovieWritePayload = {
   genres: string[];
   is_featured?: boolean;
   poster_url: string;
+  spotlight_url?: string | null;
   release_date: string;
   status: MovieStatus;
   synopsis: string;
