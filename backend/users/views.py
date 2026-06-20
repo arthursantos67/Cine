@@ -33,7 +33,11 @@ from users.serializers import (
 class HasActiveTickets(APIException):
     status_code = 409
     default_code = "HAS_ACTIVE_TICKETS"
-    default_detail = {"ticket_count": 0}
+    default_detail = "User has active tickets."
+
+    def __init__(self, ticket_count=0):
+        super().__init__()
+        self.ticket_count = ticket_count
 
 
 class OnlyMasterAdmin(APIException):
@@ -224,7 +228,7 @@ class CurrentUserView(APIView):
         ticket_count = Ticket.objects.filter(user=user).count()
 
         if ticket_count > 0 and not confirm:
-            raise HasActiveTickets({"ticket_count": ticket_count})
+            raise HasActiveTickets(ticket_count=ticket_count)
 
         if successor is not None:
             successor.is_protected_master = True
@@ -559,7 +563,7 @@ class UserDeleteView(APIView):
         ticket_count = Ticket.objects.filter(user=user).count()
 
         if ticket_count > 0 and not confirm:
-            raise HasActiveTickets({"ticket_count": ticket_count})
+            raise HasActiveTickets(ticket_count=ticket_count)
 
         _delete_user_cascade(user)
         return Response(status=status.HTTP_204_NO_CONTENT)

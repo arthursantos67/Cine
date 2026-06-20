@@ -58,11 +58,14 @@ def regular_user(db):
 
 @pytest.fixture
 def protected_master(db):
-    return User.objects.create_superuser(
+    user = User.objects.create_superuser(
         email="santos008@cineprime.local",
         username="santos008",
         password=MASTER_PASSWORD,
     )
+    user.is_protected_master = True
+    user.save(update_fields=["is_protected_master", "updated_at"])
+    return user
 
 
 def auth_client(user):
