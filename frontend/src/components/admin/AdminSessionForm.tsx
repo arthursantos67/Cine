@@ -29,11 +29,12 @@ const WEEKEND_DAYS = new Set([0, 5, 6]); // Sun, Fri, Sat
 
 function computeSessionPricePreview(
   roomBasePrice: string,
+  startDate: string,
   startTime: string,
   formatCurrency: (value: number) => string
 ): string | null {
-  if (!roomBasePrice || !startTime) return null;
-  const day = new Date(startTime).getUTCDay();
+  if (!roomBasePrice || !startDate || !startTime) return null;
+  const day = new Date(`${startDate}T${startTime}`).getDay();
   const multiplier = WEEKEND_DAYS.has(day) ? 1.24 : 1.0;
   return formatCurrency(Number(roomBasePrice) * multiplier);
 }
@@ -123,20 +124,67 @@ function isProtected(session?: AdminSession): boolean {
   return Boolean(session?.has_reservations || session?.has_purchases);
 }
 
+export function splitLocalDateTime(isoString: string): {
+  date: string;
+  time: string;
+} {
+  const d = new Date(isoString);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return {
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+  };
+}
+
+export function combineLocalDateTime(date: string, time: string): string {
+  return new Date(`${date}T${time}`).toISOString();
+}
+
+export function addMinutesToLocalDateTime(
+  date: string,
+  time: string,
+  minutes: number
+): { date: string; time: string } {
+  const base = new Date(`${date}T${time}`);
+  const result = new Date(base.getTime() + minutes * 60_000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return {
+    date: `${result.getFullYear()}-${pad(result.getMonth() + 1)}-${pad(result.getDate())}`,
+    time: `${pad(result.getHours())}:${pad(result.getMinutes())}`,
+  };
+}
+
+function getUserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return "";
+  }
+}
+
 export function AdminSessionForm({ session }: AdminSessionFormProps) {
   const router = useRouter();
   const { formatCurrency, locale, t } = useI18n();
   const isEditing = session !== undefined;
   const locked = isProtected(session);
 
+  const initTimes = session
+    ? {
+        startDate: splitLocalDateTime(session.start_time).date,
+        startTime: splitLocalDateTime(session.start_time).time,
+        endDate: splitLocalDateTime(session.end_time).date,
+        endTime: splitLocalDateTime(session.end_time).time,
+      }
+    : { startDate: "", startTime: "", endDate: "", endTime: "" };
+
   const [movieId, setMovieId] = useState(session?.movie.id ?? "");
   const [roomId, setRoomId] = useState(session?.room.id ?? "");
-  const [startTime, setStartTime] = useState(
-    session ? toLocalDateTimeInput(session.start_time) : ""
-  );
-  const [endTime, setEndTime] = useState(
-    session ? toLocalDateTimeInput(session.end_time) : ""
-  );
+  const [startDate, setStartDate] = useState(initTimes.startDate);
+  const [startTime, setStartTime] = useState(initTimes.startTime);
+  const [endDate, setEndDate] = useState(initTimes.endDate);
+  const [endTime, setEndTime] = useState(initTimes.endTime);
+  const [isEndAutoCalc, setIsEndAutoCalc] = useState(!isEditing);
+
   const [audioFormat, setAudioFormat] = useState<CatalogAudioFormat>(
     (session?.audio_format as CatalogAudioFormat) ?? ""
   );
@@ -159,8 +207,12 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
 
   const movieSelectId = useId();
   const roomSelectId = useId();
+  const startDateId = useId();
   const startTimeId = useId();
+  const endDateId = useId();
   const endTimeId = useId();
+
+  const userTz = getUserTimezone();
 
   const audioFormatOptions = [
     { label: t("domain.audio.original"), value: "original" },
@@ -190,6 +242,19 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
       .finally(() => setLoadingOptions(false));
   }, [t]);
 
+  useEffect(() => {
+    if (!isEndAutoCalc || !startDate || !startTime || !movieId) return;
+    const movie = movies.find((m) => m.id === movieId);
+    if (!movie) return;
+    const computed = addMinutesToLocalDateTime(
+      startDate,
+      startTime,
+      movie.duration_minutes
+    );
+    setEndDate(computed.date);
+    setEndTime(computed.time);
+  }, [isEndAutoCalc, startDate, startTime, movieId, movies]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFieldErrors({});
@@ -199,12 +264,12 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
 
     const payload: AdminSessionWritePayload = {
       audio_format: audioFormat || undefined,
-      end_time: toISOString(endTime),
+      end_time: combineLocalDateTime(endDate, endTime),
       movie: movieId,
       projection_format: projectionFormat || undefined,
       room: roomId,
       session_type: sessionType || undefined,
-      start_time: toISOString(startTime),
+      start_time: combineLocalDateTime(startDate, startTime),
     };
 
     try {
@@ -244,6 +309,9 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
   }));
 
   const formDisabled = isSubmitting || loadingOptions;
+
+  const selectedMovie = movies.find((m) => m.id === movieId);
+  const canAutoCalc = Boolean(selectedMovie && startDate && startTime);
 
   return (
     <form className="grid max-w-2xl gap-6" onSubmit={handleSubmit}>
@@ -331,47 +399,156 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
         value={roomId}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FormField
-          error={fieldErrors.start_time}
-          hint={t("admin.session.startHint")}
-          label={t("admin.session.start")}
-          labelFor={startTimeId}
-        >
-          <TextInput
-            disabled={formDisabled || locked}
+      {/* Start time */}
+      <div className="grid gap-1.5">
+        <span className="text-sm font-extrabold text-white">
+          {t("admin.session.start")}
+        </span>
+        {userTz ? (
+          <p className="text-xs text-white/40">
+            {t("admin.session.timezoneHint", { tz: userTz })}
+          </p>
+        ) : null}
+        <div className="grid grid-cols-[1fr_auto] gap-2">
+          <FormField
             error={fieldErrors.start_time}
-            id={startTimeId}
-            onChange={(e) => setStartTime(e.target.value)}
-            required
-            type="datetime-local"
-            value={startTime}
-          />
-        </FormField>
+            label={t("admin.session.datePart")}
+            labelFor={startDateId}
+          >
+            <TextInput
+              disabled={formDisabled || locked}
+              error={fieldErrors.start_time}
+              id={startDateId}
+              onChange={(e) => setStartDate(e.target.value)}
+              required
+              type="date"
+              value={startDate}
+            />
+          </FormField>
+          <FormField
+            error={fieldErrors.start_time}
+            label={t("admin.session.timePart")}
+            labelFor={startTimeId}
+          >
+            <TextInput
+              className="w-28"
+              disabled={formDisabled || locked}
+              error={fieldErrors.start_time}
+              id={startTimeId}
+              onChange={(e) => setStartTime(e.target.value)}
+              required
+              type="time"
+              value={startTime}
+            />
+          </FormField>
+        </div>
+        {fieldErrors.start_time ? (
+          <p className="text-sm font-bold text-error" role="alert">
+            {fieldErrors.start_time}
+          </p>
+        ) : null}
+      </div>
 
-        <FormField
-          error={fieldErrors.end_time}
-          hint={t("admin.session.endHint")}
-          label={t("admin.session.end")}
-          labelFor={endTimeId}
-        >
-          <TextInput
-            disabled={formDisabled || locked}
-            error={fieldErrors.end_time}
-            id={endTimeId}
-            onChange={(e) => setEndTime(e.target.value)}
-            required
-            type="datetime-local"
-            value={endTime}
-          />
-        </FormField>
+      {/* End time */}
+      <div className="grid gap-1.5">
+        <span className="text-sm font-extrabold text-white">
+          {t("admin.session.end")}
+        </span>
+        {isEndAutoCalc && canAutoCalc ? (
+          <>
+            <p className="text-xs text-white/40">
+              {t("admin.session.endAutoHint", {
+                duration: String(selectedMovie?.duration_minutes ?? ""),
+              })}
+            </p>
+            <div className="flex items-center gap-3">
+              <p className="inline-flex items-center rounded-control border border-border bg-surface px-3 py-2 text-sm text-white/70">
+                {endDate} {endTime}
+              </p>
+              <button
+                className="text-xs font-bold text-brand/80 underline hover:text-brand disabled:opacity-50"
+                disabled={formDisabled || locked}
+                onClick={() => setIsEndAutoCalc(false)}
+                type="button"
+              >
+                {t("admin.session.endOverrideButton")}
+              </button>
+            </div>
+            {fieldErrors.end_time ? (
+              <p className="text-sm font-bold text-error" role="alert">
+                {fieldErrors.end_time}
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <>
+            {userTz ? (
+              <p className="text-xs text-white/40">
+                {t("admin.session.timezoneHint", { tz: userTz })}
+              </p>
+            ) : null}
+            <div className="grid grid-cols-[1fr_auto] gap-2">
+              <FormField
+                error={fieldErrors.end_time}
+                label={t("admin.session.datePart")}
+                labelFor={endDateId}
+              >
+                <TextInput
+                  disabled={formDisabled || locked}
+                  error={fieldErrors.end_time}
+                  id={endDateId}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  required
+                  type="date"
+                  value={endDate}
+                />
+              </FormField>
+              <FormField
+                error={fieldErrors.end_time}
+                label={t("admin.session.timePart")}
+                labelFor={endTimeId}
+              >
+                <TextInput
+                  className="w-28"
+                  disabled={formDisabled || locked}
+                  error={fieldErrors.end_time}
+                  id={endTimeId}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  required
+                  type="time"
+                  value={endTime}
+                />
+              </FormField>
+            </div>
+            {fieldErrors.end_time ? (
+              <p className="text-sm font-bold text-error" role="alert">
+                {fieldErrors.end_time}
+              </p>
+            ) : null}
+            {canAutoCalc && !locked ? (
+              <button
+                className="mt-1 w-fit text-xs font-bold text-white/40 underline hover:text-white/70 disabled:opacity-50"
+                disabled={formDisabled}
+                onClick={() => setIsEndAutoCalc(true)}
+                type="button"
+              >
+                {t("admin.session.endAutoRestoreButton")}
+              </button>
+            ) : null}
+          </>
+        )}
       </div>
 
       {(() => {
         const selectedRoom = rooms.find((r) => r.id === roomId);
         const preview =
           selectedRoom?.base_price
-            ? computeSessionPricePreview(selectedRoom.base_price, startTime, formatCurrency)
+            ? computeSessionPricePreview(
+                selectedRoom.base_price,
+                startDate,
+                startTime,
+                formatCurrency
+              )
             : null;
         return (
           <div className="grid gap-1.5">
@@ -443,14 +620,4 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
       </div>
     </form>
   );
-}
-
-function toLocalDateTimeInput(isoString: string): string {
-  const date = new Date(isoString);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function toISOString(localDateTimeInput: string): string {
-  return new Date(localDateTimeInput).toISOString();
 }

@@ -441,9 +441,13 @@ class SessionListCreateView(ListCreateAPIView):
         return response
 
     def create(self, request, *args, **kwargs):
-        response = super().create(request, *args, **kwargs)
+        write_serializer = self.get_serializer(data=request.data)
+        write_serializer.is_valid(raise_exception=True)
+        instance = write_serializer.save()
+        read_serializer = SessionReadSerializer(instance, context=self.get_serializer_context())
+        headers = self.get_success_headers(read_serializer.data)
         invalidate_session_list_cache()
-        return response
+        return Response(read_serializer.data, status=http_status.HTTP_201_CREATED, headers=headers)
 
 
 @extend_schema(tags=["Catalog"], summary="Get, update or delete session")
@@ -459,6 +463,17 @@ class SessionDetailView(RetrieveUpdateDestroyAPIView):
         if self.request.method == "GET":
             return SessionReadSerializer
         return SessionWriteSerializer
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        write_serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        write_serializer.is_valid(raise_exception=True)
+        self.perform_update(write_serializer)
+        if getattr(instance, "_prefetched_objects_cache", None):
+            instance._prefetched_objects_cache = {}
+        read_serializer = SessionReadSerializer(instance, context=self.get_serializer_context())
+        return Response(read_serializer.data)
 
     def perform_update(self, serializer):
         serializer.save()

@@ -37,6 +37,7 @@ const paginatedRows = {
 };
 
 const seat = {
+  companion_seat: null,
   id: "seat-a1",
   is_accessible: false,
   number: 1,
@@ -277,7 +278,7 @@ test("adminApi.deleteSeatRow sends a DELETE request", async () => {
 
 test("adminApi.listAllSeats fetches all seats without filtering", async () => {
   const originalFetch = globalThis.fetch;
-  const otherSeat = { id: "seat-x1", is_accessible: false, number: 1, row: "row-other" };
+  const otherSeat = { companion_seat: null, id: "seat-x1", is_accessible: false, number: 1, row: "row-other" };
   try {
     globalThis.fetch = async () =>
       Response.json({

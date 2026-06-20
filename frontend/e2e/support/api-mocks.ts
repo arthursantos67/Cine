@@ -9,7 +9,9 @@ const posterDataUrl =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='480' viewBox='0 0 320 480'%3E%3Crect width='320' height='480' fill='%2314141f'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='28'%3ECinePrime%3C/text%3E%3C/svg%3E";
 
 type SessionSeat = {
+  companion_seat_id: string | null;
   is_accessible: boolean;
+  is_accessible_row: boolean;
   lock_expires_at: string | null;
   number: number;
   reserved_by_current_user?: boolean;
@@ -37,7 +39,9 @@ export function createMockApiState(options: MockOptions = {}) {
   const reservations: string[] = [];
   const seats: SessionSeat[] = [
     {
+      companion_seat_id: null,
       is_accessible: false,
+      is_accessible_row: false,
       lock_expires_at: null,
       number: 1,
       row: "A",
@@ -46,7 +50,9 @@ export function createMockApiState(options: MockOptions = {}) {
       status: "AVAILABLE",
     },
     {
+      companion_seat_id: null,
       is_accessible: false,
+      is_accessible_row: false,
       lock_expires_at: null,
       number: 2,
       row: "A",
@@ -55,7 +61,9 @@ export function createMockApiState(options: MockOptions = {}) {
       status: "AVAILABLE",
     },
     {
+      companion_seat_id: null,
       is_accessible: false,
+      is_accessible_row: false,
       lock_expires_at: null,
       number: 3,
       row: "A",
@@ -64,7 +72,9 @@ export function createMockApiState(options: MockOptions = {}) {
       status: "RESERVED",
     },
     {
+      companion_seat_id: null,
       is_accessible: true,
+      is_accessible_row: true,
       lock_expires_at: null,
       number: 4,
       row: "A",
@@ -75,11 +85,11 @@ export function createMockApiState(options: MockOptions = {}) {
   ];
 
   const mockSeatRows: MockSeatRow[] = [
-    { id: "row-a", name: "A", room: "room-1" },
+    { id: "row-a", is_accessible_row: false, name: "A", room: "room-1" },
   ];
   const mockSeats: MockSeat[] = [
-    { id: "seat-a1", is_accessible: false, number: 1, row: "row-a" },
-    { id: "seat-a2", is_accessible: false, number: 2, row: "row-a" },
+    { companion_seat: null, id: "seat-a1", is_accessible: false, number: 1, row: "row-a" },
+    { companion_seat: null, id: "seat-a2", is_accessible: false, number: 2, row: "row-a" },
   ];
 
   return {
@@ -116,11 +126,13 @@ export async function setupMockApi(page: Page, options: MockOptions = {}) {
 
 type MockSeatRow = {
   id: string;
+  is_accessible_row: boolean;
   name: string;
   room: string;
 };
 
 type MockSeat = {
+  companion_seat: string | null;
   id: string;
   is_accessible: boolean;
   number: number;
@@ -223,6 +235,7 @@ async function handleApiRoute(route: Route, state: ApiRouteState) {
     const payload = request.postDataJSON() as { name: string; room: string };
     const newRow: MockSeatRow = {
       id: `row-${payload.name.toLowerCase()}`,
+      is_accessible_row: false,
       name: payload.name,
       room: payload.room,
     };
@@ -279,6 +292,7 @@ async function handleApiRoute(route: Route, state: ApiRouteState) {
       }
     }
     const newSeat: MockSeat = {
+      companion_seat: null,
       id: `seat-${payload.row}-${seatsInRow.length + 1}`,
       is_accessible: payload.is_accessible ?? false,
       number: payload.number,

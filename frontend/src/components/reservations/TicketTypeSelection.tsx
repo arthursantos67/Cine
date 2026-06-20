@@ -97,47 +97,63 @@ export function TicketTypeSelectionForm({
                 </small>
               </legend>
 
-              <div
-                className="ticket-types__options grid grid-cols-2 gap-2.5 max-lg:grid-cols-1"
-                role="radiogroup"
-              >
-                {ticketTypeOptions.map((option) => {
-                  const optionPrice =
-                    option.value === "meia" ? row.halfPrice : row.fullPrice;
+              {row.isCompanion ? (
+                <div className="ticket-types__companion-notice flex items-center gap-3 rounded-md border border-brand/30 bg-brand/10 px-3 py-2.5">
+                  <span className="grid min-w-0 gap-0.5">
+                    <strong className="text-sm text-white">
+                      {t("ticketTypes.companionLabel")}
+                    </strong>
+                    <small className="text-[13px] font-bold leading-snug text-text/60">
+                      {t("ticketTypes.companionDescription")}
+                    </small>
+                  </span>
+                  <b className="whitespace-nowrap text-[15px] text-white">
+                    {formatCurrency(0, locale)}
+                  </b>
+                </div>
+              ) : (
+                <div
+                  className="ticket-types__options grid grid-cols-2 gap-2.5 max-lg:grid-cols-1"
+                  role="radiogroup"
+                >
+                  {ticketTypeOptions.map((option) => {
+                    const optionPrice =
+                      option.value === "meia" ? row.halfPrice : row.fullPrice;
 
-                  return (
-                    <label
-                      className="ticket-types__option grid min-h-[74px] cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 rounded-md border border-white/10 bg-white/[0.04] p-3 text-text/80 has-[input:checked]:border-brand/70 has-[input:checked]:bg-brand/20 has-[input:checked]:text-white has-[input:checked]:shadow-[inset_0_1px_0_rgb(255_255_255_/_8%)] focus-within:border-info focus-within:shadow-[0_0_0_3px_rgb(31_111_235_/_18%)]"
-                      key={option.value}
-                    >
-                      <input
-                        className="size-[18px] accent-brand"
-                        checked={row.selectedTicketType === option.value}
-                        name={`ticket-type-${row.seat.sessionSeatId}`}
-                        onChange={() =>
-                          onTicketTypeChange(
-                            row.seat.sessionSeatId,
-                            option.value
-                          )
-                        }
-                        type="radio"
-                        value={option.value}
-                      />
-                      <span className="grid min-w-0 gap-1">
-                        <strong className="[overflow-wrap:anywhere]">
-                          {option.label}
-                        </strong>
-                        <small className="text-[13px] font-bold leading-snug text-text/60">
-                          {option.description}
-                        </small>
-                      </span>
-                      <b className="whitespace-nowrap text-[15px] text-white">
-                        {formatCurrency(optionPrice, locale)}
-                      </b>
-                    </label>
-                  );
-                })}
-              </div>
+                    return (
+                      <label
+                        className="ticket-types__option grid min-h-[74px] cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 rounded-md border border-white/10 bg-white/[0.04] p-3 text-text/80 has-[input:checked]:border-brand/70 has-[input:checked]:bg-brand/20 has-[input:checked]:text-white has-[input:checked]:shadow-[inset_0_1px_0_rgb(255_255_255_/_8%)] focus-within:border-info focus-within:shadow-[0_0_0_3px_rgb(31_111_235_/_18%)]"
+                        key={option.value}
+                      >
+                        <input
+                          className="size-[18px] accent-brand"
+                          checked={row.selectedTicketType === option.value}
+                          name={`ticket-type-${row.seat.sessionSeatId}`}
+                          onChange={() =>
+                            onTicketTypeChange(
+                              row.seat.sessionSeatId,
+                              option.value
+                            )
+                          }
+                          type="radio"
+                          value={option.value}
+                        />
+                        <span className="grid min-w-0 gap-1">
+                          <strong className="[overflow-wrap:anywhere]">
+                            {option.label}
+                          </strong>
+                          <small className="text-[13px] font-bold leading-snug text-text/60">
+                            {option.description}
+                          </small>
+                        </span>
+                        <b className="whitespace-nowrap text-[15px] text-white">
+                          {formatCurrency(optionPrice, locale)}
+                        </b>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
             </fieldset>
           ))}
         </div>

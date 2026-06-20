@@ -34,7 +34,7 @@ export function PurchaseFlowLayout({
       <div
         className={cn(
           "purchase-flow__body grid items-start gap-5",
-          showSummary
+          showSummary && currentStep !== "seats"
             ? "grid-cols-[minmax(0,1fr)_minmax(288px,340px)] max-lg:grid-cols-1"
             : "grid-cols-1"
         )}

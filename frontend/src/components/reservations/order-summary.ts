@@ -15,6 +15,7 @@ export type OrderSummaryItem = {
 };
 
 export const ticketTypeLabels: Record<TicketType, string> = {
+  gratuito: "Gratuito",
   inteira: "Inteira",
   meia: "Meia-entrada",
 };
@@ -52,6 +53,10 @@ export function calculateTicketUnitPrice(
 ) {
   if (ticketType === "meia") {
     return roundCurrency(basePrice * 0.5);
+  }
+
+  if (ticketType === "gratuito") {
+    return 0;
   }
 
   return roundCurrency(basePrice);

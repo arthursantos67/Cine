@@ -33,7 +33,9 @@ function seat(
   const number = overrides.number ?? 1;
 
   return {
+    companion_seat_id: null,
     is_accessible: false,
+    is_accessible_row: false,
     number,
     row,
     seat_id: `seat-${row}-${number}`,
@@ -356,7 +358,41 @@ test("reserved seats built from reservation response preserve original session s
   assert.equal(reservedSeats[0].seatId, "seat-1");
   assert.equal(reservedSeats[0].sessionSeatId, "session-seat-original");
   assert.equal(reservedSeats[0].isAccessible, true);
+  assert.equal(reservedSeats[0].isCompanion, false);
   assert.equal(reservedSeats[0].expiresAt.toISOString(), "2026-05-22T21:40:00.000Z");
+});
+
+test("reserved seats built from reservation mark companion seats correctly", () => {
+  const accessibleSeat = seat({
+    companion_seat_id: "seat-companion",
+    is_accessible: true,
+    number: 1,
+    row: "PCD",
+    seat_id: "seat-accessible",
+    session_seat_id: "session-seat-accessible",
+  });
+  const companionSeat = seat({
+    number: 2,
+    row: "PCD",
+    seat_id: "seat-companion",
+    session_seat_id: "session-seat-companion",
+  });
+  const reservedSeats = buildReservedSeatsFromReservation(
+    {
+      expires_at: "2026-05-22T18:40:00-03:00",
+      seats: [
+        { number: 1, row: "PCD", seat_id: "seat-accessible", status: "RESERVED" },
+        { number: 2, row: "PCD", seat_id: "seat-companion", status: "RESERVED" },
+      ],
+      session_id: "session-1",
+      status: "TEMPORARILY_RESERVED",
+    },
+    [accessibleSeat, companionSeat],
+    42.5
+  );
+
+  assert.equal(reservedSeats[0].isCompanion, false);
+  assert.equal(reservedSeats[1].isCompanion, true);
 });
 
 test("optimistic reservation and rollback only affect targeted seats", () => {

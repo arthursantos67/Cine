@@ -23,6 +23,7 @@ const firstSeat: ReservedSeat = {
   basePrice: 42.5,
   expiresAt: new Date("2026-05-22T21:40:00.000Z"),
   isAccessible: false,
+  isCompanion: false,
   number: 7,
   row: "B",
   seatId: "seat-1",
@@ -40,6 +41,7 @@ const secondSeat: ReservedSeat = {
 test("order summary helpers calculate full, half, and total values", () => {
   assert.equal(calculateTicketUnitPrice(42.5, "inteira"), 42.5);
   assert.equal(calculateTicketUnitPrice(42.5, "meia"), 21.25);
+  assert.equal(calculateTicketUnitPrice(42.5, "gratuito"), 0);
 
   const items = buildOrderSummaryItems(
     [firstSeat, secondSeat],

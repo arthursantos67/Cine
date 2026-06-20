@@ -131,6 +131,8 @@ class Room(models.Model):
     )
     display_name = models.CharField(max_length=120, blank=True, default="")
     description = models.TextField(blank=True, default="")
+    max_center_seats_per_row = models.PositiveIntegerField(null=True, blank=True)
+    accessible_row_index = models.PositiveIntegerField(default=0)
     translations = models.JSONField(default=dict, blank=True)
     base_price = models.DecimalField(
         max_digits=8,

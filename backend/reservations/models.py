@@ -13,6 +13,7 @@ class SeatRow(models.Model):
         related_name="seat_rows",
     )
     name = models.CharField(max_length=10)
+    is_accessible_row = models.BooleanField(default=False)
 
     class Meta:
         db_table = "reservation_seat_rows"
@@ -21,7 +22,12 @@ class SeatRow(models.Model):
             models.UniqueConstraint(
                 fields=["room", "name"],
                 name="unique_seat_row_per_room",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["room"],
+                condition=models.Q(is_accessible_row=True),
+                name="unique_accessible_row_per_room",
+            ),
         ]
         indexes = [
             models.Index(fields=["room"], name="seat_row_room_idx"),
@@ -53,6 +59,13 @@ class Seat(models.Model):
     )
     number = models.PositiveIntegerField()
     is_accessible = models.BooleanField(default=False)
+    companion_seat = models.OneToOneField(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="paired_by",
+    )
 
     class Meta:
         db_table = "reservation_seats"
@@ -88,6 +101,16 @@ class Seat(models.Model):
                 {"row": ("Room capacity cannot be exceeded by adding another seat.")}
             )
 
+        if self.companion_seat_id:
+            if self.companion_seat_id == self.pk:
+                raise ValidationError(
+                    {"companion_seat": "A seat cannot be its own companion."}
+                )
+            if self.companion_seat.row.room_id != room.pk:
+                raise ValidationError(
+                    {"companion_seat": "Companion seat must belong to the same room."}
+                )
+
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
@@ -105,6 +128,7 @@ class SessionSeatStatus(models.TextChoices):
 class TicketType(models.TextChoices):
     INTEIRA = "inteira", "Inteira"
     MEIA = "meia", "Meia"
+    GRATUITO = "gratuito", "Gratuito"
 
 
 class PaymentMethod(models.TextChoices):
@@ -256,6 +280,9 @@ class Ticket(models.Model):
 
         if ticket_type == TicketType.MEIA:
             return (base_price * Decimal("0.50")).quantize(Decimal("0.01"))
+
+        if ticket_type == TicketType.GRATUITO:
+            return Decimal("0.00")
 
         return base_price.quantize(Decimal("0.01"))
 

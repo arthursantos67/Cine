@@ -19,6 +19,7 @@ const firstSeat: ReservedSeat = {
   basePrice: 42.5,
   expiresAt: new Date("2026-05-22T21:40:00.000Z"),
   isAccessible: false,
+  isCompanion: false,
   number: 7,
   row: "B",
   seatId: "seat-1",
@@ -29,6 +30,7 @@ const secondSeat: ReservedSeat = {
   basePrice: 42.5,
   expiresAt: new Date("2026-05-22T21:35:00.000Z"),
   isAccessible: true,
+  isCompanion: false,
   number: 8,
   row: "B",
   seatId: "seat-2",
@@ -128,11 +130,33 @@ test("removeSeat clears seat-specific ticket type and preserves remaining reserv
   assert.equal(updated.sessionId, "session-1");
 });
 
+test("addSeats assigns gratuito ticket type automatically to companion seats", () => {
+  const companionSeat: ReservedSeat = {
+    basePrice: 42.5,
+    expiresAt: new Date("2026-05-22T21:40:00.000Z"),
+    isAccessible: false,
+    isCompanion: true,
+    number: 2,
+    row: "PCD",
+    seatId: "seat-companion",
+    sessionSeatId: "session-seat-companion",
+  };
+  const state = addSeatsToReservation(
+    initialReservationState,
+    [firstSeat, companionSeat],
+    "session-1"
+  );
+
+  assert.equal(state.ticketTypes["session-seat-1"], "inteira");
+  assert.equal(state.ticketTypes["session-seat-companion"], "gratuito");
+});
+
 test("removeSeat recalculates expiration from remaining reserved seats", () => {
   const thirdSeat: ReservedSeat = {
     basePrice: 42.5,
     expiresAt: new Date("2026-05-22T21:50:00.000Z"),
     isAccessible: false,
+    isCompanion: false,
     number: 9,
     row: "B",
     seatId: "seat-3",

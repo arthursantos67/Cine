@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { ApiError } from "@/api/client";
-import { extractSessionFieldErrors } from "./AdminSessionForm";
+import {
+  addMinutesToLocalDateTime,
+  combineLocalDateTime,
+  extractSessionFieldErrors,
+  splitLocalDateTime,
+} from "./AdminSessionForm";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -206,4 +211,50 @@ test("adminApi.getSession rejects when movie or room is missing", async () => {
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+// ─── splitLocalDateTime ────────────────────────────────────────────────────────
+
+test("splitLocalDateTime splits an ISO string into local date and time parts", () => {
+  const d = new Date(2026, 5, 10, 19, 30); // June 10 2026, 19:30 local
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const expectedDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const expectedTime = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const result = splitLocalDateTime(d.toISOString());
+  assert.equal(result.date, expectedDate);
+  assert.equal(result.time, expectedTime);
+});
+
+// ─── combineLocalDateTime ─────────────────────────────────────────────────────
+
+test("combineLocalDateTime round-trips through splitLocalDateTime", () => {
+  const d = new Date(2026, 5, 10, 19, 30);
+  const { date, time } = splitLocalDateTime(d.toISOString());
+  const combined = combineLocalDateTime(date, time);
+  const recovered = new Date(combined);
+  assert.equal(recovered.getFullYear(), d.getFullYear());
+  assert.equal(recovered.getMonth(), d.getMonth());
+  assert.equal(recovered.getDate(), d.getDate());
+  assert.equal(recovered.getHours(), d.getHours());
+  assert.equal(recovered.getMinutes(), d.getMinutes());
+});
+
+// ─── addMinutesToLocalDateTime ────────────────────────────────────────────────
+
+test("addMinutesToLocalDateTime adds minutes that stay within the same day", () => {
+  const result = addMinutesToLocalDateTime("2026-06-10", "19:30", 120);
+  assert.equal(result.time, "21:30");
+  assert.equal(result.date, "2026-06-10");
+});
+
+test("addMinutesToLocalDateTime rolls over midnight correctly", () => {
+  const result = addMinutesToLocalDateTime("2026-06-10", "23:00", 90);
+  assert.equal(result.date, "2026-06-11");
+  assert.equal(result.time, "00:30");
+});
+
+test("addMinutesToLocalDateTime handles zero-minute addition", () => {
+  const result = addMinutesToLocalDateTime("2026-06-10", "15:00", 0);
+  assert.equal(result.date, "2026-06-10");
+  assert.equal(result.time, "15:00");
 });

@@ -37,7 +37,7 @@ def validate_room_layout_changes_are_allowed(room_ids):
 class SeatRowSerializer(serializers.ModelSerializer):
     class Meta:
         model = SeatRow
-        fields = ["id", "room", "name"]
+        fields = ["id", "room", "name", "is_accessible_row"]
         read_only_fields = ["id"]
 
     def validate(self, attrs):
@@ -58,7 +58,7 @@ class SeatRowSerializer(serializers.ModelSerializer):
 class SeatSerializer(serializers.ModelSerializer):
     class Meta:
         model = Seat
-        fields = ["id", "row", "number", "is_accessible"]
+        fields = ["id", "row", "number", "is_accessible", "companion_seat"]
         read_only_fields = ["id"]
 
     def validate(self, attrs):
@@ -178,6 +178,12 @@ class SessionSeatMapItemSerializer(serializers.ModelSerializer):
     is_accessible = serializers.BooleanField(
         source="seat.is_accessible", read_only=True
     )
+    is_accessible_row = serializers.BooleanField(
+        source="seat.row.is_accessible_row", read_only=True
+    )
+    companion_seat_id = serializers.UUIDField(
+        source="seat.companion_seat_id", read_only=True, allow_null=True
+    )
     reserved_by_current_user = serializers.SerializerMethodField()
     lock_expires_at = serializers.SerializerMethodField()
 
@@ -190,6 +196,8 @@ class SessionSeatMapItemSerializer(serializers.ModelSerializer):
             "number",
             "status",
             "is_accessible",
+            "is_accessible_row",
+            "companion_seat_id",
             "reserved_by_current_user",
             "lock_expires_at",
         ]
@@ -221,6 +229,58 @@ class SessionSeatMapItemSerializer(serializers.ModelSerializer):
             data.pop("lock_expires_at", None)
 
         return data
+
+
+class BulkLayoutRowSeatSerializer(serializers.Serializer):
+    number = serializers.IntegerField(min_value=1)
+
+
+class BulkLayoutRowSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=10)
+    seats = BulkLayoutRowSeatSerializer(many=True)
+
+    def validate_name(self, value):
+        value = value.strip().upper()
+        if not value or not value.isalpha():
+            raise serializers.ValidationError("Row name must contain letters only.")
+        return value
+
+    def validate_seats(self, value):
+        numbers = [s["number"] for s in value]
+        if len(numbers) != len(set(numbers)):
+            raise serializers.ValidationError("Seat numbers must be unique within a row.")
+        return value
+
+
+class BulkLayoutRequestSerializer(serializers.Serializer):
+    room = serializers.UUIDField()
+    rows = BulkLayoutRowSerializer(many=True, allow_empty=False)
+
+    def validate_rows(self, value):
+        names = [r["name"] for r in value]
+        if len(names) != len(set(names)):
+            raise serializers.ValidationError("Row names must be unique.")
+        return value
+
+
+class BulkLayoutSeatResultSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Seat
+        fields = ["id", "row", "number", "is_accessible", "companion_seat"]
+
+
+class BulkLayoutRowResultSerializer(serializers.ModelSerializer):
+    seats = BulkLayoutSeatResultSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = SeatRow
+        fields = ["id", "room", "name", "is_accessible_row", "seats"]
+
+
+class AccessibleRowRequestSerializer(serializers.Serializer):
+    room = serializers.UUIDField()
+    name = serializers.CharField(max_length=10)
+    accessible_seat_count = serializers.IntegerField(min_value=1, max_value=50)
 
 
 class TemporaryReservationRequestSerializer(serializers.Serializer):

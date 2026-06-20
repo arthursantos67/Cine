@@ -1,6 +1,8 @@
 from django.urls import path
 
 from reservations.views import (
+    AccessibleRowView,
+    BulkLayoutView,
     CheckoutView,
     SeatDetailView,
     SeatListCreateView,
@@ -42,4 +44,6 @@ urlpatterns = [
         name="temporary-seat-reservation",
     ),
     path("checkout/", CheckoutView.as_view(), name="checkout"),
+    path("bulk-create-layout/", BulkLayoutView.as_view(), name="bulk-create-layout"),
+    path("accessible-row/", AccessibleRowView.as_view(), name="accessible-row-create"),
 ]

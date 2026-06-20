@@ -6,7 +6,9 @@ import { reservationApi } from "./reservation";
 
 const seatMapResponse = [
   {
+    companion_seat_id: null,
     is_accessible: false,
+    is_accessible_row: false,
     lock_expires_at: null,
     number: 7,
     reserved_by_current_user: false,
@@ -34,7 +36,9 @@ const reservationResponse = {
 const releaseResponse = {
   seats: [
     {
+      companion_seat_id: null,
       is_accessible: false,
+      is_accessible_row: false,
       number: 7,
       row: "B",
       seat_id: "seat-1",
@@ -79,6 +83,7 @@ test("reservationApi normalizes legacy lowercase seat statuses", async () => {
       Response.json([
         {
           is_accessible: false,
+          is_accessible_row: false,
           number: 7,
           row: "B",
           seat_id: "seat-1",

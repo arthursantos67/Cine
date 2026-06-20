@@ -1,21 +1,27 @@
+import logging
+from datetime import timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from rest_framework import serializers
 
+from cineprime_api.catalog_translation import translate_text
 from cineprime_api.genre_translation import translate_genre_name
 from cineprime_api.localization import (
     DEFAULT_LOCALE,
+    SUPPORTED_LOCALES,
     available_translation_locales,
     get_context_locale,
     get_translation_value,
     normalize_locale,
     normalize_translation_payload,
-    SUPPORTED_LOCALES,
 )
+
 from catalog.models import CastMember, Genre, Movie, MovieInterest, Room, RoomTypePricing, Session
 from reservations.models import SessionSeat, SessionSeatStatus, Seat
+
+logger = logging.getLogger(__name__)
 
 _WEEKEND_WEEKDAYS = {4, 5, 6}  # Friday, Saturday, Sunday
 
@@ -162,16 +168,25 @@ class GenreSummarySerializer(TranslatedCatalogSerializerMixin, serializers.Model
 class RoomSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializer):
     translation_fields = ("display_name", "description")
 
+    source_language = serializers.CharField(
+        required=False,
+        write_only=True,
+        allow_blank=False,
+    )
+
     class Meta:
         model = Room
         fields = [
             "id",
             "name",
             "capacity",
+            "max_center_seats_per_row",
+            "accessible_row_index",
             "experience_type",
             "display_name",
             "description",
             "translations",
+            "source_language",
             "locale",
             "available_locales",
             "base_price",
@@ -187,6 +202,15 @@ class RoomSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializ
             "updated_at",
         ]
 
+    def validate_source_language(self, value):
+        normalized = normalize_locale(value)
+        if normalized is None:
+            supported = ", ".join(SUPPORTED_LOCALES)
+            raise serializers.ValidationError(
+                f"Unsupported locale. Expected one of: {supported}."
+            )
+        return normalized
+
     def validate_capacity(self, value):
         if self.instance is None:
             return value
@@ -199,7 +223,45 @@ class RoomSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializ
 
         return value
 
+    def _apply_display_name_translation(self, validated_data: dict, source_language: str) -> None:
+        input_display_name = validated_data.get("display_name", "")
+        if not input_display_name:
+            return
+
+        translated = translate_text(input_display_name, source_language)
+        if not translated:
+            return
+
+        expected_locales = set(SUPPORTED_LOCALES) - {source_language}
+        missing = expected_locales - set(translated.keys())
+        if missing:
+            logger.warning(
+                "Auto-translation incomplete for display_name %r: missing locales %s",
+                input_display_name,
+                sorted(missing),
+            )
+
+        existing_translations = dict(validated_data.get("translations") or {})
+
+        for loc, text in translated.items():
+            if loc == DEFAULT_LOCALE:
+                if source_language == DEFAULT_LOCALE:
+                    validated_data["display_name"] = text
+            else:
+                locale_entry = dict(existing_translations.get(loc) or {})
+                locale_entry["display_name"] = text
+                existing_translations[loc] = locale_entry
+
+        if source_language != DEFAULT_LOCALE and DEFAULT_LOCALE in translated:
+            validated_data["display_name"] = translated[DEFAULT_LOCALE]
+
+        validated_data["translations"] = existing_translations
+
     def create(self, validated_data):
+        source_language = validated_data.pop("source_language", None)
+        if source_language:
+            self._apply_display_name_translation(validated_data, source_language)
+
         room = Room(**validated_data)
 
         try:
@@ -210,6 +272,10 @@ class RoomSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSerializ
         return room
 
     def update(self, instance, validated_data):
+        source_language = validated_data.pop("source_language", None)
+        if source_language:
+            self._apply_display_name_translation(validated_data, source_language)
+
         for field, value in validated_data.items():
             setattr(instance, field, value)
 
@@ -230,6 +296,8 @@ class RoomSummarySerializer(TranslatedCatalogSerializerMixin, serializers.ModelS
             "id",
             "name",
             "capacity",
+            "max_center_seats_per_row",
+            "accessible_row_index",
             "experience_type",
             "display_name",
             "description",
@@ -425,6 +493,27 @@ class SessionWriteSerializer(serializers.ModelSerializer):
                             for field in changed_protected_fields
                         }
                     )
+
+        movie = attrs.get("movie") or (self.instance.movie if self.instance else None)
+        start_time = attrs.get("start_time") or (
+            self.instance.start_time if self.instance else None
+        )
+        end_time = attrs.get("end_time") or (
+            self.instance.end_time if self.instance else None
+        )
+
+        if movie and start_time and end_time:
+            min_end = start_time + timedelta(minutes=movie.duration_minutes)
+            tolerance = timedelta(minutes=5)
+            if end_time < min_end - tolerance:
+                raise serializers.ValidationError(
+                    {
+                        "end_time": (
+                            f"End time must be at least {movie.duration_minutes} minutes after start time "
+                            f"(movie runtime). Minimum end time: {min_end.isoformat()}."
+                        )
+                    }
+                )
 
         return attrs
 

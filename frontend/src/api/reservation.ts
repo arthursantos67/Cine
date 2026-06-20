@@ -106,6 +106,7 @@ function isSessionSeatMapItem(value: unknown): value is SessionSeatMapItem {
     typeof value.number === "number" &&
     isSessionSeatStatus(value.status) &&
     typeof value.is_accessible === "boolean" &&
+    typeof value.is_accessible_row === "boolean" &&
     optionalBoolean(value.reserved_by_current_user) &&
     optionalNullableString(value.lock_expires_at)
   );

@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+
+import { ZoomIn, ZoomOut } from "lucide-react";
 
 import { ApiError, getApiErrorUserMessage } from "@/api/client";
 import { catalogApi } from "@/api/catalog";
@@ -19,7 +21,7 @@ import type {
 type SeatMapLoadState =
   | { status: "error"; errorMessage?: string }
   | { status: "loading" }
-  | { seats: SessionSeatMapItem[]; sessionBasePrice: number; status: "success" };
+  | { accessibleRowIndex: number | null; maxCenterSeatsPerRow: number | null; seats: SessionSeatMapItem[]; sessionBasePrice: number; status: "success" };
 
 export type SeatMapRow = {
   rowLabel: string;
@@ -39,11 +41,16 @@ export type SeatMapAccessiblePair = {
 export type SeatMapRenderedRow = SeatMapRow & {
   leftSeats: SeatMapDisplaySeat[];
   rightSeats: SeatMapDisplaySeat[];
+  leftNamoradeiras: SeatMapDisplaySeat[];
+  rightNamoradeiras: SeatMapDisplaySeat[];
 };
 
 export type SeatMapLayoutModel = {
   accessibleLeftPairs: SeatMapAccessiblePair[];
   accessibleRightPairs: SeatMapAccessiblePair[];
+  accessibleRowIndex: number;
+  accessibleRowLabel: string | null;
+  maxCenterSeatsPerRow: number | null;
   rows: SeatMapRenderedRow[];
 };
 
@@ -64,13 +71,17 @@ type SeatMapProps = {
 };
 
 type SeatMapViewProps = {
+  accessibleRowIndex?: number | null;
+  maxCenterSeatsPerRow?: number | null;
   sessionBasePrice: number;
   sessionId: string;
   seats: SessionSeatMapItem[];
 };
 
 type SeatMapLayoutProps = {
+  accessibleRowIndex?: number | null;
   errorMessage?: string | null;
+  maxCenterSeatsPerRow?: number | null;
   onSeatToggle?: (seat: SessionSeatMapItem) => void;
   pendingSeatIds?: ReadonlySet<string>;
   seats: SessionSeatMapItem[];
@@ -127,6 +138,8 @@ export function SeatMap({ sessionId }: SeatMapProps) {
             sessionBasePrice: Number.isFinite(sessionBasePrice)
               ? sessionBasePrice
               : 0,
+            maxCenterSeatsPerRow: session.room.max_center_seats_per_row ?? null,
+            accessibleRowIndex: session.room.accessible_row_index ?? null,
             status: "success",
           });
         }
@@ -181,6 +194,8 @@ export function SeatMap({ sessionId }: SeatMapProps) {
 
   return (
     <SeatMapView
+      accessibleRowIndex={state.accessibleRowIndex}
+      maxCenterSeatsPerRow={state.maxCenterSeatsPerRow}
       seats={state.seats}
       sessionBasePrice={state.sessionBasePrice}
       sessionId={sessionId.trim()}
@@ -189,6 +204,8 @@ export function SeatMap({ sessionId }: SeatMapProps) {
 }
 
 export function SeatMapView({
+  accessibleRowIndex,
+  maxCenterSeatsPerRow,
   seats,
   sessionBasePrice,
   sessionId,
@@ -233,6 +250,18 @@ export function SeatMapView({
       ]),
     [currentSeats, reservedSeatsForSession]
   );
+
+  // Maps companion seat_id → its paired accessible SessionSeatMapItem.
+  // Used to auto-select the accessible seat when a companion is clicked.
+  const companionSeatIdToAccessible = useMemo(() => {
+    const map = new Map<string, SessionSeatMapItem>();
+    for (const s of currentSeats) {
+      if (s.is_accessible && s.companion_seat_id) {
+        map.set(s.companion_seat_id, s);
+      }
+    }
+    return map;
+  }, [currentSeats]);
 
   useEffect(() => {
     if (!reservation.expirationNotice) {
@@ -283,22 +312,61 @@ export function SeatMapView({
       return;
     }
 
+    // If this is a companion seat, auto-select its paired accessible seat too.
+    const pairedAccessible = companionSeatIdToAccessible.get(seat.seat_id);
+    if (pairedAccessible) {
+      const accessibleState = getSeatVisualState(pairedAccessible, selectedSeatIds);
+      if (accessibleState === "available") {
+        guardAction(() => {
+          void reserveSeats([pairedAccessible, seat]);
+        });
+        return;
+      }
+    }
+
+    // If this is an accessible seat with a companion, auto-select companion too.
+    if (seat.is_accessible && seat.companion_seat_id) {
+      const companion = currentSeats.find(
+        (s) => s.seat_id === seat.companion_seat_id
+      );
+      const companionState = companion
+        ? getSeatVisualState(companion, selectedSeatIds)
+        : null;
+      if (companion && companionState === "available") {
+        guardAction(() => {
+          void reserveSeats([seat, companion]);
+        });
+        return;
+      }
+    }
+
     guardAction(() => {
       void reserveSeat(seat);
     });
   }
 
   async function reserveSeat(seat: SessionSeatMapItem) {
+    await reserveSeats([seat]);
+  }
+
+  async function reserveSeats(seatsToReserve: SessionSeatMapItem[]) {
     setErrorMessage(null);
-    setPendingSeatIds((current) => addToSet(current, seat.session_seat_id));
+
+    for (const seat of seatsToReserve) {
+      setPendingSeatIds((current) => addToSet(current, seat.session_seat_id));
+    }
     setCurrentSeats((current) =>
-      markSeatsAsReservedBySeatIds(current, [seat.seat_id])
+      markSeatsAsReservedBySeatIds(
+        current,
+        seatsToReserve.map((s) => s.seat_id)
+      )
     );
 
     try {
-      const response = await reservationApi.reserveSeats(sessionId, [
-        seat.seat_id,
-      ]);
+      const response = await reservationApi.reserveSeats(
+        sessionId,
+        seatsToReserve.map((s) => s.seat_id)
+      );
       const nextSeats = buildReservedSeatsFromReservation(
         response,
         currentSeats,
@@ -316,32 +384,56 @@ export function SeatMapView({
       );
     } catch (error) {
       setCurrentSeats((current) =>
-        restoreSeatSnapshots(current, [seat])
+        restoreSeatSnapshots(current, seatsToReserve)
       );
       setErrorMessage(getSeatInteractionErrorMessage(error, locale, t));
     } finally {
-      setPendingSeatIds((current) =>
-        removeFromSet(current, seat.session_seat_id)
-      );
+      for (const seat of seatsToReserve) {
+        setPendingSeatIds((current) =>
+          removeFromSet(current, seat.session_seat_id)
+        );
+      }
     }
   }
 
   async function releaseSeat(seat: SessionSeatMapItem) {
-    const reservedSeat = reservedSeatsForSession.find(
-      (currentSeat) => currentSeat.sessionSeatId === seat.session_seat_id
-    );
+    const seatsToRelease = [seat];
+
+    // When releasing an accessible seat, also release its companion if selected.
+    if (seat.is_accessible && seat.companion_seat_id) {
+      const companion = currentSeats.find(
+        (s) => s.seat_id === seat.companion_seat_id
+      );
+      if (companion && selectedSeatIds.has(companion.session_seat_id)) {
+        seatsToRelease.push(companion);
+      }
+    }
+
+    const reservedSeats = seatsToRelease
+      .map((s) =>
+        reservedSeatsForSession.find(
+          (r) => r.sessionSeatId === s.session_seat_id
+        )
+      )
+      .filter((r): r is NonNullable<typeof r> => r !== undefined);
 
     setErrorMessage(null);
-    setPendingSeatIds((current) => addToSet(current, seat.session_seat_id));
-    reservation.removeSeat(seat.session_seat_id);
+    for (const s of seatsToRelease) {
+      setPendingSeatIds((current) => addToSet(current, s.session_seat_id));
+      reservation.removeSeat(s.session_seat_id);
+    }
     setCurrentSeats((current) =>
-      markSeatsAsAvailableBySessionSeatIds(current, [seat.session_seat_id])
+      markSeatsAsAvailableBySessionSeatIds(
+        current,
+        seatsToRelease.map((s) => s.session_seat_id)
+      )
     );
 
     try {
-      const response = await reservationApi.releaseReservations(sessionId, [
-        seat.session_seat_id,
-      ]);
+      const response = await reservationApi.releaseReservations(
+        sessionId,
+        seatsToRelease.map((s) => s.session_seat_id)
+      );
       const releasedSessionSeatIds = response.seats.map(
         (responseSeat) => responseSeat.session_seat_id
       );
@@ -351,24 +443,28 @@ export function SeatMapView({
       );
     } catch (error) {
       setCurrentSeats((current) =>
-        restoreSeatSnapshots(current, [seat])
+        restoreSeatSnapshots(current, seatsToRelease)
       );
 
-      if (reservedSeat) {
-        reservation.addSeats([reservedSeat], { sessionId });
+      if (reservedSeats.length > 0) {
+        reservation.addSeats(reservedSeats, { sessionId });
       }
 
       setErrorMessage(getSeatInteractionErrorMessage(error, locale, t));
     } finally {
-      setPendingSeatIds((current) =>
-        removeFromSet(current, seat.session_seat_id)
-      );
+      for (const s of seatsToRelease) {
+        setPendingSeatIds((current) =>
+          removeFromSet(current, s.session_seat_id)
+        );
+      }
     }
   }
 
   return (
     <SeatMapLayout
+      accessibleRowIndex={accessibleRowIndex}
       errorMessage={errorMessage}
+      maxCenterSeatsPerRow={maxCenterSeatsPerRow}
       onSeatToggle={toggleSeat}
       pendingSeatIds={pendingSeatIds}
       seats={currentSeats}
@@ -377,15 +473,172 @@ export function SeatMapView({
   );
 }
 
+const ZOOM_FACTOR = 1.15;
+const MAX_ZOOM_STEPS = 8;
+const MIN_DEFAULT_ZOOM = 0.75;
+
 export function SeatMapLayout({
+  accessibleRowIndex,
   errorMessage,
+  maxCenterSeatsPerRow,
   onSeatToggle,
   pendingSeatIds = new Set(),
   seats,
   selectedSeatIds = new Set(),
 }: SeatMapLayoutProps) {
   const { t } = useI18n();
-  const layout = useMemo(() => buildSeatMapLayout(seats), [seats]);
+  const layout = useMemo(
+    () => buildSeatMapLayout(seats, maxCenterSeatsPerRow ?? null, accessibleRowIndex ?? null),
+    [seats, maxCenterSeatsPerRow, accessibleRowIndex]
+  );
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const naturalWidthRef = useRef(0);
+  const prevEffectiveZoomRef = useRef(1);
+  const hasInitializedZoomRef = useRef(false);
+  const isMouseDownRef = useRef(false);
+  const dragStartRef = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
+
+  const [fitZoom, setFitZoom] = useState(1);
+  const [zoomOffset, setZoomOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const effectiveZoom = fitZoom * Math.pow(ZOOM_FACTOR, zoomOffset);
+  const canZoomIn = zoomOffset < MAX_ZOOM_STEPS;
+  const canZoomOut = zoomOffset > 0;
+
+  useLayoutEffect(() => {
+    const map = mapRef.current;
+    const scroll = scrollRef.current;
+    if (!map || !scroll) return;
+
+    const prevZoom = map.style.zoom;
+    map.style.zoom = "1";
+    const naturalWidth = map.offsetWidth;
+    map.style.zoom = prevZoom;
+    naturalWidthRef.current = naturalWidth;
+
+    if (naturalWidth > 0) {
+      const cs = window.getComputedStyle(scroll);
+      const padding = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+      const available = scroll.clientWidth - padding;
+      const newFitZoom = Math.min(1, available / naturalWidth);
+      const defaultOffset =
+        newFitZoom < MIN_DEFAULT_ZOOM
+          ? Math.min(
+              Math.ceil(Math.log(MIN_DEFAULT_ZOOM / newFitZoom) / Math.log(ZOOM_FACTOR)),
+              MAX_ZOOM_STEPS
+            )
+          : 0;
+      hasInitializedZoomRef.current = false;
+      setFitZoom(newFitZoom);
+      setZoomOffset(defaultOffset);
+    }
+  }, [seats.length]);
+
+  useEffect(() => {
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+
+    const ro = new ResizeObserver(() => {
+      const naturalWidth = naturalWidthRef.current;
+      if (naturalWidth > 0) {
+        const cs = window.getComputedStyle(scroll);
+        const padding = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+        const available = scroll.clientWidth - padding;
+        setFitZoom(Math.min(1, available / naturalWidth));
+      }
+    });
+    ro.observe(scroll);
+    return () => ro.disconnect();
+  }, []);
+
+  // Center viewport on user-initiated zoom (skip on first initialization)
+  useEffect(() => {
+    if (!hasInitializedZoomRef.current) {
+      hasInitializedZoomRef.current = true;
+      prevEffectiveZoomRef.current = effectiveZoom;
+      return;
+    }
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+    const prev = prevEffectiveZoomRef.current;
+    const ratio = effectiveZoom / prev;
+    scroll.scrollLeft = Math.max(
+      0,
+      (scroll.scrollLeft + scroll.clientWidth / 2) * ratio - scroll.clientWidth / 2
+    );
+    scroll.scrollTop = Math.max(
+      0,
+      (scroll.scrollTop + scroll.clientHeight / 2) * ratio - scroll.clientHeight / 2
+    );
+    prevEffectiveZoomRef.current = effectiveZoom;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoomOffset]);
+
+  // Keep prevEffectiveZoomRef in sync for resize-induced zoom changes
+  useEffect(() => {
+    prevEffectiveZoomRef.current = effectiveZoom;
+  });
+
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    isMouseDownRef.current = true;
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+    dragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      scrollLeft: scroll.scrollLeft,
+      scrollTop: scroll.scrollTop,
+    };
+  }, []);
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!isMouseDownRef.current) return;
+      const scroll = scrollRef.current;
+      if (!scroll) return;
+      const dx = e.clientX - dragStartRef.current.x;
+      const dy = e.clientY - dragStartRef.current.y;
+      if (!isDragging && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) setIsDragging(true);
+      scroll.scrollLeft = dragStartRef.current.scrollLeft - dx;
+      scroll.scrollTop = dragStartRef.current.scrollTop - dy;
+    },
+    [isDragging]
+  );
+
+  const stopDragging = useCallback(() => {
+    isMouseDownRef.current = false;
+    setIsDragging(false);
+  }, []);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+    isMouseDownRef.current = true;
+    dragStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      scrollLeft: scroll.scrollLeft,
+      scrollTop: scroll.scrollTop,
+    };
+  }, []);
+
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent<HTMLDivElement>) => {
+      if (!isMouseDownRef.current || e.touches.length !== 1) return;
+      const scroll = scrollRef.current;
+      if (!scroll) return;
+      const touch = e.touches[0];
+      scroll.scrollLeft = dragStartRef.current.scrollLeft - (touch.clientX - dragStartRef.current.x);
+      scroll.scrollTop = dragStartRef.current.scrollTop - (touch.clientY - dragStartRef.current.y);
+    },
+    []
+  );
 
   if (seats.length === 0) {
     return (
@@ -396,12 +649,44 @@ export function SeatMapLayout({
   }
 
   return (
-    <section aria-labelledby="mapa-assentos" className="seat-map-section">
-      <div className="seat-map-section__header">
-        <h2 id="mapa-assentos">{t("seats.title")}</h2>
-        <p className="sr-only" id="mapa-assentos-instrucoes">
-          {t("seats.instructions")}
-        </p>
+    <section aria-labelledby="mapa-assentos" className="seat-map-section min-w-0">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="seat-map-section__header">
+          <h2 id="mapa-assentos">{t("seats.title")}</h2>
+          <p className="sr-only" id="mapa-assentos-instrucoes">
+            {t("seats.instructions")}
+          </p>
+        </div>
+        <div
+          aria-label={t("seats.zoomControls")}
+          className="flex shrink-0 items-center gap-1"
+          role="group"
+        >
+          <button
+            aria-label={t("seats.zoomOut")}
+            className="inline-flex h-8 w-8 items-center justify-center rounded border border-white/15 bg-white/5 text-text/60 transition hover:bg-white/10 hover:text-text disabled:pointer-events-none disabled:opacity-30"
+            disabled={!canZoomOut}
+            onClick={() => setZoomOffset((o) => Math.max(o - 1, 0))}
+            type="button"
+          >
+            <ZoomOut size={14} />
+          </button>
+          <span
+            aria-hidden="true"
+            className="w-10 text-center text-xs font-bold tabular-nums text-text/50"
+          >
+            {Math.round(effectiveZoom * 100)}%
+          </span>
+          <button
+            aria-label={t("seats.zoomIn")}
+            className="inline-flex h-8 w-8 items-center justify-center rounded border border-white/15 bg-white/5 text-text/60 transition hover:bg-white/10 hover:text-text disabled:pointer-events-none disabled:opacity-30"
+            disabled={!canZoomIn}
+            onClick={() => setZoomOffset((o) => Math.min(o + 1, MAX_ZOOM_STEPS))}
+            type="button"
+          >
+            <ZoomIn size={14} />
+          </button>
+        </div>
       </div>
 
       <SeatMapLegend />
@@ -414,106 +699,191 @@ export function SeatMapLayout({
 
       <div
         aria-describedby="mapa-assentos-instrucoes"
-        aria-label={t("seats.scrollAreaA11y")}
-        className="seat-map-scroll"
+        aria-label={t("seats.mapContainerA11y")}
+        className={[
+          "seat-map-scroll min-w-0 [&::-webkit-scrollbar]:hidden",
+          isDragging ? "cursor-grabbing select-none" : "cursor-grab",
+        ].join(" ")}
+        onMouseDown={handleMouseDown}
+        onMouseLeave={stopDragging}
+        onMouseMove={handleMouseMove}
+        onMouseUp={stopDragging}
+        onTouchEnd={stopDragging}
+        onTouchMove={handleTouchMove}
+        onTouchStart={handleTouchStart}
+        ref={scrollRef}
+        style={{ overflow: "scroll", scrollbarWidth: "none" }}
         tabIndex={0}
       >
         <div
           aria-label={t("seats.interactiveMapA11y")}
           className="seat-map"
+          ref={mapRef}
+          style={{ zoom: effectiveZoom }}
         >
           <div className="seat-map__screen">{t("seats.screen")}</div>
 
-          <div
-            aria-label={t("seats.accessiblePriorityA11y")}
-            className="seat-map__accessible-row"
-            role="group"
-          >
-            <span aria-hidden="true" className="seat-map__row-label" />
-            <div className="seat-map__accessible-list">
-              <div className="seat-map__accessible-group seat-map__accessible-group--left">
-                {layout.accessibleLeftPairs.map((pair) =>
-                  renderAccessiblePair({
-                    companionFirst: true,
-                    onSeatToggle,
-                    pair,
-                    pendingSeatIds,
-                    selectedSeatIds,
-                    t,
-                  })
-                )}
-              </div>
-              <div className="seat-map__accessible-group seat-map__accessible-group--right">
-                {layout.accessibleRightPairs.map((pair) =>
-                  renderAccessiblePair({
-                    onSeatToggle,
-                    pair,
-                    pendingSeatIds,
-                    selectedSeatIds,
-                    t,
-                  })
-                )}
-              </div>
-            </div>
-            <span aria-hidden="true" className="seat-map__row-label" />
-          </div>
-
           <div className="seat-map__rows">
-            {layout.rows.map((row) => (
-              <div className="seat-map__row" key={row.rowLabel}>
-                <span
-                  aria-hidden="true"
-                  className="seat-map__row-label"
-                >
-                  {row.rowLabel}
-                </span>
-                <div
-                  aria-label={t("seats.rowA11y", { row: row.rowLabel })}
-                  className="seat-map__seat-list"
-                  role="group"
-                >
-                  <div className="seat-map__seat-group seat-map__seat-group--left">
-                    {row.leftSeats.map((seat) =>
-                      renderSeatButton({
-                        displayNumber: seat.displayNumber,
-                        key: seat.seat.session_seat_id,
-                        onSeatToggle,
-                        pendingSeatIds,
-                        seat: seat.seat,
-                        selectedSeatIds,
-                        t,
-                      })
-                    )}
-                  </div>
-                  <span aria-hidden="true" className="seat-map__center-aisle" />
-                  <div className="seat-map__seat-group seat-map__seat-group--right">
-                    {row.rightSeats.map((seat) =>
-                      renderSeatButton({
-                        displayNumber: seat.displayNumber,
-                        key: seat.seat.session_seat_id,
-                        onSeatToggle,
-                        pendingSeatIds,
-                        seat: seat.seat,
-                        selectedSeatIds,
-                        t,
-                      })
-                    )}
-                  </div>
+            {layout.rows.slice(0, layout.accessibleRowIndex).map((row, index) =>
+              renderRegularRow({ globalIndex: index, onSeatToggle, pendingSeatIds, row, selectedSeatIds, t, totalRows: layout.rows.length })
+            )}
+
+            <div
+              aria-label={t("seats.accessiblePriorityA11y")}
+              className="seat-map__accessible-row"
+              role="group"
+            >
+              <span aria-hidden="true" className="seat-map__row-label">
+                {layout.accessibleRowLabel}
+              </span>
+              <div className="seat-map__accessible-list">
+                <div className="seat-map__accessible-group seat-map__accessible-group--left">
+                  {layout.accessibleLeftPairs.map((pair) =>
+                    renderAccessiblePair({
+                      companionFirst: true,
+                      onSeatToggle,
+                      pair,
+                      pendingSeatIds,
+                      selectedSeatIds,
+                      t,
+                    })
+                  )}
                 </div>
-                <span
-                  aria-hidden="true"
-                  className="seat-map__row-label"
-                >
-                  {row.rowLabel}
-                </span>
+                <div className="seat-map__accessible-group seat-map__accessible-group--right">
+                  {layout.accessibleRightPairs.map((pair) =>
+                    renderAccessiblePair({
+                      onSeatToggle,
+                      pair,
+                      pendingSeatIds,
+                      selectedSeatIds,
+                      t,
+                    })
+                  )}
+                </div>
               </div>
-            ))}
+              <span aria-hidden="true" className="seat-map__row-label">
+                {layout.accessibleRowLabel}
+              </span>
+            </div>
+
+            {layout.rows.slice(layout.accessibleRowIndex).map((row, index) =>
+              renderRegularRow({ globalIndex: layout.accessibleRowIndex + index, onSeatToggle, pendingSeatIds, row, selectedSeatIds, t, totalRows: layout.rows.length })
+            )}
           </div>
 
           <div className="seat-map__back-label">{t("seats.backOfRoom")}</div>
         </div>
       </div>
     </section>
+  );
+}
+
+function renderRegularRow({
+  globalIndex,
+  onSeatToggle,
+  pendingSeatIds,
+  row,
+  selectedSeatIds,
+  t,
+  totalRows,
+}: {
+  globalIndex: number;
+  onSeatToggle?: (seat: SessionSeatMapItem) => void;
+  pendingSeatIds: ReadonlySet<string>;
+  row: SeatMapRenderedRow;
+  selectedSeatIds: ReadonlySet<string>;
+  t: Translate;
+  totalRows: number;
+}) {
+  const isLastRow = globalIndex === totalRows - 1;
+  const hasNamoradeiras =
+    row.leftNamoradeiras.length > 0 || row.rightNamoradeiras.length > 0;
+
+  return (
+    <div
+      className="seat-map__row"
+      key={row.rowLabel}
+    >
+      <span
+        aria-hidden="true"
+        className="seat-map__row-label"
+      >
+        {row.rowLabel}
+      </span>
+      <div
+        aria-label={t("seats.rowA11y", { row: row.rowLabel })}
+        className="seat-map__seat-list"
+        role="group"
+      >
+        <div className="seat-map__seat-group seat-map__seat-group--left">
+          {hasNamoradeiras && row.leftNamoradeiras.map((seat) =>
+            renderSeatButton({
+              displayNumber: seat.displayNumber,
+              key: seat.seat.session_seat_id,
+              onSeatToggle,
+              pendingSeatIds,
+              seat: seat.seat,
+              selectedSeatIds,
+              t,
+            })
+          )}
+          {hasNamoradeiras && !isLastRow && (
+            <span aria-hidden="true" className="block w-5 flex-shrink-0" />
+          )}
+          {row.leftSeats.map((seat) =>
+            renderSeatButton({
+              displayNumber: seat.displayNumber,
+              key: seat.seat.session_seat_id,
+              onSeatToggle,
+              pendingSeatIds,
+              seat: seat.seat,
+              selectedSeatIds,
+              t,
+            })
+          )}
+          {hasNamoradeiras && isLastRow && (
+            <span aria-hidden="true" className="block w-5 flex-shrink-0" />
+          )}
+        </div>
+        <span aria-hidden="true" className="seat-map__center-aisle" />
+        <div className="seat-map__seat-group seat-map__seat-group--right">
+          {hasNamoradeiras && isLastRow && (
+            <span aria-hidden="true" className="block w-5 flex-shrink-0" />
+          )}
+          {row.rightSeats.map((seat) =>
+            renderSeatButton({
+              displayNumber: seat.displayNumber,
+              key: seat.seat.session_seat_id,
+              onSeatToggle,
+              pendingSeatIds,
+              seat: seat.seat,
+              selectedSeatIds,
+              t,
+            })
+          )}
+          {hasNamoradeiras && !isLastRow && (
+            <span aria-hidden="true" className="block w-5 flex-shrink-0" />
+          )}
+          {hasNamoradeiras && row.rightNamoradeiras.map((seat) =>
+            renderSeatButton({
+              displayNumber: seat.displayNumber,
+              key: seat.seat.session_seat_id,
+              onSeatToggle,
+              pendingSeatIds,
+              seat: seat.seat,
+              selectedSeatIds,
+              t,
+            })
+          )}
+        </div>
+      </div>
+      <span
+        aria-hidden="true"
+        className="seat-map__row-label"
+      >
+        {row.rowLabel}
+      </span>
+    </div>
   );
 }
 
@@ -723,7 +1093,9 @@ export function groupSeatMapRows(
 }
 
 export function buildSeatMapLayout(
-  seats: SessionSeatMapItem[]
+  seats: SessionSeatMapItem[],
+  maxCenterSeatsPerRow: number | null = null,
+  accessibleRowIndex: number | null = null
 ): SeatMapLayoutModel {
   const accessibleSeats = getAccessibleDisplaySeats(seats);
   const accessibleSeatIds = new Set(
@@ -744,14 +1116,37 @@ export function buildSeatMapLayout(
   const roomRows = groupSeatMapRows(
     seats.filter((seat) => !reservedFrontSeatIds.has(seat.session_seat_id))
   );
+  // Prefer the row flagged as the accessible row (e.g. "PCD") over whatever
+  // happens to be first after sorting — fallback seats from other rows can
+  // otherwise sort before the real accessible row alphabetically.
+  const accessibleRowLabel =
+    seats.find((s) => s.is_accessible_row)?.row ??
+    seats.find((s) => s.is_accessible)?.row ??
+    null;
+
+  // Clamp accessibleRowIndex to valid insertion points in regular rows.
+  // Default to 0 (beginning) for rooms without the field configured.
+  const resolvedAccessibleRowIndex =
+    accessibleRowIndex !== null
+      ? Math.min(Math.max(0, accessibleRowIndex), roomRows.length)
+      : 0;
 
   return {
     accessibleLeftPairs: accessiblePairs.slice(0, ACCESSIBLE_SEATS_PER_SIDE),
     accessibleRightPairs: accessiblePairs.slice(ACCESSIBLE_SEATS_PER_SIDE),
-    rows: roomRows.map((row) => ({
-      ...row,
-      ...splitRowSeats(withDisplayNumbers(row.seats)),
-    })),
+    accessibleRowIndex: resolvedAccessibleRowIndex,
+    accessibleRowLabel,
+    maxCenterSeatsPerRow,
+    rows: roomRows.map((row) => {
+      const displaySeats = withDisplayNumbers(row.seats);
+
+      if (maxCenterSeatsPerRow !== null && displaySeats.length > maxCenterSeatsPerRow) {
+        return { ...row, ...splitRowSeatsWithNamoradeiras(displaySeats, maxCenterSeatsPerRow) };
+      }
+
+      const { leftSeats, rightSeats } = splitRowSeats(displaySeats);
+      return { ...row, leftSeats, rightSeats, leftNamoradeiras: [], rightNamoradeiras: [] };
+    }),
   };
 }
 
@@ -858,6 +1253,11 @@ export function buildReservedSeatsFromReservation(
 ): ReservedSeat[] {
   const expiresAt = new Date(expiresAtValue);
   const seatsBySeatId = new Map(seatMap.map((seat) => [seat.seat_id, seat]));
+  const companionSeatIds = new Set(
+    seatMap
+      .filter((s) => s.is_accessible && s.companion_seat_id)
+      .map((s) => s.companion_seat_id!)
+  );
 
   return response.seats.map((reservedSeat) => {
     const originalSeat = seatsBySeatId.get(reservedSeat.seat_id);
@@ -870,6 +1270,7 @@ export function buildReservedSeatsFromReservation(
       basePrice,
       expiresAt,
       isAccessible: originalSeat.is_accessible,
+      isCompanion: companionSeatIds.has(reservedSeat.seat_id),
       number: reservedSeat.number,
       row: reservedSeat.row,
       seatId: reservedSeat.seat_id,
@@ -980,13 +1381,18 @@ function getAccessibleDisplaySeats(seats: SessionSeatMapItem[]) {
     selectedSeats.push(seat);
   }
 
-  for (const seat of getAccessibleFallbackSeats(seats, selectedSeatIds)) {
-    if (selectedSeats.length >= ACCESSIBLE_SEAT_COUNT) {
-      break;
-    }
+  // Fallbacks from regular rows are only needed when there's no dedicated accessible row.
+  const hasAccessibleRow = seats.some((s) => s.is_accessible_row);
 
-    selectedSeatIds.add(seat.session_seat_id);
-    selectedSeats.push(seat);
+  if (!hasAccessibleRow) {
+    for (const seat of getAccessibleFallbackSeats(seats, selectedSeatIds)) {
+      if (selectedSeats.length >= ACCESSIBLE_SEAT_COUNT) {
+        break;
+      }
+
+      selectedSeatIds.add(seat.session_seat_id);
+      selectedSeats.push(seat);
+    }
   }
 
   return selectedSeats
@@ -1000,11 +1406,27 @@ function pairAccessibleSeatsWithCompanions(
   selectedSeatIds: ReadonlySet<string>
 ): SeatMapAccessiblePair[] {
   const usedSeatIds = new Set(selectedSeatIds);
+  const seatBySeatId = new Map(seats.map((s) => [s.seat_id, s]));
 
   return accessibleSeats.map((accessibleSeat) => {
-    const companionSeat =
-      findAdjacentCompanionSeat(accessibleSeat.seat, seats, usedSeatIds) ??
-      findFallbackCompanionSeat(accessibleSeat.seat, seats, usedSeatIds);
+    let companionSeat: SessionSeatMapItem | undefined;
+
+    const explicitCompanionId = accessibleSeat.seat.companion_seat_id;
+    if (explicitCompanionId) {
+      const candidate = seatBySeatId.get(explicitCompanionId);
+      // Companion must be in the same row; if not, the FK is stale/wrong — fall through to adjacent lookup.
+      if (candidate && !usedSeatIds.has(candidate.session_seat_id) && candidate.row === accessibleSeat.seat.row) {
+        companionSeat = candidate;
+      } else {
+        companionSeat =
+          findAdjacentCompanionSeat(accessibleSeat.seat, seats, usedSeatIds) ??
+          findFallbackCompanionSeat(accessibleSeat.seat, seats, usedSeatIds);
+      }
+    } else {
+      companionSeat =
+        findAdjacentCompanionSeat(accessibleSeat.seat, seats, usedSeatIds) ??
+        findFallbackCompanionSeat(accessibleSeat.seat, seats, usedSeatIds);
+    }
 
     if (companionSeat) {
       usedSeatIds.add(companionSeat.session_seat_id);
@@ -1128,6 +1550,22 @@ function splitRowSeats(seats: SeatMapDisplaySeat[]) {
     leftSeats: seats.slice(0, leftSeatCount),
     rightSeats: seats.slice(leftSeatCount),
   };
+}
+
+function splitRowSeatsWithNamoradeiras(
+  seats: SeatMapDisplaySeat[],
+  maxCenter: number
+) {
+  const excess = seats.length - maxCenter;
+  const leftExcess = Math.ceil(excess / 2);
+
+  const leftNamoradeiras = seats.slice(0, leftExcess);
+  const centerSeats = seats.slice(leftExcess, leftExcess + maxCenter);
+  const rightNamoradeiras = seats.slice(leftExcess + maxCenter);
+
+  const { leftSeats, rightSeats } = splitRowSeats(centerSeats);
+
+  return { leftNamoradeiras, leftSeats, rightNamoradeiras, rightSeats };
 }
 
 function withDisplayNumbers(

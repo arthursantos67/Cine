@@ -50,12 +50,39 @@ export type AdminGenreWritePayload = {
 };
 
 export type AdminRoomWritePayload = {
+  accessible_row_index?: number;
   capacity: number;
+  max_center_seats_per_row?: number | null;
   description?: string;
   display_name?: string;
   experience_type?: CatalogRoomExperienceType;
   name: string;
+  source_language?: string;
   translations?: CatalogRoomTranslations;
+};
+
+export type AdminAccessibleRowWritePayload = {
+  room: string;
+  name: string;
+  accessible_seat_count: number;
+};
+
+export type AdminBulkLayoutRowSeat = {
+  number: number;
+};
+
+export type AdminBulkLayoutRow = {
+  name: string;
+  seats: AdminBulkLayoutRowSeat[];
+};
+
+export type AdminBulkLayoutPayload = {
+  room: string;
+  rows: AdminBulkLayoutRow[];
+};
+
+export type AdminBulkLayoutCreatedRow = AdminSeatRow & {
+  seats: AdminSeat[];
 };
 
 export type RoomTypePricingWritePayload = {
@@ -68,6 +95,7 @@ export type AdminSeatRowWritePayload = {
 };
 
 export type AdminSeatWritePayload = {
+  companion_seat?: string | null;
   is_accessible?: boolean;
   number: number;
   row: string;
@@ -414,8 +442,8 @@ export const adminApi = {
   },
 
   async listAllSeatRows(roomId: string): Promise<AdminSeatRow[]> {
-    const all = await fetchAllPages<AdminSeatRow>(SEAT_ROWS_PATH, isAdminSeatRow);
-    return all.filter((row) => row.room === roomId);
+    const rows = await fetchAllPages<AdminSeatRow>(`${SEAT_ROWS_PATH}?room=${roomId}`, isAdminSeatRow);
+    return rows.filter((row) => row.room === roomId);
   },
 
   async createSeatRow(payload: AdminSeatRowWritePayload) {
@@ -453,8 +481,9 @@ export const adminApi = {
     return response satisfies AdminSeatRow;
   },
 
-  async listAllSeats(): Promise<AdminSeat[]> {
-    return fetchAllPages<AdminSeat>(SEATS_PATH, isAdminSeat);
+  async listAllSeats(roomId?: string): Promise<AdminSeat[]> {
+    const path = roomId ? `${SEATS_PATH}?room=${roomId}` : SEATS_PATH;
+    return fetchAllPages<AdminSeat>(path, isAdminSeat);
   },
 
   async createSeat(payload: AdminSeatWritePayload) {
@@ -490,6 +519,26 @@ export const adminApi = {
       auth: "required",
       method: "DELETE",
     });
+  },
+
+  async bulkCreateLayout(payload: AdminBulkLayoutPayload): Promise<AdminBulkLayoutCreatedRow[]> {
+    const response = await apiRequest<unknown[]>("/api/v1/reservation/bulk-create-layout/", {
+      auth: "required",
+      json: payload,
+      method: "POST",
+    });
+    return response as AdminBulkLayoutCreatedRow[];
+  },
+
+  async createAccessibleRow(
+    payload: AdminAccessibleRowWritePayload
+  ): Promise<AdminBulkLayoutCreatedRow> {
+    const response = await apiRequest<unknown>("/api/v1/reservation/accessible-row/", {
+      auth: "required",
+      json: payload,
+      method: "POST",
+    });
+    return response as AdminBulkLayoutCreatedRow;
   },
 
   async listSessions(params: ListSessionsParams = {}) {
@@ -664,7 +713,8 @@ function isAdminSeat(value: unknown): value is AdminSeat {
     typeof value.id === "string" &&
     typeof value.row === "string" &&
     typeof value.number === "number" &&
-    typeof value.is_accessible === "boolean"
+    typeof value.is_accessible === "boolean" &&
+    (value.companion_seat === null || typeof value.companion_seat === "string")
   );
 }
 

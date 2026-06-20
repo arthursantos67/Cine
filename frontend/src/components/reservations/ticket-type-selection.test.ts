@@ -20,6 +20,7 @@ const firstSeat: ReservedSeat = {
   basePrice: 42.5,
   expiresAt: new Date("2026-05-22T21:40:00.000Z"),
   isAccessible: false,
+  isCompanion: false,
   number: 7,
   row: "B",
   seatId: "seat-1",
@@ -103,6 +104,41 @@ test("ticket type selection form renders seats, options, voucher field, and subt
   assert.match(html, /O cupom não altera o subtotal nesta versão/);
   assert.match(html, /Continuar para pagamento/);
   assert.match(html, new RegExp(escapeRegExp(formatCurrency(63.75))));
+});
+
+test("companion seat row shows gratuito price and hides ticket type radio buttons", () => {
+  const companionSeat: ReservedSeat = {
+    ...firstSeat,
+    isCompanion: true,
+    number: 2,
+    seatId: "seat-companion",
+    sessionSeatId: "session-seat-companion",
+  };
+  const rows = buildTicketTypeSelectionRows(
+    [firstSeat, companionSeat],
+    { "session-seat-1": "inteira", "session-seat-companion": "gratuito" }
+  );
+
+  assert.equal(rows[0].isCompanion, false);
+  assert.equal(rows[0].selectedTicketType, "inteira");
+  assert.equal(rows[0].unitPrice, 42.5);
+  assert.equal(rows[1].isCompanion, true);
+  assert.equal(rows[1].selectedTicketType, "gratuito");
+  assert.equal(rows[1].unitPrice, 0);
+  assert.equal(calculateTicketTypeSubtotal(rows), 42.5);
+
+  const html = renderToStaticMarkup(
+    createElement(TicketTypeSelectionForm, {
+      onTicketTypeChange: () => undefined,
+      reservedSeats: [firstSeat, companionSeat],
+      ticketTypes: { "session-seat-1": "inteira", "session-seat-companion": "gratuito" },
+    })
+  );
+
+  assert.match(html, /name="ticket-type-session-seat-1"/);
+  assert.doesNotMatch(html, /name="ticket-type-session-seat-companion"/);
+  assert.match(html, /ticket-types__companion-notice/);
+  assert.match(html, /Assento de acompanhante/);
 });
 
 test("voucher input is present without validation or discount controls", () => {
