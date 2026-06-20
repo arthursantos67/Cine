@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { adminApi, type AdminSessionWritePayload } from "@/api/admin";
-import { ApiError, getApiErrorUserMessage } from "@/api/client";
+import { getApiErrorUserMessage } from "@/api/client";
 import type {
   AdminRoom,
   AdminSession,
@@ -18,21 +18,19 @@ import type { BadgeTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { useI18n } from "@/i18n";
-
-type FieldErrors = Partial<
-  Record<keyof AdminSessionWritePayload | "non_field_errors", string>
->;
+import {
+  addMinutesToLocalDateTime,
+  combineLocalDateTime,
+  extractSessionFieldErrors,
+  getSessionPriceMultiplier,
+  isConflictError,
+  splitLocalDateTime,
+  type FieldErrors,
+} from "./session-utils";
 
 type AdminSessionFormProps = {
   session?: AdminSession;
 };
-
-const WEEKEND_DAYS = new Set([0, 5, 6]); // Sun, Fri, Sat
-
-export function getSessionPriceMultiplier(date: string, time: string): number {
-  const day = new Date(`${date}T${time}`).getDay();
-  return WEEKEND_DAYS.has(day) ? 1.24 : 1.0;
-}
 
 function computeSessionPricePreview(
   roomBasePrice: string,
@@ -43,36 +41,6 @@ function computeSessionPricePreview(
   if (!roomBasePrice || !startDate || !startTime) return null;
   const multiplier = getSessionPriceMultiplier(startDate, startTime);
   return formatCurrency(Number(roomBasePrice) * multiplier);
-}
-
-export function extractSessionFieldErrors(error: unknown): FieldErrors {
-  if (!(error instanceof ApiError) || error.code !== "VALIDATION_FAILED") {
-    return {};
-  }
-
-  const details = error.details as Record<string, unknown> | null;
-  if (!details || typeof details !== "object") {
-    return {};
-  }
-
-  const result: FieldErrors = {};
-
-  for (const [key, val] of Object.entries(details)) {
-    const messages = Array.isArray(val) ? val : [val];
-    result[key as keyof FieldErrors] = messages.join(" ");
-  }
-
-  return result;
-}
-
-export function isConflictError(error: unknown): boolean {
-  return (
-    error instanceof ApiError &&
-    (error.status === 409 ||
-      (error.status === 400 &&
-        typeof error.message === "string" &&
-        /overlap|conflict|horário|já existe/i.test(error.message)))
-  );
 }
 
 function FormField({
@@ -130,49 +98,19 @@ function isProtected(session?: AdminSession): boolean {
   return Boolean(session?.has_reservations || session?.has_purchases);
 }
 
-export function splitLocalDateTime(isoString: string): {
-  date: string;
-  time: string;
-} {
-  const d = new Date(isoString);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return {
-    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
-    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
-  };
-}
-
-export function combineLocalDateTime(date: string, time: string): string {
-  return new Date(`${date}T${time}`).toISOString();
-}
-
-export function addMinutesToLocalDateTime(
-  date: string,
-  time: string,
-  minutes: number
-): { date: string; time: string } {
-  const base = new Date(`${date}T${time}`);
-  const result = new Date(base.getTime() + minutes * 60_000);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return {
-    date: `${result.getFullYear()}-${pad(result.getMonth() + 1)}-${pad(result.getDate())}`,
-    time: `${pad(result.getHours())}:${pad(result.getMinutes())}`,
-  };
-}
-
-const AUDIO_BADGE_TONE: Record<string, BadgeTone> = {
+const AUDIO_BADGE_TONE: Record<Exclude<CatalogAudioFormat, "">, BadgeTone> = {
   dublado: "neutral",
   legendado: "neutral",
   original: "info",
 };
 
-const PROJECTION_BADGE_TONE: Record<string, BadgeTone> = {
+const PROJECTION_BADGE_TONE: Record<Exclude<CatalogProjectionFormat, "">, BadgeTone> = {
   "2d": "neutral",
   "3d": "info",
   imax: "accent",
 };
 
-const SESSION_TYPE_BADGE_TONE: Record<string, BadgeTone> = {
+const SESSION_TYPE_BADGE_TONE: Record<Exclude<CatalogSessionType, "">, BadgeTone> = {
   preview: "info",
   regular: "neutral",
   special_event: "accent",
@@ -286,17 +224,17 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
     setConflictError(null);
     setIsSubmitting(true);
 
-    const payload: AdminSessionWritePayload = {
-      audio_format: audioFormat || undefined,
-      end_time: combineLocalDateTime(endDate, endTime),
-      movie: movieId,
-      projection_format: projectionFormat || undefined,
-      room: roomId,
-      session_type: sessionType || undefined,
-      start_time: combineLocalDateTime(startDate, startTime),
-    };
-
     try {
+      const payload: AdminSessionWritePayload = {
+        audio_format: audioFormat || undefined,
+        end_time: combineLocalDateTime(endDate, endTime),
+        movie: movieId,
+        projection_format: projectionFormat || undefined,
+        room: roomId,
+        session_type: sessionType || undefined,
+        start_time: combineLocalDateTime(startDate, startTime),
+      };
+
       if (isEditing) {
         await adminApi.updateSession(session.id, payload);
       } else {

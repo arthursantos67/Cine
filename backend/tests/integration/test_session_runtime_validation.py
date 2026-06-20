@@ -105,6 +105,24 @@ def test_session_accepts_end_time_within_tolerance(admin_client, movie_120, room
 
 @pytest.mark.django_db
 @override_settings(REST_FRAMEWORK=REST_FRAMEWORK_OVERRIDE)
+def test_session_rejects_end_time_outside_tolerance(admin_client, movie_120, room):
+    """End time 6 min short of runtime (outside 5-min tolerance) is rejected."""
+    response = admin_client.post(
+        "/api/v1/catalog/sessions/",
+        {
+            "movie": str(movie_120.id),
+            "room": str(room.id),
+            "start_time": "2026-07-05T19:00:00Z",
+            "end_time": "2026-07-05T20:54:00Z",  # 114 min — outside 5-min tolerance
+        },
+        format="json",
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "end_time" in response.json().get("error", {}).get("details", {})
+
+
+@pytest.mark.django_db
+@override_settings(REST_FRAMEWORK=REST_FRAMEWORK_OVERRIDE)
 def test_session_accepts_longer_end_time(admin_client, movie_120, room):
     """End time longer than runtime (e.g. with intermission/ads) is valid."""
     response = admin_client.post(

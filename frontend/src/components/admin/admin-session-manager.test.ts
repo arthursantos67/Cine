@@ -9,7 +9,7 @@ import {
   getSessionPriceMultiplier,
   isConflictError,
   splitLocalDateTime,
-} from "./AdminSessionForm";
+} from "./session-utils";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -218,7 +218,8 @@ test("adminApi.getSession rejects when movie or room is missing", async () => {
 // ─── splitLocalDateTime ────────────────────────────────────────────────────────
 
 test("splitLocalDateTime splits an ISO string into local date and time parts", () => {
-  // Use a fixed offset to avoid TZ dependency: parse a date string directly
+  // Both sides use local-time arithmetic (Date constructor + getFullYear/getMonth/...),
+  // so they cancel out — the result is TZ-stable without any fixed-offset trick.
   const d = new Date(2026, 5, 10, 19, 30); // June 10 2026, 19:30 local
   const iso = d.toISOString();
   // Re-derive expected parts the same way the helper does
