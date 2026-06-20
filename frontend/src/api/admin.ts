@@ -442,8 +442,7 @@ export const adminApi = {
   },
 
   async listAllSeatRows(roomId: string): Promise<AdminSeatRow[]> {
-    const all = await fetchAllPages<AdminSeatRow>(SEAT_ROWS_PATH, isAdminSeatRow);
-    return all.filter((row) => row.room === roomId);
+    return fetchAllPages<AdminSeatRow>(`${SEAT_ROWS_PATH}?room=${roomId}`, isAdminSeatRow);
   },
 
   async createSeatRow(payload: AdminSeatRowWritePayload) {
@@ -481,8 +480,9 @@ export const adminApi = {
     return response satisfies AdminSeatRow;
   },
 
-  async listAllSeats(): Promise<AdminSeat[]> {
-    return fetchAllPages<AdminSeat>(SEATS_PATH, isAdminSeat);
+  async listAllSeats(roomId?: string): Promise<AdminSeat[]> {
+    const path = roomId ? `${SEATS_PATH}?room=${roomId}` : SEATS_PATH;
+    return fetchAllPages<AdminSeat>(path, isAdminSeat);
   },
 
   async createSeat(payload: AdminSeatWritePayload) {

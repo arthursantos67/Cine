@@ -64,6 +64,7 @@ export type CheckoutResponse = {
 export type SessionSeatMapItem = {
   companion_seat_id: string | null;
   is_accessible: boolean;
+  is_accessible_row: boolean;
   lock_expires_at?: string | null;
   number: number;
   reserved_by_current_user?: boolean;

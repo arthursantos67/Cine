@@ -717,7 +717,7 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
       const [room, rows, allSeats] = await Promise.all([
         adminApi.getRoom(roomId),
         adminApi.listAllSeatRows(roomId),
-        adminApi.listAllSeats(),
+        adminApi.listAllSeats(roomId),
       ]);
 
       const sortedRows = orderRows(rows, room.accessible_row_index ?? 0);

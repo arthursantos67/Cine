@@ -1381,13 +1381,18 @@ function getAccessibleDisplaySeats(seats: SessionSeatMapItem[]) {
     selectedSeats.push(seat);
   }
 
-  for (const seat of getAccessibleFallbackSeats(seats, selectedSeatIds)) {
-    if (selectedSeats.length >= ACCESSIBLE_SEAT_COUNT) {
-      break;
-    }
+  // Fallbacks from regular rows are only needed when there's no dedicated accessible row.
+  const hasAccessibleRow = seats.some((s) => s.is_accessible_row);
 
-    selectedSeatIds.add(seat.session_seat_id);
-    selectedSeats.push(seat);
+  if (!hasAccessibleRow) {
+    for (const seat of getAccessibleFallbackSeats(seats, selectedSeatIds)) {
+      if (selectedSeats.length >= ACCESSIBLE_SEAT_COUNT) {
+        break;
+      }
+
+      selectedSeatIds.add(seat.session_seat_id);
+      selectedSeats.push(seat);
+    }
   }
 
   return selectedSeats

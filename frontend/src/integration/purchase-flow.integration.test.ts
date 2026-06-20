@@ -114,6 +114,7 @@ const seatMap: SessionSeatMapItem[] = [
   {
     companion_seat_id: null,
     is_accessible: false,
+    is_accessible_row: false,
     lock_expires_at: null,
     number: 7,
     reserved_by_current_user: false,
@@ -125,6 +126,7 @@ const seatMap: SessionSeatMapItem[] = [
   {
     companion_seat_id: null,
     is_accessible: true,
+    is_accessible_row: true,
     lock_expires_at: null,
     number: 8,
     reserved_by_current_user: false,
@@ -136,6 +138,7 @@ const seatMap: SessionSeatMapItem[] = [
   {
     companion_seat_id: null,
     is_accessible: false,
+    is_accessible_row: false,
     lock_expires_at: null,
     number: 9,
     reserved_by_current_user: false,
