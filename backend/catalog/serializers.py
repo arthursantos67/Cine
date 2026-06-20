@@ -18,7 +18,7 @@ from cineprime_api.localization import (
     normalize_translation_payload,
 )
 
-from catalog.models import CastMember, Genre, Movie, MovieInterest, Room, RoomTypePricing, Session
+from catalog.models import CastMember, Genre, Movie, MovieInterest, MovieReview, Room, RoomTypePricing, Session
 from reservations.models import SessionSeat, SessionSeatStatus, Seat
 
 logger = logging.getLogger(__name__)
@@ -382,6 +382,8 @@ class MovieReadSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSer
 
     genres = GenreSummarySerializer(many=True, read_only=True)
     cast = serializers.SerializerMethodField()
+    average_rating = serializers.FloatField(read_only=True, allow_null=True)
+    review_count = serializers.IntegerField(read_only=True)
 
     def get_cast(self, obj):
         return [m.name for m in obj.cast.all()]
@@ -405,6 +407,8 @@ class MovieReadSerializer(TranslatedCatalogSerializerMixin, serializers.ModelSer
             "cast",
             "status",
             "is_featured",
+            "average_rating",
+            "review_count",
             "created_at",
             "updated_at",
         ]
@@ -415,6 +419,8 @@ class MovieSummarySerializer(TranslatedCatalogSerializerMixin, serializers.Model
 
     genres = GenreSummarySerializer(many=True, read_only=True)
     cast = serializers.SerializerMethodField()
+    average_rating = serializers.FloatField(read_only=True, allow_null=True)
+    review_count = serializers.IntegerField(read_only=True)
 
     def get_cast(self, obj):
         return [m.name for m in obj.cast.all()]
@@ -437,6 +443,8 @@ class MovieSummarySerializer(TranslatedCatalogSerializerMixin, serializers.Model
             "cast",
             "status",
             "is_featured",
+            "average_rating",
+            "review_count",
         ]
 
 
@@ -584,3 +592,30 @@ class SessionReadSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+
+class MovieReviewUserSerializer(serializers.Serializer):
+    id = serializers.UUIDField(read_only=True)
+    username = serializers.CharField(read_only=True)
+    email = serializers.EmailField(read_only=True)
+
+    def to_representation(self, instance):
+        return {
+            "id": str(instance.id),
+            "username": instance.username,
+            "email": instance.email,
+        }
+
+
+class MovieReviewSerializer(serializers.ModelSerializer):
+    user = MovieReviewUserSerializer(read_only=True)
+
+    class Meta:
+        model = MovieReview
+        fields = ["id", "user", "rating", "comment", "created_at", "updated_at"]
+        read_only_fields = ["id", "user", "created_at", "updated_at"]
+
+    def validate_rating(self, value):
+        if not (1 <= value <= 5):
+            raise serializers.ValidationError("Rating must be between 1 and 5.")
+        return value

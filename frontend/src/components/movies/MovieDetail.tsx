@@ -25,6 +25,7 @@ import {
   formatMovieGenres,
   formatMovieReleaseDate,
 } from "./movie-formatters";
+import { MovieReviewsPanel } from "./MovieReviews";
 import { SessionBadgeList } from "./SessionBadges";
 import {
   buildSessionDateOptions,
@@ -63,7 +64,9 @@ type MovieDetailProps = {
 };
 
 type MovieDetailViewProps = {
+  currentUserId?: string | null;
   interestState?: InterestState;
+  isAdmin?: boolean;
   isAuthenticated?: boolean;
   isInterestToggling?: boolean;
   onInterestToggle?: () => void;
@@ -77,7 +80,7 @@ const loadingState: MovieDetailState = {
 
 export function MovieDetail({ movieId }: MovieDetailProps) {
   const { locale } = useI18n();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [state, setState] = useState<MovieDetailState>(loadingState);
   const [interestState, setInterestState] = useState<InterestState>({ status: "idle" });
   const [isToggling, setIsToggling] = useState(false);
@@ -156,7 +159,9 @@ export function MovieDetail({ movieId }: MovieDetailProps) {
 
   return (
     <MovieDetailView
+      currentUserId={user?.id ?? null}
       interestState={interestState}
+      isAdmin={user?.is_staff ?? false}
       isAuthenticated={isAuthenticated}
       isInterestToggling={isToggling}
       onInterestToggle={() => void handleInterestToggle()}
@@ -167,7 +172,9 @@ export function MovieDetail({ movieId }: MovieDetailProps) {
 }
 
 export function MovieDetailView({
+  currentUserId,
   interestState,
+  isAdmin,
   isAuthenticated,
   isInterestToggling,
   onInterestToggle,
@@ -204,7 +211,9 @@ export function MovieDetailView({
 
   return (
     <MovieDetailSuccess
+      currentUserId={currentUserId}
       interestState={interestState}
+      isAdmin={isAdmin}
       isAuthenticated={isAuthenticated}
       isInterestToggling={isInterestToggling}
       movie={state.movie}
@@ -214,13 +223,17 @@ export function MovieDetailView({
 }
 
 function MovieDetailSuccess({
+  currentUserId,
   interestState,
+  isAdmin,
   isAuthenticated,
   isInterestToggling,
   movie,
   onInterestToggle,
 }: {
+  currentUserId?: string | null;
   interestState?: InterestState;
+  isAdmin?: boolean;
   isAuthenticated?: boolean;
   isInterestToggling?: boolean;
   movie: CatalogMovieDetail;
@@ -313,6 +326,15 @@ function MovieDetailSuccess({
           <MovieSessionSelector movieId={movie.id} />
         )}
       </article>
+
+      <div className="col-span-full border-t border-white/10 pt-[18px]">
+        <MovieReviewsPanel
+          currentUserId={currentUserId}
+          isAdmin={isAdmin}
+          isAuthenticated={isAuthenticated}
+          movie={movie}
+        />
+      </div>
     </div>
   );
 }

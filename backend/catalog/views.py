@@ -2,6 +2,7 @@ import uuid
 
 from django.core.cache import cache
 from django.db import transaction
+from django.db.models import Avg, Count
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
@@ -22,6 +23,7 @@ from catalog.models import (
     Genre,
     Movie,
     MovieInterest,
+    MovieReview,
     MovieStatus,
     ProjectionFormat,
     Room,
@@ -34,6 +36,7 @@ from catalog.serializers import (
     GenreSerializer,
     MovieInterestStatusSerializer,
     MovieReadSerializer,
+    MovieReviewSerializer,
     MovieWriteSerializer,
     RoomSerializer,
     RoomTypePricingSerializer,
@@ -153,9 +156,19 @@ class GenreDetailView(RetrieveUpdateDestroyAPIView):
         return response
 
 
+def _movie_queryset_with_aggregates():
+    return (
+        Movie.objects.prefetch_related("genres", "cast")
+        .annotate(
+            average_rating=Avg("reviews__rating"),
+            review_count=Count("reviews"),
+        )
+    )
+
+
 @extend_schema(tags=["Catalog"], summary="List or create movies")
 class MovieListCreateView(ListCreateAPIView):
-    queryset = Movie.objects.prefetch_related("genres", "cast").all()
+    queryset = _movie_queryset_with_aggregates()
     permission_classes = [IsAdminUserOrReadOnly]
     CACHE_TTL_SECONDS = 300
     IS_FEATURED_FILTER_VALUES = {
@@ -246,7 +259,7 @@ class MovieListCreateView(ListCreateAPIView):
 
 @extend_schema(tags=["Catalog"], summary="Get, update or delete movie")
 class MovieDetailView(RetrieveUpdateDestroyAPIView):
-    queryset = Movie.objects.prefetch_related("genres", "cast").all()
+    queryset = _movie_queryset_with_aggregates()
     permission_classes = [IsAdminUserOrReadOnly]
 
     def get_serializer_class(self):
@@ -563,4 +576,76 @@ class MovieInterestView(APIView):
     def delete(self, request, movie_pk):
         movie = self._get_movie(movie_pk)
         MovieInterest.objects.filter(movie=movie, user=request.user).delete()
+        return Response(status=http_status.HTTP_204_NO_CONTENT)
+
+
+@extend_schema(tags=["Catalog"], summary="List or create reviews for a movie")
+class MovieReviewListCreateView(APIView):
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsAuthenticated()]
+        return []
+
+    def get(self, request, movie_pk):
+        movie = get_object_or_404(Movie, pk=movie_pk)
+        page_size = 10
+        try:
+            page = max(1, int(request.query_params.get("page", 1)))
+        except (ValueError, TypeError):
+            page = 1
+
+        qs = MovieReview.objects.filter(movie=movie).select_related("user")
+        total = qs.count()
+        offset = (page - 1) * page_size
+        reviews = qs[offset: offset + page_size]
+
+        serializer = MovieReviewSerializer(reviews, many=True)
+
+        base_url = request.build_absolute_uri(request.path)
+
+        def page_url(p):
+            return f"{base_url}?page={p}"
+
+        return Response({
+            "count": total,
+            "next": page_url(page + 1) if offset + page_size < total else None,
+            "previous": page_url(page - 1) if page > 1 else None,
+            "results": serializer.data,
+        })
+
+    def post(self, request, movie_pk):
+        movie = get_object_or_404(Movie, pk=movie_pk)
+        serializer = MovieReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        review, created = MovieReview.objects.update_or_create(
+            movie=movie,
+            user=request.user,
+            defaults={
+                "rating": serializer.validated_data["rating"],
+                "comment": serializer.validated_data.get("comment", ""),
+            },
+        )
+
+        out = MovieReviewSerializer(review)
+        return Response(
+            out.data,
+            status=http_status.HTTP_201_CREATED if created else http_status.HTTP_200_OK,
+        )
+
+
+@extend_schema(tags=["Catalog"], summary="Delete a movie review")
+class MovieReviewDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, movie_pk, review_pk):
+        review = get_object_or_404(MovieReview, pk=review_pk, movie_id=movie_pk)
+
+        if review.user_id != request.user.id and not request.user.is_staff:
+            return Response(
+                {"error": {"code": "PERMISSION_DENIED", "message": "You do not have permission to delete this review.", "status": 403, "details": None}},
+                status=http_status.HTTP_403_FORBIDDEN,
+            )
+
+        review.delete()
         return Response(status=http_status.HTTP_204_NO_CONTENT)
