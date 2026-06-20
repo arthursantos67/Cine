@@ -78,7 +78,7 @@ export function RatingSummaryBar({
   return (
     <button
       aria-expanded={expanded}
-      className="flex w-full cursor-pointer items-center gap-3 border-0 bg-transparent p-0 text-left"
+      className="flex w-full cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 border-0 bg-transparent p-0 text-left"
       onClick={onToggle}
       type="button"
     >
@@ -111,7 +111,7 @@ export function RatingSummaryBar({
         </span>
       </div>
 
-      <span className="ml-auto shrink-0 text-sm text-white/50">
+      <span className="shrink-0 text-sm text-white/50">
         {expanded ? t("reviews.collapse") : t("reviews.expand")}
       </span>
     </button>

@@ -327,7 +327,7 @@ function MovieDetailSuccess({
         )}
       </article>
 
-      <div className="col-span-full border-t border-white/10 pt-[18px]">
+      <div className="max-[820px]:col-span-full border-t border-white/10 pt-[18px] self-start">
         <MovieReviewsPanel
           currentUserId={currentUserId}
           isAdmin={isAdmin}
