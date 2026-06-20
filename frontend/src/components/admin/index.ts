@@ -15,5 +15,6 @@ export type { AdminTableColumn } from "./AdminTable";
 export { AdminToolbar } from "./AdminToolbar";
 export { AdminUserList } from "./AdminUserList";
 export { AdminEditSessionLoader } from "./AdminEditSessionLoader";
-export { AdminSessionForm, extractSessionFieldErrors } from "./AdminSessionForm";
+export { AdminSessionForm } from "./AdminSessionForm";
+export { extractSessionFieldErrors } from "./session-utils";
 export { AdminSessionList } from "./AdminSessionList";
