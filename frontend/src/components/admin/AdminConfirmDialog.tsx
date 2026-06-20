@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/components/ui/classNames";
@@ -10,6 +10,8 @@ type ConfirmTone = "danger" | "default";
 
 type AdminConfirmDialogProps = {
   cancelLabel?: string;
+  children?: React.ReactNode;
+  confirmDisabled?: boolean;
   confirmLabel?: string;
   description?: string;
   isOpen: boolean;
@@ -21,6 +23,8 @@ type AdminConfirmDialogProps = {
 
 export function AdminConfirmDialog({
   cancelLabel,
+  children,
+  confirmDisabled,
   confirmLabel,
   description,
   isOpen,
@@ -65,11 +69,13 @@ export function AdminConfirmDialog({
           <p className="text-sm text-white/60">{description}</p>
         ) : null}
       </div>
+      {children ? <div>{children}</div> : null}
       <div className="flex justify-end gap-2">
         <Button onClick={onCancel} variant="ghost">
           {cancelLabel ?? t("admin.cancel")}
         </Button>
         <Button
+          disabled={confirmDisabled}
           onClick={onConfirm}
           variant={tone === "danger" ? "danger" : "primary"}
         >
