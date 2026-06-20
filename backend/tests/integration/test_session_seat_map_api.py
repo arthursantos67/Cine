@@ -94,6 +94,7 @@ def test_session_seat_map_returns_full_seat_map():
             "number": 1,
             "status": "AVAILABLE",
             "is_accessible": False,
+            "is_accessible_row": False,
             "companion_seat_id": None,
         },
         {
@@ -103,6 +104,7 @@ def test_session_seat_map_returns_full_seat_map():
             "number": 2,
             "status": "RESERVED",
             "is_accessible": True,
+            "is_accessible_row": False,
             "companion_seat_id": None,
         },
         {
@@ -112,6 +114,7 @@ def test_session_seat_map_returns_full_seat_map():
             "number": 1,
             "status": "PURCHASED",
             "is_accessible": False,
+            "is_accessible_row": False,
             "companion_seat_id": None,
         },
     ]
