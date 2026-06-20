@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models import Case, IntegerField, Q, Value, When
 from django.utils import timezone
 from drf_spectacular.utils import (
@@ -52,15 +53,22 @@ class ProtectedTransferRequired(APIException):
     default_detail = "You are the protected master. Designate a successor master before deleting your account."
 
 
+class WrongPassword(APIException):
+    status_code = 400
+    default_code = "WRONG_PASSWORD"
+    default_detail = "Incorrect password."
+
+
 def _delete_user_cascade(user):
-    SessionSeat.objects.filter(ticket__user=user).update(
-        status=SessionSeatStatus.AVAILABLE,
-        locked_by_user=None,
-        lock_expires_at=None,
-    )
-    Ticket.objects.filter(user=user).delete()
-    AdminPermissionLog.objects.filter(target=user).delete()
-    user.delete()
+    with transaction.atomic():
+        SessionSeat.objects.filter(ticket__user=user).update(
+            status=SessionSeatStatus.AVAILABLE,
+            locked_by_user=None,
+            lock_expires_at=None,
+        )
+        Ticket.objects.filter(user=user).delete()
+        AdminPermissionLog.objects.filter(target=user).delete()
+        user.delete()
 
 
 class UserLoginResponseSerializer(serializers.Serializer):
@@ -150,7 +158,7 @@ class UserTokenRefreshView(TokenRefreshView):
     permission_classes = [AllowAny]
 
 
-class SelfDeleteConflictResponseSerializer(serializers.Serializer):
+class DeleteConflictResponseSerializer(serializers.Serializer):
     ticket_count = serializers.IntegerField()
 
 
@@ -180,7 +188,7 @@ class SelfDeleteConflictResponseSerializer(serializers.Serializer):
         responses={
             204: None,
             400: OpenApiResponse(description="Account cannot be deleted (last master or protected)."),
-            409: OpenApiResponse(response=SelfDeleteConflictResponseSerializer, description="Account has active tickets. Resend with ?confirm=true."),
+            409: OpenApiResponse(response=DeleteConflictResponseSerializer, description="Account has active tickets. Resend with ?confirm=true."),
         },
     ),
 )
@@ -205,12 +213,7 @@ class CurrentUserView(APIView):
 
         password = request.data.get("password", "")
         if not password or not user.check_password(password):
-            raise ValidationError("Incorrect password.")
-
-        if user.is_superuser:
-            other_master_exists = User.objects.filter(is_superuser=True).exclude(pk=user.pk).exists()
-            if not other_master_exists:
-                raise OnlyMasterAdmin()
+            raise WrongPassword()
 
         successor = None
         if user.is_protected:
@@ -230,11 +233,23 @@ class CurrentUserView(APIView):
         if ticket_count > 0 and not confirm:
             raise HasActiveTickets(ticket_count=ticket_count)
 
-        if successor is not None:
-            successor.is_protected_master = True
-            successor.save(update_fields=["is_protected_master", "updated_at"])
+        with transaction.atomic():
+            if user.is_superuser:
+                other_master_exists = (
+                    User.objects.select_for_update()
+                    .filter(is_superuser=True)
+                    .exclude(pk=user.pk)
+                    .exists()
+                )
+                if not other_master_exists:
+                    raise OnlyMasterAdmin()
 
-        _delete_user_cascade(user)
+            if successor is not None:
+                successor.is_protected_master = True
+                successor.save(update_fields=["is_protected_master", "updated_at"])
+
+            _delete_user_cascade(user)
+
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -476,7 +491,7 @@ class UserListView(ListAPIView):
         elif role == "staff":
             qs = qs.filter(is_staff=True, is_superuser=False)
         elif role == "user":
-            qs = qs.filter(is_staff=False)
+            qs = qs.filter(is_staff=False, is_superuser=False)
 
         return qs
 
@@ -512,10 +527,6 @@ class UserPermissionLogsView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class UserDeleteConflictResponseSerializer(serializers.Serializer):
-    ticket_count = serializers.IntegerField()
-
-
 @extend_schema(
     tags=["Admin"],
     summary="Delete user account",
@@ -537,7 +548,7 @@ class UserDeleteConflictResponseSerializer(serializers.Serializer):
         400: OpenApiResponse(description="Cannot delete protected or own account."),
         403: OpenApiResponse(description="Master access required."),
         404: OpenApiResponse(description="User not found."),
-        409: OpenApiResponse(response=UserDeleteConflictResponseSerializer, description="User has active tickets. Resend with ?confirm=true."),
+        409: OpenApiResponse(response=DeleteConflictResponseSerializer, description="User has active tickets. Resend with ?confirm=true."),
     },
 )
 class UserDeleteView(APIView):
@@ -549,15 +560,15 @@ class UserDeleteView(APIView):
         except (User.DoesNotExist, ValueError):
             raise NotFound("User not found.")
 
+        password = request.data.get("password", "")
+        if not password or not request.user.check_password(password):
+            raise WrongPassword()
+
         if user == request.user:
             raise ValidationError("To delete your own account, use your profile settings.")
 
         if user.is_protected:
             raise ValidationError("Cannot delete the primary admin account.")
-
-        password = request.data.get("password", "")
-        if not password or not request.user.check_password(password):
-            raise ValidationError("Incorrect password.")
 
         confirm = request.query_params.get("confirm") == "true"
         ticket_count = Ticket.objects.filter(user=user).count()

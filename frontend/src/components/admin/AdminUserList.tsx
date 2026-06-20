@@ -290,15 +290,13 @@ export function AdminUserList() {
         setDeleteStep("elect-master");
       } else if (err instanceof ApiError && err.code === "PROTECTED_TRANSFER_REQUIRED") {
         setDeleteStep("transfer-protection");
+      } else if (err instanceof ApiError && err.code === "WRONG_PASSWORD") {
+        setDeletePasswordError(t("admin.user.deletePasswordError"));
       } else if (err instanceof ApiError && err.status === 400) {
         const details = err.details as Record<string, unknown> | null;
         const fieldErrors = details?.non_field_errors;
         const firstError = Array.isArray(fieldErrors) ? String(fieldErrors[0]) : null;
-        if (firstError?.toLowerCase().includes("password") || firstError?.toLowerCase().includes("senha")) {
-          setDeletePasswordError(t("admin.user.deletePasswordError"));
-        } else {
-          setDeleteError(firstError ?? t("admin.user.deleteError"));
-        }
+        setDeleteError(firstError ?? t("admin.user.deleteError"));
       } else {
         setDeleteError(t("admin.user.deleteError"));
       }

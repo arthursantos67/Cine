@@ -10,7 +10,7 @@ type ConfirmTone = "danger" | "default";
 
 type AdminConfirmDialogProps = {
   cancelLabel?: string;
-  children?: React.ReactNode;
+  children?: ReactNode;
   confirmDisabled?: boolean;
   confirmLabel?: string;
   description?: string;
