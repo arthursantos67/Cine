@@ -147,6 +147,9 @@ def _build_details(error_code, normalized_data, exc):
             return {"retry_after_seconds": int(wait)}
         return {}
 
+    if error_code == "HAS_ACTIVE_TICKETS":
+        return {"ticket_count": getattr(exc, "ticket_count", 0)}
+
     if isinstance(normalized_data, dict):
         return {key: value for key, value in normalized_data.items() if key != "detail"}
 
