@@ -152,7 +152,7 @@ const SEAT_ROWS_PATH = "/api/v1/reservation/seat-rows/";
 const SEATS_PATH = "/api/v1/reservation/seats/";
 
 export const adminApi = {
-  async listUsers(params: { page?: number; search?: string } = {}) {
+  async listUsers(params: { page?: number; role?: "staff" | "master" | "user"; search?: string } = {}) {
     const query = buildQueryString(params);
     const response = await apiRequest<unknown>(
       query ? `${USERS_PATH}?${query}` : USERS_PATH,
@@ -203,6 +203,20 @@ export const adminApi = {
     }
 
     return response satisfies AdminPermissionLogEntry[];
+  },
+
+  async deleteUser(userId: string, options: { confirm?: boolean; password?: string } = {}): Promise<void> {
+    const url = options.confirm
+      ? `${USERS_PATH}${userId}/?confirm=true`
+      : `${USERS_PATH}${userId}/`;
+    await apiRequest<void>(url, { auth: "required", method: "DELETE", json: { password: options.password ?? "" } });
+  },
+
+  async deleteSelfAccount(options: { confirm?: boolean; password?: string; transfer_to?: string } = {}): Promise<void> {
+    const url = options.confirm ? `${USERS_PATH}me/?confirm=true` : `${USERS_PATH}me/`;
+    const body: Record<string, string> = { password: options.password ?? "" };
+    if (options.transfer_to) body.transfer_to = options.transfer_to;
+    await apiRequest<void>(url, { auth: "required", method: "DELETE", json: body });
   },
 
   async getSummary(): Promise<AdminSummary> {

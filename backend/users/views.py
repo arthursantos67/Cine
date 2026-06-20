@@ -1,4 +1,5 @@
-from django.db.models import Q
+from django.db import transaction
+from django.db.models import Case, IntegerField, Q, Value, When
 from django.utils import timezone
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -8,7 +9,7 @@ from drf_spectacular.utils import (
 )
 from rest_framework import status
 from rest_framework import serializers
-from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
+from rest_framework.exceptions import APIException, NotFound, PermissionDenied, ValidationError
 from rest_framework.generics import CreateAPIView, ListAPIView
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
@@ -19,7 +20,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from cineprime_api.permissions import IsMasterUser
 from cineprime_api.throttling import LoginRateThrottle
-from reservations.models import Ticket
+from reservations.models import SessionSeat, SessionSeatStatus, Ticket
 from users.models import AdminPermissionLog, User
 from users.serializers import (
     AdminPermissionLogSerializer,
@@ -28,6 +29,46 @@ from users.serializers import (
     UserRegistrationSerializer,
     UserTicketSerializer,
 )
+
+
+class HasActiveTickets(APIException):
+    status_code = 409
+    default_code = "HAS_ACTIVE_TICKETS"
+    default_detail = "User has active tickets."
+
+    def __init__(self, ticket_count=0):
+        super().__init__()
+        self.ticket_count = ticket_count
+
+
+class OnlyMasterAdmin(APIException):
+    status_code = 400
+    default_code = "ONLY_MASTER_ADMIN"
+    default_detail = "You are the only master admin. Promote another user to master before deleting your account."
+
+
+class ProtectedTransferRequired(APIException):
+    status_code = 400
+    default_code = "PROTECTED_TRANSFER_REQUIRED"
+    default_detail = "You are the protected master. Designate a successor master before deleting your account."
+
+
+class WrongPassword(APIException):
+    status_code = 400
+    default_code = "WRONG_PASSWORD"
+    default_detail = "Incorrect password."
+
+
+def _delete_user_cascade(user):
+    with transaction.atomic():
+        SessionSeat.objects.filter(ticket__user=user).update(
+            status=SessionSeatStatus.AVAILABLE,
+            locked_by_user=None,
+            lock_expires_at=None,
+        )
+        Ticket.objects.filter(user=user).delete()
+        AdminPermissionLog.objects.filter(target=user).delete()
+        user.delete()
 
 
 class UserLoginResponseSerializer(serializers.Serializer):
@@ -117,13 +158,39 @@ class UserTokenRefreshView(TokenRefreshView):
     permission_classes = [AllowAny]
 
 
+class DeleteConflictResponseSerializer(serializers.Serializer):
+    ticket_count = serializers.IntegerField()
+
+
 @extend_schema_view(
     get=extend_schema(
         tags=["Users"],
         summary="Get current user",
         description="Return profile information for the authenticated user.",
         responses={200: CurrentUserResponseSerializer},
-    )
+    ),
+    delete=extend_schema(
+        tags=["Users"],
+        summary="Delete own account",
+        description=(
+            "Permanently delete the authenticated user's account. "
+            "Master admins can only delete their own account if another master exists. "
+            "If the account has active tickets, resend with ?confirm=true to proceed."
+        ),
+        parameters=[
+            OpenApiParameter(
+                name="confirm",
+                location=OpenApiParameter.QUERY,
+                description="Set to 'true' to confirm deletion when the account has tickets.",
+                required=False,
+            )
+        ],
+        responses={
+            204: None,
+            400: OpenApiResponse(description="Account cannot be deleted (last master or protected)."),
+            409: OpenApiResponse(response=DeleteConflictResponseSerializer, description="Account has active tickets. Resend with ?confirm=true."),
+        },
+    ),
 )
 class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
@@ -140,6 +207,50 @@ class CurrentUserView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+    def delete(self, request, *args, **kwargs):
+        user = request.user
+
+        password = request.data.get("password", "")
+        if not password or not user.check_password(password):
+            raise WrongPassword()
+
+        successor = None
+        if user.is_protected:
+            transfer_to_id = request.data.get("transfer_to")
+            if not transfer_to_id:
+                raise ProtectedTransferRequired()
+            try:
+                successor = User.objects.get(pk=transfer_to_id, is_superuser=True)
+                if successor.pk == user.pk:
+                    raise ValidationError("Cannot transfer protected status to yourself.")
+            except (User.DoesNotExist, ValueError):
+                raise ValidationError("Designated successor must be an existing master.")
+
+        confirm = request.query_params.get("confirm") == "true"
+        ticket_count = Ticket.objects.filter(user=user).count()
+
+        if ticket_count > 0 and not confirm:
+            raise HasActiveTickets(ticket_count=ticket_count)
+
+        with transaction.atomic():
+            if user.is_superuser:
+                other_master_exists = (
+                    User.objects.select_for_update()
+                    .filter(is_superuser=True)
+                    .exclude(pk=user.pk)
+                    .exists()
+                )
+                if not other_master_exists:
+                    raise OnlyMasterAdmin()
+
+            if successor is not None:
+                successor.is_protected_master = True
+                successor.save(update_fields=["is_protected_master", "updated_at"])
+
+            _delete_user_cascade(user)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @extend_schema_view(
@@ -337,14 +448,21 @@ class AdminGrantView(APIView):
     get=extend_schema(
         tags=["Admin"],
         summary="List users",
-        description="Return a paginated list of all users. Supports search by email or username.",
+        description="Return a paginated list of all users. Supports search by email or username and filtering by role.",
         parameters=[
             OpenApiParameter(
                 name="search",
                 required=False,
                 location=OpenApiParameter.QUERY,
                 description="Filter by email or username (case-insensitive partial match).",
-            )
+            ),
+            OpenApiParameter(
+                name="role",
+                required=False,
+                location=OpenApiParameter.QUERY,
+                description="Filter by role: 'master', 'staff', or 'user'.",
+                enum=["master", "staff", "user"],
+            ),
         ],
     )
 )
@@ -353,12 +471,28 @@ class UserListView(ListAPIView):
     serializer_class = UserListSerializer
 
     def get_queryset(self):
-        qs = User.objects.order_by("created_at")
+        qs = User.objects.annotate(
+            is_me=Case(
+                When(pk=self.request.user.pk, then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            )
+        ).order_by("is_me", "created_at")
+
         search = self.request.query_params.get("search", "").strip()
         if search:
             qs = qs.filter(
                 Q(email__icontains=search) | Q(username__icontains=search)
             )
+
+        role = self.request.query_params.get("role", "").strip()
+        if role == "master":
+            qs = qs.filter(is_superuser=True)
+        elif role == "staff":
+            qs = qs.filter(is_staff=True, is_superuser=False)
+        elif role == "user":
+            qs = qs.filter(is_staff=False, is_superuser=False)
+
         return qs
 
 
@@ -391,3 +525,56 @@ class UserPermissionLogsView(APIView):
         )
         serializer = AdminPermissionLogSerializer(logs, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    tags=["Admin"],
+    summary="Delete user account",
+    description=(
+        "Permanently delete a user account. "
+        "Cannot delete the primary admin account or your own account via this endpoint. "
+        "If the user has active tickets, resend with ?confirm=true to proceed."
+    ),
+    parameters=[
+        OpenApiParameter(
+            name="confirm",
+            location=OpenApiParameter.QUERY,
+            description="Set to 'true' to confirm deletion even if the user has tickets.",
+            required=False,
+        )
+    ],
+    responses={
+        204: None,
+        400: OpenApiResponse(description="Cannot delete protected or own account."),
+        403: OpenApiResponse(description="Master access required."),
+        404: OpenApiResponse(description="User not found."),
+        409: OpenApiResponse(response=DeleteConflictResponseSerializer, description="User has active tickets. Resend with ?confirm=true."),
+    },
+)
+class UserDeleteView(APIView):
+    permission_classes = [IsMasterUser]
+
+    def delete(self, request, user_id, *args, **kwargs):
+        try:
+            user = User.objects.get(pk=user_id)
+        except (User.DoesNotExist, ValueError):
+            raise NotFound("User not found.")
+
+        password = request.data.get("password", "")
+        if not password or not request.user.check_password(password):
+            raise WrongPassword()
+
+        if user == request.user:
+            raise ValidationError("To delete your own account, use your profile settings.")
+
+        if user.is_protected:
+            raise ValidationError("Cannot delete the primary admin account.")
+
+        confirm = request.query_params.get("confirm") == "true"
+        ticket_count = Ticket.objects.filter(user=user).count()
+
+        if ticket_count > 0 and not confirm:
+            raise HasActiveTickets(ticket_count=ticket_count)
+
+        _delete_user_cascade(user)
+        return Response(status=status.HTTP_204_NO_CONTENT)

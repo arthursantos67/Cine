@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import timedelta
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -39,7 +40,7 @@ def test_should_create_ticket_for_purchased_seat():
         movie=movie,
         room=room,
         start_time=timezone.now(),
-        end_time=timezone.now(),
+        end_time=timezone.now() + timedelta(hours=2),
         base_price="30.00",
     )
 
@@ -89,7 +90,7 @@ def test_should_not_allow_explicit_zero_amount_when_price_is_not_zero():
         movie=movie,
         room=room,
         start_time=timezone.now(),
-        end_time=timezone.now(),
+        end_time=timezone.now() + timedelta(hours=2),
         base_price="30.00",
     )
 
@@ -135,7 +136,7 @@ def test_should_not_allow_ticket_for_non_purchased_seat():
         movie=movie,
         room=room,
         start_time=timezone.now(),
-        end_time=timezone.now(),
+        end_time=timezone.now() + timedelta(hours=2),
         base_price="30.00",
     )
 
@@ -179,7 +180,7 @@ def test_should_not_allow_ticket_with_invalid_amount_paid():
         movie=movie,
         room=room,
         start_time=timezone.now(),
-        end_time=timezone.now(),
+        end_time=timezone.now() + timedelta(hours=2),
         base_price="30.00",
     )
 
@@ -224,7 +225,7 @@ def test_should_generate_unique_ticket_codes():
         movie=movie,
         room=room,
         start_time=timezone.now(),
-        end_time=timezone.now(),
+        end_time=timezone.now() + timedelta(hours=2),
         base_price="30.00",
     )
 

@@ -48,6 +48,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     username = models.CharField(max_length=150, unique=True)
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    is_protected_master = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -71,7 +72,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def is_protected(self):
         protected = getattr(settings, "PROTECTED_SUPERUSER_USERNAME", None)
-        return bool(protected and self.username == protected)
+        return bool(protected and self.username == protected) or self.is_protected_master
 
     def save(self, *args, **kwargs):
         self.email = self.email.strip().lower()
