@@ -13,6 +13,8 @@ import type {
   CatalogProjectionFormat,
   CatalogSessionType,
 } from "@/types/catalog";
+import { Badge } from "@/components/ui/Badge";
+import type { BadgeTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { useI18n } from "@/i18n";
@@ -27,6 +29,11 @@ type AdminSessionFormProps = {
 
 const WEEKEND_DAYS = new Set([0, 5, 6]); // Sun, Fri, Sat
 
+export function getSessionPriceMultiplier(date: string, time: string): number {
+  const day = new Date(`${date}T${time}`).getDay();
+  return WEEKEND_DAYS.has(day) ? 1.24 : 1.0;
+}
+
 function computeSessionPricePreview(
   roomBasePrice: string,
   startDate: string,
@@ -34,8 +41,7 @@ function computeSessionPricePreview(
   formatCurrency: (value: number) => string
 ): string | null {
   if (!roomBasePrice || !startDate || !startTime) return null;
-  const day = new Date(`${startDate}T${startTime}`).getDay();
-  const multiplier = WEEKEND_DAYS.has(day) ? 1.24 : 1.0;
+  const multiplier = getSessionPriceMultiplier(startDate, startTime);
   return formatCurrency(Number(roomBasePrice) * multiplier);
 }
 
@@ -59,7 +65,7 @@ export function extractSessionFieldErrors(error: unknown): FieldErrors {
   return result;
 }
 
-function isConflictError(error: unknown): boolean {
+export function isConflictError(error: unknown): boolean {
   return (
     error instanceof ApiError &&
     (error.status === 409 ||
@@ -153,6 +159,24 @@ export function addMinutesToLocalDateTime(
     time: `${pad(result.getHours())}:${pad(result.getMinutes())}`,
   };
 }
+
+const AUDIO_BADGE_TONE: Record<string, BadgeTone> = {
+  dublado: "neutral",
+  legendado: "neutral",
+  original: "info",
+};
+
+const PROJECTION_BADGE_TONE: Record<string, BadgeTone> = {
+  "2d": "neutral",
+  "3d": "info",
+  imax: "accent",
+};
+
+const SESSION_TYPE_BADGE_TONE: Record<string, BadgeTone> = {
+  preview: "info",
+  regular: "neutral",
+  special_event: "accent",
+};
 
 function getUserTimezone(): string {
   try {
@@ -604,6 +628,31 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
           value={sessionType}
         />
       </div>
+
+      {(audioFormat || projectionFormat || sessionType) ? (
+        <div className="grid gap-2">
+          <span className="text-xs font-extrabold uppercase tracking-wider text-white/40">
+            {t("admin.session.formatPreview")}
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {audioFormat ? (
+              <Badge size="sm" tone={AUDIO_BADGE_TONE[audioFormat] ?? "neutral"}>
+                {t(`domain.audio.${audioFormat}`)}
+              </Badge>
+            ) : null}
+            {projectionFormat ? (
+              <Badge size="sm" tone={PROJECTION_BADGE_TONE[projectionFormat] ?? "neutral"}>
+                {t(`domain.projection.${projectionFormat}`)}
+              </Badge>
+            ) : null}
+            {sessionType ? (
+              <Badge size="sm" tone={SESSION_TYPE_BADGE_TONE[sessionType] ?? "neutral"}>
+                {t(`domain.sessionType.${sessionType}`)}
+              </Badge>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex justify-end gap-2 border-t border-white/[0.07] pt-4">
         <Button
