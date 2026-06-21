@@ -49,7 +49,9 @@ export function AppHeader() {
             className="inline-flex items-center gap-2.5 text-[18px] font-[850] text-white"
             href="/"
           >
-            <LogoCp className="h-[34px] w-[34px]" />
+            <span className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-[6px] bg-[#1e2535] p-[5px]">
+              <LogoCp className="h-full w-full" />
+            </span>
             <span>Cine Prime</span>
           </Link>
           <span
