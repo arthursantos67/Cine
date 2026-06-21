@@ -32,6 +32,7 @@ export type AdminSummary = {
 export type AdminMovieWritePayload = {
   age_rating?: CatalogMovieAgeRating;
   cast?: string[];
+  classification_description?: string;
   director?: string;
   duration_minutes: number;
   genres: string[];
@@ -454,6 +455,14 @@ export const adminApi = {
     }
 
     return response satisfies RoomTypePricing;
+  },
+
+  async listAllMovies(): Promise<CatalogMovieDetail[]> {
+    return fetchAllPages<CatalogMovieDetail>(MOVIES_PATH);
+  },
+
+  async listAllRooms(): Promise<AdminRoom[]> {
+    return fetchAllPages<AdminRoom>(ROOMS_PATH);
   },
 
   async listAllSeatRows(roomId: string): Promise<AdminSeatRow[]> {

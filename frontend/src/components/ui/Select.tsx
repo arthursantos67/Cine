@@ -38,7 +38,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
 
     return (
       <div className="grid gap-1.5">
-        <label className="text-sm font-extrabold text-text" htmlFor={selectId}>
+        <label className="text-sm font-extrabold text-white" htmlFor={selectId}>
           {label}
         </label>
         {description ? (
@@ -50,7 +50,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           aria-describedby={cn(descriptionId, errorId) || undefined}
           aria-invalid={error ? "true" : undefined}
           className={cn(
-            "min-h-[var(--control-height-lg)] w-full rounded-control border border-border bg-surface px-3 py-2 text-text shadow-none transition-colors duration-150 focus-visible:border-info focus-visible:outline-none focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-[0.68]",
+            "min-h-[var(--control-height-lg)] w-full rounded-control border border-border bg-surface px-3 py-2 text-white shadow-none outline-none transition-colors duration-150 focus:border-brand focus:shadow-focus disabled:cursor-not-allowed disabled:opacity-[0.68]",
             error ? "border-error" : undefined,
             className
           )}
