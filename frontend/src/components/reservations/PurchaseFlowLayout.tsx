@@ -9,6 +9,7 @@ import type { CheckoutStepKey } from "./checkout-steps";
 type PurchaseFlowLayoutProps = {
   children: ReactNode;
   currentStep: CheckoutStepKey;
+  renderStepIndicator?: boolean;
   showSummary?: boolean;
   summaryActionHref?: string;
   summaryActionLabel?: string;
@@ -17,6 +18,7 @@ type PurchaseFlowLayoutProps = {
 export function PurchaseFlowLayout({
   children,
   currentStep,
+  renderStepIndicator = true,
   showSummary = true,
   summaryActionHref,
   summaryActionLabel,
@@ -30,7 +32,7 @@ export function PurchaseFlowLayout({
         showSummary ? undefined : "purchase-flow--no-summary"
       )}
     >
-      <CheckoutStepIndicator currentStep={currentStep} />
+      {renderStepIndicator && <CheckoutStepIndicator currentStep={currentStep} />}
       <div
         className={cn(
           "purchase-flow__body grid items-start gap-5",
