@@ -76,6 +76,7 @@ class Movie(models.Model):
         default="",
         verbose_name="Faixa etária",
     )
+    classification_description = models.TextField(blank=True, default="", verbose_name="Descrição da classificação")
     director = models.CharField(max_length=255, blank=True, default="", verbose_name="Direção")
     is_featured = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

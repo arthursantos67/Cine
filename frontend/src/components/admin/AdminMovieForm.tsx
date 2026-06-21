@@ -160,6 +160,7 @@ export function AdminMovieForm({ movie }: AdminMovieFormProps) {
   const [ageRating, setAgeRating] = useState<CatalogMovieAgeRating>(
     (movie?.age_rating as CatalogMovieAgeRating) ?? ""
   );
+  const [classificationDescription, setClassificationDescription] = useState(movie?.classification_description ?? "");
   const [director, setDirector] = useState(movie?.director ?? "");
   const [selectedGenres, setSelectedGenres] = useState<CatalogGenre[]>(
     movie?.genres ?? []
@@ -200,6 +201,7 @@ export function AdminMovieForm({ movie }: AdminMovieFormProps) {
   const releaseDateId = useId();
   const posterUrlId = useId();
   const spotlightUrlId = useId();
+  const classificationDescriptionId = useId();
   const directorId = useId();
   const castInputId = useId();
   const tmdbInputId = useId();
@@ -401,6 +403,7 @@ export function AdminMovieForm({ movie }: AdminMovieFormProps) {
     const payload: AdminMovieWritePayload = {
       age_rating: ageRating || undefined,
       cast: castMembers,
+      classification_description: classificationDescription,
       director: director || undefined,
       duration_minutes: Number(durationMinutes),
       genres: selectedGenres.map((g) => g.id),
@@ -728,6 +731,20 @@ export function AdminMovieForm({ movie }: AdminMovieFormProps) {
             />
           </div>
 
+          <FormField
+            error={fieldErrors.classification_description as string | undefined}
+            label={t("admin.movie.classificationDescription")}
+            labelFor={classificationDescriptionId}
+          >
+            <Textarea
+              disabled={isSubmitting}
+              id={classificationDescriptionId}
+              onChange={(e) => setClassificationDescription(e.target.value)}
+              placeholder={t("admin.movie.classificationDescriptionPlaceholder")}
+              value={classificationDescription}
+            />
+          </FormField>
+
           <div className="flex items-center gap-3">
             <input
               checked={isFeatured}
@@ -774,40 +791,37 @@ export function AdminMovieForm({ movie }: AdminMovieFormProps) {
             </div>
           )}
 
-          {isFeatured ? (
-            <>
-              <FormField
-                error={fieldErrors.spotlight_url}
-                label={t("admin.movie.spotlightUrl")}
-                labelFor={spotlightUrlId}
-              >
-                <TextInput
-                  disabled={isSubmitting}
-                  error={fieldErrors.spotlight_url}
-                  id={spotlightUrlId}
-                  onChange={(e) => setSpotlightUrl(e.target.value)}
-                  placeholder={t("admin.movie.spotlightUrlPlaceholder")}
-                  type="url"
-                  value={spotlightUrl}
-                />
-              </FormField>
-              {spotlightUrl ? (
-                <div className="overflow-hidden rounded-[8px] border border-white/[0.07]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    alt={t("admin.movie.spotlightPreview")}
-                    className="w-full object-cover"
-                    src={spotlightUrl}
-                    style={{ maxHeight: 280 }}
-                  />
-                </div>
-              ) : (
-                <div className="flex h-40 items-center justify-center rounded-[8px] border border-dashed border-white/[0.12] text-sm text-white/30">
-                  {t("admin.movie.spotlightPreview")}
-                </div>
-              )}
-            </>
-          ) : null}
+          <FormField
+            error={fieldErrors.spotlight_url}
+            label={t("admin.movie.spotlightUrl")}
+            labelFor={spotlightUrlId}
+          >
+            <TextInput
+              disabled={isSubmitting}
+              error={fieldErrors.spotlight_url}
+              id={spotlightUrlId}
+              onChange={(e) => setSpotlightUrl(e.target.value)}
+              placeholder={t("admin.movie.spotlightUrlPlaceholder")}
+              type="url"
+              value={spotlightUrl}
+            />
+          </FormField>
+          {spotlightUrl ? (
+            <div className="overflow-hidden rounded-[8px] border border-white/[0.07]" style={{ aspectRatio: "16/9" }}>
+              <iframe
+                allow="accelerometer; autoplay; encrypted-media; picture-in-picture"
+                allowFullScreen
+                className="h-full w-full"
+                sandbox="allow-scripts allow-same-origin allow-presentation allow-fullscreen"
+                src={spotlightUrl}
+                title={t("admin.movie.spotlightPreview")}
+              />
+            </div>
+          ) : (
+            <div className="flex h-40 items-center justify-center rounded-[8px] border border-dashed border-white/[0.12] text-sm text-white/30">
+              {t("admin.movie.spotlightPreview")}
+            </div>
+          )}
 
           {/* Genres */}
           <div className="grid gap-2">

@@ -1,8 +1,10 @@
 "use client";
 
+import React from "react";
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { ZoomIn, ZoomOut } from "lucide-react";
+import { User, ZoomIn, ZoomOut } from "lucide-react";
 
 import { ApiError, getApiErrorUserMessage } from "@/api/client";
 import { catalogApi } from "@/api/catalog";
@@ -97,9 +99,9 @@ const defaultSeatStateLabels: Record<SeatVisualState, string> = {
   selected: "Selecionado",
 };
 
-const seatStateMarkers: Record<SeatVisualState, string> = {
+const seatStateMarkers: Record<SeatVisualState, ReactNode> = {
   available: "",
-  purchased: "C",
+  purchased: <User size={12} strokeWidth={2.5} />,
   reserved: "R",
   selected: "",
 };
@@ -475,7 +477,7 @@ export function SeatMapView({
 
 const ZOOM_FACTOR = 1.15;
 const MAX_ZOOM_STEPS = 8;
-const MIN_DEFAULT_ZOOM = 0.75;
+const DEFAULT_TARGET_ZOOM = 0.67;
 
 export function SeatMapLayout({
   accessibleRowIndex,
@@ -506,7 +508,7 @@ export function SeatMapLayout({
 
   const effectiveZoom = fitZoom * Math.pow(ZOOM_FACTOR, zoomOffset);
   const canZoomIn = zoomOffset < MAX_ZOOM_STEPS;
-  const canZoomOut = zoomOffset > 0;
+  const canZoomOut = zoomOffset > -MAX_ZOOM_STEPS;
 
   useLayoutEffect(() => {
     const map = mapRef.current;
@@ -524,13 +526,10 @@ export function SeatMapLayout({
       const padding = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
       const available = scroll.clientWidth - padding;
       const newFitZoom = Math.min(1, available / naturalWidth);
-      const defaultOffset =
-        newFitZoom < MIN_DEFAULT_ZOOM
-          ? Math.min(
-              Math.ceil(Math.log(MIN_DEFAULT_ZOOM / newFitZoom) / Math.log(ZOOM_FACTOR)),
-              MAX_ZOOM_STEPS
-            )
-          : 0;
+      const rawOffset = newFitZoom < DEFAULT_TARGET_ZOOM
+        ? Math.log(DEFAULT_TARGET_ZOOM / newFitZoom) / Math.log(ZOOM_FACTOR)
+        : 0;
+      const defaultOffset = Math.min(Math.max(Math.round(rawOffset), -MAX_ZOOM_STEPS), MAX_ZOOM_STEPS);
       hasInitializedZoomRef.current = false;
       setFitZoom(newFitZoom);
       setZoomOffset(defaultOffset);
@@ -666,7 +665,7 @@ export function SeatMapLayout({
             aria-label={t("seats.zoomOut")}
             className="inline-flex h-8 w-8 items-center justify-center rounded border border-white/15 bg-white/5 text-text/60 transition hover:bg-white/10 hover:text-text disabled:pointer-events-none disabled:opacity-30"
             disabled={!canZoomOut}
-            onClick={() => setZoomOffset((o) => Math.max(o - 1, 0))}
+            onClick={() => setZoomOffset((o) => Math.max(o - 1, -MAX_ZOOM_STEPS))}
             type="button"
           >
             <ZoomOut size={14} />
@@ -995,9 +994,11 @@ function renderSeatButton({
       onClick={() => onSeatToggle?.(seat)}
       type="button"
     >
-      <span className="seat-map__seat-number">
-        {displayLabel ?? displayNumber ?? seat.number}
-      </span>
+      {visualState !== "purchased" && (
+        <span className="seat-map__seat-number">
+          {displayLabel ?? displayNumber ?? seat.number}
+        </span>
+      )}
       {stateMarker ? (
         <span aria-hidden="true" className="seat-map__seat-marker">
           {stateMarker}
@@ -1017,7 +1018,7 @@ export function SeatMapLegend() {
   const legendItems: Array<{
     className: string;
     label: string;
-    marker: string;
+    marker: ReactNode;
   }> = [
     {
       className: "seat-map__legend-swatch--available",
