@@ -570,3 +570,44 @@ def test_release_temporary_reservation_rejects_ownership_mismatch():
     assert session_seat.status == SessionSeatStatus.RESERVED
     assert session_seat.locked_by_user == owner
     assert session_seat.lock_expires_at is not None
+
+
+def test_temporary_reservation_returns_410_when_session_started_more_than_10_min_ago():
+    client = APIClient()
+    user = create_user(email="expired-session@example.com")
+    authenticate(client, user)
+
+    data = create_session_with_seats()
+    session = data["session"]
+    seat = data["seats"][0]
+
+    # Backdate the session so it started 11 minutes ago
+    session.start_time = timezone.now() - timedelta(minutes=11)
+    session.end_time = timezone.now() + timedelta(hours=2)
+    session.save()
+
+    url = reverse("temporary-seat-reservation", kwargs={"session_id": session.id})
+    response = client.post(url, {"seat_ids": [str(seat.id)]}, format="json")
+
+    assert response.status_code == 410
+    assert response.data["error"]["code"] == "SESSION_EXPIRED"
+
+
+def test_temporary_reservation_is_allowed_within_10_min_of_session_start():
+    client = APIClient()
+    user = create_user(email="in-grace-period@example.com")
+    authenticate(client, user)
+
+    data = create_session_with_seats()
+    session = data["session"]
+    seat = data["seats"][0]
+
+    # Session started 9 minutes ago — still within the grace period
+    session.start_time = timezone.now() - timedelta(minutes=9)
+    session.end_time = timezone.now() + timedelta(hours=2)
+    session.save()
+
+    url = reverse("temporary-seat-reservation", kwargs={"session_id": session.id})
+    response = client.post(url, {"seat_ids": [str(seat.id)]}, format="json")
+
+    assert response.status_code == 201

@@ -8,6 +8,7 @@ from catalog.models import Session
 from reservations.exceptions import (
     InvalidSeatSelectionError,
     SeatUnavailableError,
+    SessionExpiredError,
     SessionNotFoundError,
 )
 from reservations.locks import SeatLockManager
@@ -26,6 +27,7 @@ def _schedule_expiration_tasks(session_seat_ids, expires_at):
 
 class TemporaryReservationService:
     LOCK_DURATION_SECONDS = 600
+    SESSION_SALE_CUTOFF_MINUTES = 10
     SEAT_UNAVAILABLE_MESSAGE = "One or more selected seats are not available."
     INVALID_SELECTION_MESSAGE = (
         "One or more selected seats do not belong to this session."
@@ -57,9 +59,14 @@ class TemporaryReservationService:
                     raise InvalidSeatSelectionError(self.COMPANION_WITHOUT_ACCESSIBLE_MESSAGE)
 
     def execute(self, *, session_id, seat_ids, user):
-        session_exists = Session.objects.filter(id=session_id).exists()
-        if not session_exists:
+        try:
+            session = Session.objects.get(id=session_id)
+        except Session.DoesNotExist:
             raise SessionNotFoundError("Session not found.")
+
+        cutoff = session.start_time + timedelta(minutes=self.SESSION_SALE_CUTOFF_MINUTES)
+        if timezone.now() >= cutoff:
+            raise SessionExpiredError("Ticket sales for this session have ended.")
 
         ordered_seat_ids = sorted(seat_ids)
 

@@ -1,3 +1,4 @@
+from datetime import timedelta
 from decimal import Decimal
 
 from django.db import transaction
@@ -33,6 +34,10 @@ class InvalidSubmittedTotalError(CheckoutError):
     pass
 
 
+class SessionExpiredError(CheckoutError):
+    pass
+
+
 class CheckoutService:
     INVALID_SELECTION_MESSAGE = "One or more selected seats are invalid for checkout."
     OWNERSHIP_MESSAGE = "One or more selected seats are not locked by this user."
@@ -42,6 +47,8 @@ class CheckoutService:
     COMPANION_WITHOUT_ACCESSIBLE_MESSAGE = (
         "Companion seat must be purchased together with its paired accessible seat."
     )
+    SESSION_EXPIRED_MESSAGE = "Ticket sales for this session have ended."
+    SESSION_SALE_CUTOFF_MINUTES = 10
 
     def __init__(self):
         self.lock_manager = SeatLockManager()
@@ -70,6 +77,16 @@ class CheckoutService:
 
         if len(session_seats) != len(ordered_session_seat_ids):
             raise InvalidSeatSelectionError(self.INVALID_SELECTION_MESSAGE)
+
+        seen_session_ids = set()
+        for session_seat in session_seats:
+            if session_seat.session_id not in seen_session_ids:
+                seen_session_ids.add(session_seat.session_id)
+                cutoff = session_seat.session.start_time + timedelta(
+                    minutes=self.SESSION_SALE_CUTOFF_MINUTES
+                )
+                if now >= cutoff:
+                    raise SessionExpiredError(self.SESSION_EXPIRED_MESSAGE)
 
         self._validate_companion_seat_rules(session_seats)
 

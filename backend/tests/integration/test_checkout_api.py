@@ -362,3 +362,53 @@ def test_list_movies_should_use_cache_on_second_request():
     assert first_response.data == second_response.data
     assert len(second_request_queries) < len(first_request_queries)
     cache.clear()
+
+
+@pytest.mark.django_db
+def test_checkout_returns_410_when_session_started_more_than_10_min_ago():
+    context = _build_checkout_context()
+    session = context["session"]
+
+    # Backdate the session so it started 11 minutes ago — bypass model
+    # validation via queryset update to avoid the reserved-seats guard
+    Session.objects.filter(pk=session.pk).update(
+        start_time=timezone.now() - timedelta(minutes=11),
+        end_time=timezone.now() + timedelta(hours=2),
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=context["user"])
+
+    response = client.post(
+        "/api/v1/reservation/checkout/",
+        _checkout_payload(context["session_seats"], ["inteira"], "pix"),
+        format="json",
+    )
+
+    assert response.status_code == 410
+    assert response.data["error"]["code"] == "SESSION_EXPIRED"
+    assert Ticket.objects.filter(user=context["user"]).count() == 0
+
+
+@pytest.mark.django_db
+def test_checkout_is_allowed_within_10_min_of_session_start():
+    context = _build_checkout_context()
+    session = context["session"]
+
+    # Session started 9 minutes ago — bypass model validation via queryset update
+    Session.objects.filter(pk=session.pk).update(
+        start_time=timezone.now() - timedelta(minutes=9),
+        end_time=timezone.now() + timedelta(hours=2),
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=context["user"])
+
+    response = client.post(
+        "/api/v1/reservation/checkout/",
+        _checkout_payload(context["session_seats"], ["inteira"], "pix"),
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert response.data["status"] == "PURCHASED"
