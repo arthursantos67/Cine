@@ -48,6 +48,7 @@ export type CatalogMovieAgeRating = "" | "L" | "10" | "12" | "14" | "16" | "18";
 
 export type CatalogMovie = {
   age_rating?: CatalogMovieAgeRating | null;
+  average_rating?: number | null;
   cast?: string[] | null;
   director?: string | null;
   duration_minutes: number;
@@ -57,6 +58,7 @@ export type CatalogMovie = {
   poster_url: string;
   spotlight_url?: string | null;
   release_date?: string | null;
+  review_count?: number;
   status: MovieStatus;
   title: string;
   translations?: CatalogMovieTranslations;
@@ -66,6 +68,34 @@ export type CatalogMovieDetail = CatalogMovie & {
   created_at?: string;
   synopsis: string;
   updated_at?: string;
+};
+
+export type MovieReviewUser = {
+  id: string;
+  username: string;
+  email: string;
+};
+
+export type MovieReviewVoteValue = "like" | "dislike";
+
+export type MovieReview = {
+  id: string;
+  user: MovieReviewUser;
+  rating: string;
+  comment: string;
+  like_count: number;
+  dislike_count: number;
+  user_vote: MovieReviewVoteValue | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MovieReviewsPage = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: MovieReview[];
+  my_review?: MovieReview | null;
 };
 
 export type CatalogRoomSummary = {

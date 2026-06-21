@@ -25,6 +25,7 @@ import {
   formatMovieGenres,
   formatMovieReleaseDate,
 } from "./movie-formatters";
+import { MovieReviewsPanel } from "./MovieReviews";
 import { SessionBadgeList } from "./SessionBadges";
 import {
   buildSessionDateOptions,
@@ -63,7 +64,9 @@ type MovieDetailProps = {
 };
 
 type MovieDetailViewProps = {
+  currentUserId?: string | null;
   interestState?: InterestState;
+  isAdmin?: boolean;
   isAuthenticated?: boolean;
   isInterestToggling?: boolean;
   onInterestToggle?: () => void;
@@ -77,7 +80,7 @@ const loadingState: MovieDetailState = {
 
 export function MovieDetail({ movieId }: MovieDetailProps) {
   const { locale } = useI18n();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [state, setState] = useState<MovieDetailState>(loadingState);
   const [interestState, setInterestState] = useState<InterestState>({ status: "idle" });
   const [isToggling, setIsToggling] = useState(false);
@@ -156,7 +159,9 @@ export function MovieDetail({ movieId }: MovieDetailProps) {
 
   return (
     <MovieDetailView
+      currentUserId={user?.id ?? null}
       interestState={interestState}
+      isAdmin={user?.is_staff ?? false}
       isAuthenticated={isAuthenticated}
       isInterestToggling={isToggling}
       onInterestToggle={() => void handleInterestToggle()}
@@ -167,7 +172,9 @@ export function MovieDetail({ movieId }: MovieDetailProps) {
 }
 
 export function MovieDetailView({
+  currentUserId,
   interestState,
+  isAdmin,
   isAuthenticated,
   isInterestToggling,
   onInterestToggle,
@@ -204,7 +211,9 @@ export function MovieDetailView({
 
   return (
     <MovieDetailSuccess
+      currentUserId={currentUserId}
       interestState={interestState}
+      isAdmin={isAdmin}
       isAuthenticated={isAuthenticated}
       isInterestToggling={isInterestToggling}
       movie={state.movie}
@@ -214,13 +223,17 @@ export function MovieDetailView({
 }
 
 function MovieDetailSuccess({
+  currentUserId,
   interestState,
+  isAdmin,
   isAuthenticated,
   isInterestToggling,
   movie,
   onInterestToggle,
 }: {
+  currentUserId?: string | null;
   interestState?: InterestState;
+  isAdmin?: boolean;
   isAuthenticated?: boolean;
   isInterestToggling?: boolean;
   movie: CatalogMovieDetail;
@@ -238,27 +251,37 @@ function MovieDetailSuccess({
 
   return (
     <div className="movie-detail">
-      <div className="movie-detail__poster-frame">
-        {movie.poster_url ? (
-          <ResponsiveImage
-            alt={t("movie.posterAlt", { title: movie.title })}
-            className="movie-detail__poster"
-            height={720}
-            priority
-            src={movie.poster_url}
-            sizes="(max-width: 820px) 100vw, 340px"
-            unoptimized
-            width={480}
-          />
-        ) : (
-          <div
-            aria-label={t("movie.posterUnavailableAlt", { title: movie.title })}
-            className="movie-detail__poster-placeholder"
-            role="img"
-          >
-            {t("movie.posterUnavailable")}
-          </div>
-        )}
+      {/* Left column: poster + reviews stacked so reviews sit directly below the poster */}
+      <div className="flex flex-col gap-4 max-[820px]:[grid-row:span_3]">
+        <div className="movie-detail__poster-frame">
+          {movie.poster_url ? (
+            <ResponsiveImage
+              alt={t("movie.posterAlt", { title: movie.title })}
+              className="movie-detail__poster"
+              height={720}
+              priority
+              src={movie.poster_url}
+              sizes="(max-width: 820px) 100vw, 340px"
+              unoptimized
+              width={480}
+            />
+          ) : (
+            <div
+              aria-label={t("movie.posterUnavailableAlt", { title: movie.title })}
+              className="movie-detail__poster-placeholder"
+              role="img"
+            >
+              {t("movie.posterUnavailable")}
+            </div>
+          )}
+        </div>
+
+        <MovieReviewsPanel
+          currentUserId={currentUserId}
+          isAdmin={isAdmin}
+          isAuthenticated={isAuthenticated}
+          movie={movie}
+        />
       </div>
 
       <article className="movie-detail__content">

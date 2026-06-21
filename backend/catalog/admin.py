@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from catalog.models import CastMember, Genre, Movie, Room, Session
+from catalog.models import CastMember, Genre, Movie, MovieReview, Room, Session
 
 
 @admin.register(Genre)
@@ -51,6 +51,14 @@ class RoomAdmin(admin.ModelAdmin):
     list_display = ("name", "display_name", "experience_type", "capacity", "created_at")
     list_filter = ("experience_type",)
     search_fields = ("name", "display_name", "description")
+
+
+@admin.register(MovieReview)
+class MovieReviewAdmin(admin.ModelAdmin):
+    list_display = ("movie", "user", "rating", "created_at")
+    list_filter = ("rating",)
+    search_fields = ("movie__title", "user__email", "user__username")
+    readonly_fields = ("movie", "user", "rating", "comment", "created_at", "updated_at")
 
 
 @admin.register(Session)
