@@ -578,3 +578,47 @@ class UserDeleteView(APIView):
 
         _delete_user_cascade(user)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class TmdbTokenResponseSerializer(serializers.Serializer):
+    configured = serializers.BooleanField()
+    hint = serializers.CharField(allow_null=True)
+
+
+class TmdbTokenBodySerializer(serializers.Serializer):
+    value = serializers.CharField(min_length=1)
+
+
+@extend_schema(
+    tags=["Admin"],
+    responses={
+        200: TmdbTokenResponseSerializer,
+        403: OpenApiResponse(description="Master access required."),
+    },
+)
+class TmdbTokenView(APIView):
+    permission_classes = [IsMasterUser]
+
+    @extend_schema(summary="Get TMDB token status")
+    def get(self, request, *args, **kwargs):
+        from users.models import SiteConfig
+        try:
+            cfg = SiteConfig.objects.get(key="tmdb_api_read_token")
+            value = cfg.value
+            configured = bool(value)
+            hint = value[-4:] if configured else None
+        except SiteConfig.DoesNotExist:
+            configured = False
+            hint = None
+        return Response({"configured": configured, "hint": hint})
+
+    @extend_schema(summary="Set TMDB token", request=TmdbTokenBodySerializer)
+    def put(self, request, *args, **kwargs):
+        from users.models import SiteConfig
+        body = TmdbTokenBodySerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        SiteConfig.objects.update_or_create(
+            key="tmdb_api_read_token",
+            defaults={"value": body.validated_data["value"]},
+        )
+        return Response({"configured": True, "hint": body.validated_data["value"][-4:]})

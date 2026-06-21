@@ -459,3 +459,6 @@ LOGGING = {
 
 # Username that cannot be demoted or have permissions revoked via the API.
 PROTECTED_SUPERUSER_USERNAME = os.getenv("PROTECTED_SUPERUSER_USERNAME") or None
+
+# Internal API key shared between Next.js server and Django for server-to-server calls.
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY") or None

@@ -82,6 +82,18 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.email
 
 
+class SiteConfig(models.Model):
+    key = models.CharField(max_length=100, unique=True)
+    value = models.TextField(blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "site_config"
+
+    def __str__(self):
+        return self.key
+
+
 class AdminPermissionLog(models.Model):
     class Action(models.TextChoices):
         GRANTED = "granted", "Granted"
