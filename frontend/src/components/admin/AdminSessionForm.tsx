@@ -16,7 +16,7 @@ import type {
 import { Badge } from "@/components/ui/Badge";
 import type { BadgeTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Select } from "@/components/ui/Select";
+import { SelectMenu } from "@/components/ui/SelectMenu";
 import { useI18n } from "@/i18n";
 import {
   addMinutesToLocalDateTime,
@@ -167,8 +167,6 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [conflictError, setConflictError] = useState<string | null>(null);
 
-  const movieSelectId = useId();
-  const roomSelectId = useId();
   const startDateId = useId();
   const startTimeId = useId();
   const endDateId = useId();
@@ -193,10 +191,10 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
   ];
 
   useEffect(() => {
-    Promise.all([adminApi.listMovies({ page: 1 }), adminApi.listRooms()])
-      .then(([moviesRes, roomsRes]) => {
-        setMovies(moviesRes.results);
-        setRooms(roomsRes.results);
+    Promise.all([adminApi.listAllMovies(), adminApi.listAllRooms()])
+      .then(([allMovies, allRooms]) => {
+        setMovies(allMovies);
+        setRooms(allRooms);
       })
       .catch(() => {
         setGlobalError(t("admin.session.formLoadError"));
@@ -329,12 +327,11 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
         </div>
       ) : null}
 
-      <Select
+      <SelectMenu
         disabled={formDisabled || locked}
         error={fieldErrors.movie}
-        id={movieSelectId}
         label={t("admin.session.movie")}
-        onChange={(e) => setMovieId(e.target.value)}
+        onChange={setMovieId}
         options={movieOptions}
         placeholder={
           loadingOptions
@@ -345,12 +342,11 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
         value={movieId}
       />
 
-      <Select
+      <SelectMenu
         disabled={formDisabled || locked}
         error={fieldErrors.room}
-        id={roomSelectId}
         label={t("admin.session.room")}
-        onChange={(e) => setRoomId(e.target.value)}
+        onChange={setRoomId}
         options={roomOptions}
         placeholder={
           loadingOptions
@@ -534,33 +530,31 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
       })()}
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Select
+        <SelectMenu
           disabled={formDisabled}
           error={fieldErrors.audio_format}
           label={t("admin.session.audioFormat")}
-          onChange={(e) => setAudioFormat(e.target.value as CatalogAudioFormat)}
+          onChange={(v) => setAudioFormat(v as CatalogAudioFormat)}
           options={audioFormatOptions}
           placeholder={t("common.notSpecified")}
           value={audioFormat}
         />
 
-        <Select
+        <SelectMenu
           disabled={formDisabled}
           error={fieldErrors.projection_format}
           label={t("admin.session.projection")}
-          onChange={(e) =>
-            setProjectionFormat(e.target.value as CatalogProjectionFormat)
-          }
+          onChange={(v) => setProjectionFormat(v as CatalogProjectionFormat)}
           options={projectionFormatOptions}
           placeholder={t("common.notSpecified")}
           value={projectionFormat}
         />
 
-        <Select
+        <SelectMenu
           disabled={formDisabled}
           error={fieldErrors.session_type}
           label={t("admin.session.type")}
-          onChange={(e) => setSessionType(e.target.value as CatalogSessionType)}
+          onChange={(v) => setSessionType(v as CatalogSessionType)}
           options={sessionTypeOptions}
           placeholder={t("common.notSpecified")}
           value={sessionType}
