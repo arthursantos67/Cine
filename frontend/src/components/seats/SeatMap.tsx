@@ -524,7 +524,9 @@ export function SeatMapLayout({
       const padding = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
       const available = scroll.clientWidth - padding;
       const newFitZoom = Math.min(1, available / naturalWidth);
-      const rawOffset = Math.log(DEFAULT_TARGET_ZOOM / newFitZoom) / Math.log(ZOOM_FACTOR);
+      const rawOffset = newFitZoom < DEFAULT_TARGET_ZOOM
+        ? Math.log(DEFAULT_TARGET_ZOOM / newFitZoom) / Math.log(ZOOM_FACTOR)
+        : 0;
       const defaultOffset = Math.min(Math.max(Math.round(rawOffset), -MAX_ZOOM_STEPS), MAX_ZOOM_STEPS);
       hasInitializedZoomRef.current = false;
       setFitZoom(newFitZoom);

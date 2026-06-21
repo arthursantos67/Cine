@@ -1507,7 +1507,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     "session.today": "Today",
     "session.tomorrow": "Tomorrow",
     "session.previewPanel.trailer": "Trailer",
-    "session.previewPanel.ratingWarning": "NOT RECOMMENDED FOR VIEWERS UNDER {rating}",
+    "session.previewPanel.ratingWarning": "NOT RECOMMENDED FOR VIEWERS UNDER {rating} YEARS",
     "session.previewPanel.ratingLink": "click here",
     "session.previewPanel.collapsedLabel": "View movie details",
     "schedule.badgeDescription": ", formats {badges}",

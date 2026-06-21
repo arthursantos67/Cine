@@ -38,8 +38,6 @@ function AgeRatingBlock({ ageRating, classificationDescription }: {
 }) {
   const { t } = useI18n();
 
-  if (!ageRating || ageRating === "L") return null;
-
   const colorClass = ratingIconColors[ageRating] ?? "bg-neutral-700";
 
   return (
@@ -140,9 +138,10 @@ function PanelContent({ session }: { session: CatalogSession }) {
               style={{ aspectRatio: "16/9" }}
             >
               <iframe
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allow="accelerometer; autoplay; encrypted-media; picture-in-picture"
                 allowFullScreen
                 className="h-full w-full"
+                sandbox="allow-scripts allow-same-origin allow-presentation allow-fullscreen"
                 src={movie.spotlight_url}
                 title={t("session.previewPanel.trailer")}
               />

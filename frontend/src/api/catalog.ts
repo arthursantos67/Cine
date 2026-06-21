@@ -43,8 +43,8 @@ export const catalogApi = {
     return getMovie(movieId);
   },
 
-  getSession(sessionId: string) {
-    return getSession(sessionId);
+  getSession(sessionId: string, options?: { signal?: AbortSignal }) {
+    return getSession(sessionId, options);
   },
 
   getSessions(params: GetSessionsParams = {}) {
@@ -85,10 +85,11 @@ async function getMovie(movieId: string) {
   return response satisfies CatalogMovieDetail;
 }
 
-async function getSession(sessionId: string) {
+async function getSession(sessionId: string, options?: { signal?: AbortSignal }) {
   const response = await apiRequest<unknown>(`${SESSIONS_PATH}${sessionId}/`, {
     auth: "none",
     method: "GET",
+    signal: options?.signal,
   });
 
   if (!isCatalogSession(response)) {

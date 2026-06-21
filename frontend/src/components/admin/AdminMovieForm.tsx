@@ -403,7 +403,7 @@ export function AdminMovieForm({ movie }: AdminMovieFormProps) {
     const payload: AdminMovieWritePayload = {
       age_rating: ageRating || undefined,
       cast: castMembers,
-      classification_description: classificationDescription || undefined,
+      classification_description: classificationDescription,
       director: director || undefined,
       duration_minutes: Number(durationMinutes),
       genres: selectedGenres.map((g) => g.id),
@@ -809,9 +809,10 @@ export function AdminMovieForm({ movie }: AdminMovieFormProps) {
           {spotlightUrl ? (
             <div className="overflow-hidden rounded-[8px] border border-white/[0.07]" style={{ aspectRatio: "16/9" }}>
               <iframe
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allow="accelerometer; autoplay; encrypted-media; picture-in-picture"
                 allowFullScreen
                 className="h-full w-full"
+                sandbox="allow-scripts allow-same-origin allow-presentation allow-fullscreen"
                 src={spotlightUrl}
                 title={t("admin.movie.spotlightPreview")}
               />

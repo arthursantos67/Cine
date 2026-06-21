@@ -21,15 +21,21 @@ export function SessionMoviePreview({
   summaryActionLabel,
 }: SessionMoviePreviewProps) {
   const [session, setSession] = useState<CatalogSession | null>(null);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
+    const controller = new AbortController();
     catalogApi
-      .getSession(sessionId)
+      .getSession(sessionId, { signal: controller.signal })
       .then(setSession)
-      .catch(() => {});
+      .catch((err) => {
+        if (err.name !== "AbortError") setError(true);
+      });
+    return () => controller.abort();
   }, [sessionId]);
 
-  if (!session) return null;
+  if (error) return <p className="text-sm text-white/50">...</p>;
+  if (!session) return <div className="animate-pulse rounded-card bg-white/5 h-64 w-full" />;
 
   return (
     <MoviePreviewPanel

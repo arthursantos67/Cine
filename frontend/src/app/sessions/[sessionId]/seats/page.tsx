@@ -31,7 +31,7 @@ export default async function SeatSelectionPage({
               <SeatMap sessionId={sessionId} />
             </div>
           </div>
-          <div className="hidden md:flex md:flex-col md:w-[300px] md:shrink-0 md:sticky md:top-24">
+          <div className="md:w-[300px] md:shrink-0 md:sticky md:top-24">
             <SessionMoviePreview
               sessionId={sessionId}
               showOrderSummary
