@@ -212,7 +212,7 @@ export function AdminSessionList() {
         title={t("admin.sessions")}
       />
 
-      <div className="flex flex-wrap items-end gap-4 rounded-[8px] border border-white/[0.07] bg-white/[0.02] p-4">
+      <div className="flex flex-wrap items-end gap-4">
         <div className="grid gap-1.5">
           <label
             className="text-sm font-extrabold text-white"
