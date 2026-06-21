@@ -633,7 +633,7 @@ class MovieReviewListCreateView(APIView):
         if rating_param is not None:
             try:
                 rating_val = Decimal(rating_param)
-                qs = qs.filter(rating=rating_val)
+                qs = qs.filter(rating__gte=rating_val, rating__lt=rating_val + 1)
             except InvalidOperation:
                 pass
 
