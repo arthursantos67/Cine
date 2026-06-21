@@ -154,6 +154,7 @@ export function AdminMovieForm({ movie }: AdminMovieFormProps) {
   );
   const [releaseDate, setReleaseDate] = useState(movie?.release_date ?? "");
   const [posterUrl, setPosterUrl] = useState(movie?.poster_url ?? "");
+  const [spotlightUrl, setSpotlightUrl] = useState(movie?.spotlight_url ?? "");
   const [status, setStatus] = useState<MovieStatus>(movie?.status ?? "em_cartaz");
   const [isFeatured, setIsFeatured] = useState(movie?.is_featured ?? false);
   const [ageRating, setAgeRating] = useState<CatalogMovieAgeRating>(
@@ -198,6 +199,7 @@ export function AdminMovieForm({ movie }: AdminMovieFormProps) {
   const durationId = useId();
   const releaseDateId = useId();
   const posterUrlId = useId();
+  const spotlightUrlId = useId();
   const directorId = useId();
   const castInputId = useId();
   const tmdbInputId = useId();
@@ -404,6 +406,7 @@ export function AdminMovieForm({ movie }: AdminMovieFormProps) {
       genres: selectedGenres.map((g) => g.id),
       is_featured: isFeatured,
       poster_url: posterUrl,
+      spotlight_url: spotlightUrl ? spotlightUrl : isEditing ? null : undefined,
       release_date: releaseDate,
       status,
       synopsis,
@@ -770,6 +773,41 @@ export function AdminMovieForm({ movie }: AdminMovieFormProps) {
               {t("admin.movie.posterPreview")}
             </div>
           )}
+
+          {isFeatured ? (
+            <>
+              <FormField
+                error={fieldErrors.spotlight_url}
+                label={t("admin.movie.spotlightUrl")}
+                labelFor={spotlightUrlId}
+              >
+                <TextInput
+                  disabled={isSubmitting}
+                  error={fieldErrors.spotlight_url}
+                  id={spotlightUrlId}
+                  onChange={(e) => setSpotlightUrl(e.target.value)}
+                  placeholder={t("admin.movie.spotlightUrlPlaceholder")}
+                  type="url"
+                  value={spotlightUrl}
+                />
+              </FormField>
+              {spotlightUrl ? (
+                <div className="overflow-hidden rounded-[8px] border border-white/[0.07]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    alt={t("admin.movie.spotlightPreview")}
+                    className="w-full object-cover"
+                    src={spotlightUrl}
+                    style={{ maxHeight: 280 }}
+                  />
+                </div>
+              ) : (
+                <div className="flex h-40 items-center justify-center rounded-[8px] border border-dashed border-white/[0.12] text-sm text-white/30">
+                  {t("admin.movie.spotlightPreview")}
+                </div>
+              )}
+            </>
+          ) : null}
 
           {/* Genres */}
           <div className="grid gap-2">

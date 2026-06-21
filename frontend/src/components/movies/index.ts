@@ -4,6 +4,8 @@ export { MovieDetail, MovieDetailView, type MovieDetailState } from "./MovieDeta
 export { MovieCard } from "./MovieCard";
 export { MovieCarousel } from "./MovieCarousel";
 export { MovieGrid } from "./MovieGrid";
+export { MovieReviewsPanel, RatingSummaryBar } from "./MovieReviews";
+export { StarRating } from "./StarRating";
 export { TabbedMovieCatalog } from "./TabbedMovieCatalog";
 export {
   formatMovieDuration,

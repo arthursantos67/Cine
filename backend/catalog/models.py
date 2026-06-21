@@ -63,6 +63,7 @@ class Movie(models.Model):
     duration_minutes = models.PositiveIntegerField()
     release_date = models.DateField()
     poster_url = models.URLField(max_length=500)
+    spotlight_url = models.URLField(max_length=500, null=True, blank=True)
     status = models.CharField(
         max_length=20,
         choices=MovieStatus.choices,
@@ -361,6 +362,63 @@ class MovieInterest(models.Model):
 
     def __str__(self):
         return f"{self.user} → {self.movie}"
+
+
+class MovieReview(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name="reviews")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="movie_reviews",
+    )
+    rating = models.DecimalField(max_digits=3, decimal_places=1)
+    comment = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "movie_reviews"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["movie", "user"],
+                name="unique_movie_review_per_user",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(rating__gte=Decimal("0.5")) & models.Q(rating__lte=Decimal("5.0")),
+                name="movie_review_rating_half_to_5",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user} → {self.movie} ({self.rating}★)"
+
+
+class MovieReviewVote(models.Model):
+    LIKE = "like"
+    DISLIKE = "dislike"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    review = models.ForeignKey(MovieReview, on_delete=models.CASCADE, related_name="votes")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="review_votes",
+    )
+    vote = models.CharField(max_length=7, choices=[(LIKE, "Like"), (DISLIKE, "Dislike")])
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "movie_review_votes"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["review", "user"],
+                name="unique_review_vote_per_user",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user} → {self.review_id} ({self.vote})"
 
 
 class Genre(models.Model):

@@ -5,8 +5,10 @@ import { useEffect, useState } from "react";
 import { adminApi } from "@/api/admin";
 import type { CatalogMovieDetail } from "@/types/catalog";
 import { AdminMovieForm } from "./AdminMovieForm";
+import { AdminMovieReviewList } from "./AdminMovieReviewList";
 import { AdminToolbar } from "./AdminToolbar";
 import { ButtonLink } from "@/components/ui/Button";
+import { Tabs } from "@/components/ui/Tabs";
 import { useI18n } from "@/i18n";
 
 export function AdminEditMovieLoader({ movieId }: { movieId: string }) {
@@ -71,7 +73,21 @@ export function AdminEditMovieLoader({ movieId }: { movieId: string }) {
         }
         title={t("admin.editPrefix", { name: movie.title })}
       />
-      <AdminMovieForm movie={movie} />
+      <Tabs
+        ariaLabel={t("admin.movie.edit")}
+        items={[
+          {
+            value: "details",
+            label: t("admin.movie.detailsTab"),
+            content: <AdminMovieForm movie={movie} />,
+          },
+          {
+            value: "reviews",
+            label: t("reviews.title"),
+            content: <AdminMovieReviewList movieId={movie.id} />,
+          },
+        ]}
+      />
     </div>
   );
 }

@@ -31,39 +31,32 @@ export function FeaturedMovieBanner({
   const [activeIndex, setActiveIndex] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  function clearAutoAdvance() {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-  }
-
   function startAutoAdvance() {
     if (featuredMovies.length <= 1) return;
+    if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = setInterval(() => {
       setActiveIndex((i) => (i + 1) % featuredMovies.length);
     }, 7000);
   }
 
-  function resetAutoAdvance() {
-    clearAutoAdvance();
+  useEffect(() => {
+    startAutoAdvance();
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [featuredMovies.length]);
+
+  function navigateTo(targetIndex: number) {
+    setActiveIndex(targetIndex);
     startAutoAdvance();
   }
 
   function scrollFeatured(direction: "next" | "previous") {
-    setActiveIndex((i) =>
+    setActiveIndex((current) =>
       direction === "next"
-        ? (i + 1) % featuredMovies.length
-        : (i - 1 + featuredMovies.length) % featuredMovies.length
+        ? (current + 1) % featuredMovies.length
+        : (current - 1 + featuredMovies.length) % featuredMovies.length
     );
-    resetAutoAdvance();
-  }
-
-  useEffect(() => {
     startAutoAdvance();
-    return clearAutoAdvance;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [featuredMovies.length]);
+  }
 
   if (featuredMovies.length === 0) {
     return null;
@@ -92,7 +85,7 @@ export function FeaturedMovieBanner({
               className="block h-full w-full object-cover object-top"
               height={1080}
               priority={i === 0}
-              src={fm.poster_url}
+              src={fm.spotlight_url ?? fm.poster_url}
               sizes="100vw"
               unoptimized
               width={1920}
@@ -167,8 +160,7 @@ export function FeaturedMovieBanner({
                   e.key === "ArrowRight"
                     ? (activeIndex + 1) % featuredMovies.length
                     : (activeIndex - 1 + featuredMovies.length) % featuredMovies.length;
-                setActiveIndex(next);
-                resetAutoAdvance();
+                navigateTo(next);
                 const tabs = e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]');
                 tabs[next]?.focus();
               }}
@@ -186,10 +178,7 @@ export function FeaturedMovieBanner({
                       ? "w-10 bg-white"
                       : "w-6 bg-white/35 hover:bg-white/60"
                   }`}
-                  onClick={() => {
-                    setActiveIndex(i);
-                    resetAutoAdvance();
-                  }}
+                  onClick={() => navigateTo(i)}
                   role="tab"
                   tabIndex={i === activeIndex ? 0 : -1}
                   type="button"
@@ -205,7 +194,7 @@ export function FeaturedMovieBanner({
         <>
           <button
             aria-label={t("home.previousFeatured")}
-            className="absolute left-1 top-1/2 z-[3] -translate-y-1/2 flex h-[52px] w-9 items-center justify-center rounded-[6px] bg-white/55 text-[rgb(20_20_20/0.65)] transition-all hover:bg-white/[0.92] hover:scale-[1.08] focus-visible:outline-none focus-visible:shadow-focus"
+            className="absolute left-1 top-1/2 z-[5] -translate-y-1/2 flex h-[52px] w-9 items-center justify-center rounded-[6px] bg-white/55 text-[rgb(20_20_20/0.65)] transition-all hover:bg-white/[0.92] hover:scale-[1.08] focus-visible:outline-none focus-visible:shadow-focus"
             onClick={() => scrollFeatured("previous")}
             type="button"
           >
@@ -216,7 +205,7 @@ export function FeaturedMovieBanner({
           </button>
           <button
             aria-label={t("home.nextFeatured")}
-            className="absolute right-1 top-1/2 z-[3] -translate-y-1/2 flex h-[52px] w-9 items-center justify-center rounded-[6px] bg-white/55 text-[rgb(20_20_20/0.65)] transition-all hover:bg-white/[0.92] hover:scale-[1.08] focus-visible:outline-none focus-visible:shadow-focus"
+            className="absolute right-1 top-1/2 z-[5] -translate-y-1/2 flex h-[52px] w-9 items-center justify-center rounded-[6px] bg-white/55 text-[rgb(20_20_20/0.65)] transition-all hover:bg-white/[0.92] hover:scale-[1.08] focus-visible:outline-none focus-visible:shadow-focus"
             onClick={() => scrollFeatured("next")}
             type="button"
           >
