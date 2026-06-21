@@ -1,8 +1,10 @@
 import uuid
 
+from decimal import Decimal, InvalidOperation
+
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Avg, Count
+from django.db.models import Avg, CharField, Count, ExpressionWrapper, F, IntegerField, Q, Subquery, OuterRef, Value
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
@@ -24,6 +26,7 @@ from catalog.models import (
     Movie,
     MovieInterest,
     MovieReview,
+    MovieReviewVote,
     MovieStatus,
     ProjectionFormat,
     Room,
@@ -44,6 +47,36 @@ from catalog.serializers import (
     SessionWriteSerializer,
     compute_session_price,
 )
+
+
+def _review_queryset(movie, request):
+    """Annotate review queryset with vote counts and current user's vote."""
+    like_expr = Count("votes", filter=Q(votes__vote=MovieReviewVote.LIKE))
+    dislike_expr = Count("votes", filter=Q(votes__vote=MovieReviewVote.DISLIKE))
+
+    qs = (
+        MovieReview.objects.filter(movie=movie)
+        .select_related("user")
+        .annotate(
+            like_count=like_expr,
+            dislike_count=dislike_expr,
+            # Compute net_votes inline to avoid F()-referencing-annotation issues
+            net_votes=ExpressionWrapper(
+                Count("votes", filter=Q(votes__vote=MovieReviewVote.LIKE))
+                - Count("votes", filter=Q(votes__vote=MovieReviewVote.DISLIKE)),
+                output_field=IntegerField(),
+            ),
+        )
+    )
+    if request.user.is_authenticated:
+        user_vote_sq = MovieReviewVote.objects.filter(
+            review=OuterRef("pk"),
+            user=request.user,
+        ).values("vote")[:1]
+        qs = qs.annotate(user_vote=Subquery(user_vote_sq, output_field=CharField()))
+    else:
+        qs = qs.annotate(user_vote=Value(None, output_field=CharField()))
+    return qs.order_by("-net_votes", "-created_at")
 
 MOVIE_LIST_CACHE_VERSION_KEY = "catalog:movies:version"
 SESSION_LIST_CACHE_VERSION_KEY = "catalog:sessions:version"
@@ -594,24 +627,44 @@ class MovieReviewListCreateView(APIView):
         except (ValueError, TypeError):
             page = 1
 
-        qs = MovieReview.objects.filter(movie=movie).select_related("user")
+        qs = _review_queryset(movie, request)
+
+        rating_param = request.query_params.get("rating")
+        if rating_param is not None:
+            try:
+                rating_val = Decimal(rating_param)
+                qs = qs.filter(rating=rating_val)
+            except InvalidOperation:
+                pass
+
         total = qs.count()
         offset = (page - 1) * page_size
-        reviews = qs[offset: offset + page_size]
+        reviews = list(qs[offset: offset + page_size])
 
         serializer = MovieReviewSerializer(reviews, many=True)
 
         base_url = request.build_absolute_uri(request.path)
 
-        def page_url(p):
-            return f"{base_url}?page={p}"
+        def page_url(p, rating=rating_param):
+            url = f"{base_url}?page={p}"
+            if rating is not None:
+                url += f"&rating={rating}"
+            return url
 
-        return Response({
+        response_data = {
             "count": total,
             "next": page_url(page + 1) if offset + page_size < total else None,
             "previous": page_url(page - 1) if page > 1 else None,
             "results": serializer.data,
-        })
+        }
+
+        if request.user.is_authenticated:
+            my_review_qs = _review_queryset(movie, request).filter(user=request.user).first()
+            response_data["my_review"] = (
+                MovieReviewSerializer(my_review_qs).data if my_review_qs else None
+            )
+
+        return Response(response_data)
 
     def post(self, request, movie_pk):
         movie = get_object_or_404(Movie, pk=movie_pk)
@@ -627,16 +680,41 @@ class MovieReviewListCreateView(APIView):
             },
         )
 
-        out = MovieReviewSerializer(review)
+        if not created:
+            review.votes.all().delete()
+
+        out_qs = _review_queryset(movie, request).get(pk=review.pk)
+        out = MovieReviewSerializer(out_qs)
         return Response(
             out.data,
             status=http_status.HTTP_201_CREATED if created else http_status.HTTP_200_OK,
         )
 
 
-@extend_schema(tags=["Catalog"], summary="Delete a movie review")
+@extend_schema(tags=["Catalog"], summary="Update or delete a movie review")
 class MovieReviewDetailView(APIView):
     permission_classes = [IsAuthenticated]
+
+    def patch(self, request, movie_pk, review_pk):
+        review = get_object_or_404(MovieReview, pk=review_pk, movie_id=movie_pk)
+
+        if review.user_id != request.user.id:
+            return Response(
+                {"error": {"code": "PERMISSION_DENIED", "message": "You can only edit your own reviews.", "status": 403, "details": None}},
+                status=http_status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = MovieReviewSerializer(review, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Reset votes so an edited review doesn't keep its previous reputation
+        review.votes.all().delete()
+
+        movie = get_object_or_404(Movie, pk=movie_pk)
+        out_qs = _review_queryset(movie, request).get(pk=review.pk)
+        out = MovieReviewSerializer(out_qs)
+        return Response(out.data)
 
     def delete(self, request, movie_pk, review_pk):
         review = get_object_or_404(MovieReview, pk=review_pk, movie_id=movie_pk)
@@ -648,4 +726,29 @@ class MovieReviewDetailView(APIView):
             )
 
         review.delete()
+        return Response(status=http_status.HTTP_204_NO_CONTENT)
+
+
+@extend_schema(tags=["Catalog"], summary="Like or dislike a movie review")
+class MovieReviewVoteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, movie_pk, review_pk):
+        review = get_object_or_404(MovieReview, pk=review_pk, movie_id=movie_pk)
+        vote_value = request.data.get("vote")
+        if vote_value not in (MovieReviewVote.LIKE, MovieReviewVote.DISLIKE):
+            return Response(
+                {"error": {"code": "INVALID_VOTE", "message": "vote must be 'like' or 'dislike'.", "status": 400, "details": None}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+        _, created = MovieReviewVote.objects.update_or_create(
+            review=review,
+            user=request.user,
+            defaults={"vote": vote_value},
+        )
+        return Response({"vote": vote_value}, status=http_status.HTTP_201_CREATED if created else http_status.HTTP_200_OK)
+
+    def delete(self, request, movie_pk, review_pk):
+        review = get_object_or_404(MovieReview, pk=review_pk, movie_id=movie_pk)
+        MovieReviewVote.objects.filter(review=review, user=request.user).delete()
         return Response(status=http_status.HTTP_204_NO_CONTENT)

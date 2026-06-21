@@ -372,27 +372,53 @@ class MovieReview(models.Model):
         on_delete=models.CASCADE,
         related_name="movie_reviews",
     )
-    rating = models.PositiveSmallIntegerField()
+    rating = models.DecimalField(max_digits=3, decimal_places=1)
     comment = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "movie_reviews"
-        ordering = ["-created_at"]
         constraints = [
             models.UniqueConstraint(
                 fields=["movie", "user"],
                 name="unique_movie_review_per_user",
             ),
             models.CheckConstraint(
-                condition=models.Q(rating__gte=1) & models.Q(rating__lte=5),
-                name="movie_review_rating_1_to_5",
+                condition=models.Q(rating__gte=Decimal("0.5")) & models.Q(rating__lte=Decimal("5.0")),
+                name="movie_review_rating_half_to_5",
             ),
         ]
 
     def __str__(self):
         return f"{self.user} → {self.movie} ({self.rating}★)"
+
+
+class MovieReviewVote(models.Model):
+    LIKE = "like"
+    DISLIKE = "dislike"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    review = models.ForeignKey(MovieReview, on_delete=models.CASCADE, related_name="votes")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="review_votes",
+    )
+    vote = models.CharField(max_length=7, choices=[(LIKE, "Like"), (DISLIKE, "Dislike")])
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "movie_review_votes"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["review", "user"],
+                name="unique_review_vote_per_user",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user} → {self.review_id} ({self.vote})"
 
 
 class Genre(models.Model):

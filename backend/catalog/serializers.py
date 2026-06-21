@@ -18,7 +18,7 @@ from cineprime_api.localization import (
     normalize_translation_payload,
 )
 
-from catalog.models import CastMember, Genre, Movie, MovieInterest, MovieReview, Room, RoomTypePricing, Session
+from catalog.models import CastMember, Genre, Movie, MovieInterest, MovieReview, MovieReviewVote, Room, RoomTypePricing, Session
 from reservations.models import SessionSeat, SessionSeatStatus, Seat
 
 logger = logging.getLogger(__name__)
@@ -609,13 +609,23 @@ class MovieReviewUserSerializer(serializers.Serializer):
 
 class MovieReviewSerializer(serializers.ModelSerializer):
     user = MovieReviewUserSerializer(read_only=True)
+    like_count = serializers.IntegerField(read_only=True, default=0)
+    dislike_count = serializers.IntegerField(read_only=True, default=0)
+    user_vote = serializers.CharField(read_only=True, allow_null=True, default=None)
 
     class Meta:
         model = MovieReview
-        fields = ["id", "user", "rating", "comment", "created_at", "updated_at"]
-        read_only_fields = ["id", "user", "created_at", "updated_at"]
+        fields = ["id", "user", "rating", "comment", "like_count", "dislike_count", "user_vote", "created_at", "updated_at"]
+        read_only_fields = ["id", "user", "like_count", "dislike_count", "user_vote", "created_at", "updated_at"]
 
     def validate_rating(self, value):
-        if not (1 <= value <= 5):
-            raise serializers.ValidationError("Rating must be between 1 and 5.")
-        return value
+        from decimal import Decimal, InvalidOperation
+        try:
+            d = Decimal(str(value))
+        except InvalidOperation:
+            raise serializers.ValidationError("Rating must be a number.")
+        if d < Decimal("0.5") or d > Decimal("5.0"):
+            raise serializers.ValidationError("Rating must be between 0.5 and 5.")
+        if (d * 2) != int(d * 2):
+            raise serializers.ValidationError("Rating must be a multiple of 0.5.")
+        return d

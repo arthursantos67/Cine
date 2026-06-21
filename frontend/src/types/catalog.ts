@@ -76,11 +76,16 @@ export type MovieReviewUser = {
   email: string;
 };
 
+export type MovieReviewVoteValue = "like" | "dislike";
+
 export type MovieReview = {
   id: string;
   user: MovieReviewUser;
   rating: number;
   comment: string;
+  like_count: number;
+  dislike_count: number;
+  user_vote: MovieReviewVoteValue | null;
   created_at: string;
   updated_at: string;
 };
@@ -90,6 +95,7 @@ export type MovieReviewsPage = {
   next: string | null;
   previous: string | null;
   results: MovieReview[];
+  my_review?: MovieReview | null;
 };
 
 export type CatalogRoomSummary = {
