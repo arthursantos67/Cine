@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <rect width="80" height="80" rx="14" fill="#1e2535"/>
+  <g stroke="#b31322" stroke-width="9" stroke-linecap="round" fill="none">
+    <!-- c -->
+    <path d="M 47 18 A 20 20 0 1 0 47 48"/>
+    <!-- p bowl -->
+    <circle cx="54" cy="33" r="15"/>
+    <!-- p descender -->
+    <line x1="39" y1="33" x2="39" y2="66"/>
+  </g>
+</svg>
