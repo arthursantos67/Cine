@@ -1067,9 +1067,9 @@ h1 {
 }
 
 .seat-map__legend-swatch--purchased {
-  background: rgb(7 10 16 / 92%);
-  border-color: rgb(255 255 255 / 12%);
-  color: rgb(228 232 240 / 70%);
+  background: rgb(55 65 82 / 68%);
+  border-color: rgb(255 255 255 / 22%);
+  color: rgb(228 232 240 / 80%);
 }
 
 .seat-map__legend-swatch--accessible {
@@ -1268,9 +1268,9 @@ h1 {
 }
 
 .seat-map__seat--purchased {
-  background: rgb(7 10 16 / 92%);
-  border-color: rgb(255 255 255 / 10%);
-  color: rgb(228 232 240 / 56%);
+  background: rgb(55 65 82 / 68%);
+  border-color: rgb(255 255 255 / 20%);
+  color: rgb(228 232 240 / 70%);
 }
 
 .seat-map__seat--pending {

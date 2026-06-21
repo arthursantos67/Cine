@@ -1,8 +1,9 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { ZoomIn, ZoomOut } from "lucide-react";
+import { User, ZoomIn, ZoomOut } from "lucide-react";
 
 import { ApiError, getApiErrorUserMessage } from "@/api/client";
 import { catalogApi } from "@/api/catalog";
@@ -97,9 +98,9 @@ const defaultSeatStateLabels: Record<SeatVisualState, string> = {
   selected: "Selecionado",
 };
 
-const seatStateMarkers: Record<SeatVisualState, string> = {
+const seatStateMarkers: Record<SeatVisualState, ReactNode> = {
   available: "",
-  purchased: "C",
+  purchased: <User size={12} strokeWidth={2.5} />,
   reserved: "R",
   selected: "",
 };
@@ -992,9 +993,11 @@ function renderSeatButton({
       onClick={() => onSeatToggle?.(seat)}
       type="button"
     >
-      <span className="seat-map__seat-number">
-        {displayLabel ?? displayNumber ?? seat.number}
-      </span>
+      {visualState !== "purchased" && (
+        <span className="seat-map__seat-number">
+          {displayLabel ?? displayNumber ?? seat.number}
+        </span>
+      )}
       {stateMarker ? (
         <span aria-hidden="true" className="seat-map__seat-marker">
           {stateMarker}
@@ -1014,7 +1017,7 @@ export function SeatMapLegend() {
   const legendItems: Array<{
     className: string;
     label: string;
-    marker: string;
+    marker: ReactNode;
   }> = [
     {
       className: "seat-map__legend-swatch--available",
