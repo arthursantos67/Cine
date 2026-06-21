@@ -53,7 +53,7 @@ function ReviewRow({ onDelete, review }: RowProps) {
         <span className="admin-review-row__email">{review.user.email}</span>
       </td>
       <td className="admin-review-row__rating">
-        <StarRating mode="display" value={review.rating} />
+        <StarRating mode="display" value={Number(review.rating)} />
       </td>
       <td className="admin-review-row__comment">
         {review.comment || <em className="text-muted">—</em>}
