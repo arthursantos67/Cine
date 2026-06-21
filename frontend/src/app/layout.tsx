@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const t = getTranslator(locale);
 
   return {
-    title: "CinePrime",
+    title: "Cine Prime",
     description: t("metadata.description"),
   };
 }

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { cn } from "@/components/ui/classNames";
+import { LogoCp } from "@/components/ui/LogoCp";
 import { useI18n } from "@/i18n";
 
 import { LanguageSwitcher } from "./LanguageSwitcher";
@@ -48,13 +49,8 @@ export function AppHeader() {
             className="inline-flex items-center gap-2.5 text-[18px] font-[850] text-white"
             href="/"
           >
-            <span
-              aria-hidden="true"
-              className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-[6px] bg-brand text-[12px] font-[850] text-white"
-            >
-              CP
-            </span>
-            <span>CinePrime</span>
+            <LogoCp className="h-[34px] w-[34px]" />
+            <span>Cine Prime</span>
           </Link>
           <span
             aria-label={t("nav.venue")}
