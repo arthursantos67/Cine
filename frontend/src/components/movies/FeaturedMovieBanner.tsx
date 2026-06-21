@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
@@ -29,25 +29,33 @@ export function FeaturedMovieBanner({
   const actionLabel = primaryActionLabel ?? t("movie.viewSessions");
   const featuredMovies = movies?.length ? movies : movie ? [movie] : [];
   const [activeIndex, setActiveIndex] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
+  function startAutoAdvance() {
     if (featuredMovies.length <= 1) return;
-    const id = setInterval(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => {
       setActiveIndex((i) => (i + 1) % featuredMovies.length);
     }, 7000);
-    return () => clearInterval(id);
+  }
+
+  useEffect(() => {
+    startAutoAdvance();
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [featuredMovies.length]);
 
   function navigateTo(targetIndex: number) {
     setActiveIndex(targetIndex);
+    startAutoAdvance();
   }
 
   function scrollFeatured(direction: "next" | "previous") {
-    const targetIndex =
+    setActiveIndex((current) =>
       direction === "next"
-        ? (activeIndex + 1) % featuredMovies.length
-        : (activeIndex - 1 + featuredMovies.length) % featuredMovies.length;
-    navigateTo(targetIndex);
+        ? (current + 1) % featuredMovies.length
+        : (current - 1 + featuredMovies.length) % featuredMovies.length
+    );
+    startAutoAdvance();
   }
 
   if (featuredMovies.length === 0) {

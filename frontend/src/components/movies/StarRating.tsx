@@ -31,7 +31,7 @@ function getStarFill(starIndex: number, value: number): StarFill {
   return "empty";
 }
 
-function StarIcon({ fill }: { fill: StarFill }) {
+function StarIcon({ fill, gradientId = "half-fill" }: { fill: StarFill; gradientId?: string }) {
   return (
     <svg
       aria-hidden="true"
@@ -43,7 +43,7 @@ function StarIcon({ fill }: { fill: StarFill }) {
     >
       {fill === "half" && (
         <defs>
-          <linearGradient id="half-fill" x1="0" x2="1" y1="0" y2="0">
+          <linearGradient id={gradientId} x1="0" x2="1" y1="0" y2="0">
             <stop offset="50%" stopColor="var(--color-cinema-gold)" />
             <stop offset="50%" stopColor="var(--color-cinema-gold)" stopOpacity="0.15" />
           </linearGradient>
@@ -55,7 +55,7 @@ function StarIcon({ fill }: { fill: StarFill }) {
           fill === "full"
             ? "var(--color-cinema-gold)"
             : fill === "half"
-            ? "url(#half-fill)"
+            ? `url(#${gradientId})`
             : "var(--color-cinema-gold)"
         }
         opacity={fill === "empty" ? 0.15 : 1}
@@ -85,7 +85,7 @@ export function StarRating(props: StarRatingProps) {
         role="img"
       >
         {stars.map((fill, i) => (
-          <StarIcon fill={fill} key={i} />
+          <StarIcon fill={fill} gradientId={`${uid}-${i}-g`} key={i} />
         ))}
       </div>
     );
@@ -175,7 +175,7 @@ function StarRatingInteractive({
             onKeyDown={(e) => handleKeyDown(e, starFullValue)}
             type="button"
           >
-            <StarIcon fill={fill} />
+            <StarIcon fill={fill} gradientId={`${uid}-${starFullValue}-g`} />
           </button>
         );
       })}

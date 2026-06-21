@@ -597,13 +597,11 @@ class SessionReadSerializer(serializers.ModelSerializer):
 class MovieReviewUserSerializer(serializers.Serializer):
     id = serializers.UUIDField(read_only=True)
     username = serializers.CharField(read_only=True)
-    email = serializers.EmailField(read_only=True)
 
     def to_representation(self, instance):
         return {
             "id": str(instance.id),
             "username": instance.username,
-            "email": instance.email,
         }
 
 

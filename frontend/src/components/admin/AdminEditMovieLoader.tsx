@@ -78,7 +78,7 @@ export function AdminEditMovieLoader({ movieId }: { movieId: string }) {
         items={[
           {
             value: "details",
-            label: t("admin.movie.titleField").replace(" em português", ""),
+            label: t("admin.movie.detailsTab"),
             content: <AdminMovieForm movie={movie} />,
           },
           {

@@ -81,7 +81,7 @@ export type MovieReviewVoteValue = "like" | "dislike";
 export type MovieReview = {
   id: string;
   user: MovieReviewUser;
-  rating: number;
+  rating: string;
   comment: string;
   like_count: number;
   dislike_count: number;

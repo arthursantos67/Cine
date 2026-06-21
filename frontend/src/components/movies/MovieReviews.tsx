@@ -137,19 +137,37 @@ type SubmitFeedback = "idle" | "submitting" | "success" | "updated" | "error";
 type ReviewFormProps = {
   movieId: string;
   existingReview: MovieReview | null;
+  onDeleted?: () => void;
   onSubmitted: (review: MovieReview, wasUpdate: boolean) => void;
 };
 
-function ReviewForm({ existingReview, movieId, onSubmitted }: ReviewFormProps) {
+function ReviewForm({ existingReview, movieId, onDeleted, onSubmitted }: ReviewFormProps) {
   const { t } = useI18n();
   const [rating, setRating] = useState(existingReview?.rating != null ? Number(existingReview.rating) : 0);
   const [comment, setComment] = useState(existingReview?.comment ?? "");
   const [feedback, setFeedback] = useState<SubmitFeedback>("idle");
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     setRating(existingReview?.rating != null ? Number(existingReview.rating) : 0);
     setComment(existingReview?.comment ?? "");
   }, [existingReview]);
+
+  async function handleDelete() {
+    if (!existingReview) return;
+    if (!confirming) { setConfirming(true); return; }
+    setDeleting(true);
+    try {
+      await reviewsApi.deleteReview(movieId, existingReview.id);
+      onDeleted?.();
+    } catch {
+      // silent
+    } finally {
+      setDeleting(false);
+      setConfirming(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -212,17 +230,51 @@ function ReviewForm({ existingReview, movieId, onSubmitted }: ReviewFormProps) {
       )}
       {feedback === "error" && (
         <p className="text-sm text-red-400" role="alert">
-          {t("reviews.loadError")}
+          {t("reviews.submitError")}
         </p>
       )}
 
-      <button
-        className="button button-primary"
-        disabled={rating === 0 || feedback === "submitting"}
-        type="submit"
-      >
-        {feedback === "submitting" ? t("reviews.submitting") : t("reviews.submit")}
-      </button>
+      <div className="flex items-center gap-3 flex-wrap">
+        <button
+          className="button button-primary"
+          disabled={rating === 0 || feedback === "submitting"}
+          type="submit"
+        >
+          {feedback === "submitting" ? t("reviews.submitting") : t("reviews.submit")}
+        </button>
+
+        {isEditing && (
+          confirming ? (
+            <>
+              <span className="text-sm text-white/60">{t("reviews.deleteConfirm")}</span>
+              <button
+                className="button button-ghost text-red-400 hover:text-red-300"
+                disabled={deleting}
+                onClick={() => void handleDelete()}
+                type="button"
+              >
+                {t("reviews.delete")}
+              </button>
+              <button
+                className="button button-ghost"
+                onClick={() => setConfirming(false)}
+                type="button"
+              >
+                {t("admin.cancel")}
+              </button>
+            </>
+          ) : (
+            <button
+              className="button button-ghost text-red-400/70 hover:text-red-400"
+              disabled={feedback === "submitting" || deleting}
+              onClick={() => void handleDelete()}
+              type="button"
+            >
+              {t("reviews.deleteOwnReview")}
+            </button>
+          )
+        )}
+      </div>
     </form>
   );
 }
@@ -273,6 +325,7 @@ type ReviewCardProps = {
   canDelete: boolean;
   compact?: boolean;
   isAuthenticated: boolean;
+  isOwn?: boolean;
   movieId: string;
   review: MovieReview;
   onDelete: (id: string) => void;
@@ -283,6 +336,7 @@ function ReviewCard({
   canDelete,
   compact = false,
   isAuthenticated,
+  isOwn = false,
   movieId,
   onDelete,
   onVoteChange,
@@ -329,7 +383,12 @@ function ReviewCard({
   }
 
   return (
-    <article className="border-b border-white/10 py-4 last:border-0">
+    <article className={cn("border-b border-white/10 py-4 last:border-0", isOwn && "rounded-lg bg-[var(--color-cinema-gold)]/5 px-3")}>
+      {isOwn && (
+        <span className="mb-1 block text-xs font-semibold text-[var(--color-cinema-gold)]/80">
+          {t("reviews.yourReview")}
+        </span>
+      )}
       <div className="flex items-start gap-3">
         <div
           aria-hidden="true"
@@ -586,11 +645,13 @@ function ReviewListSection({
         {displayedResults.map((review) => {
           const canDelete =
             !compact && (isAdmin || (currentUserId != null && review.user.id === currentUserId));
+          const isOwn = !compact && currentUserId != null && review.user.id === currentUserId;
           return (
             <ReviewCard
               canDelete={canDelete}
               compact={compact}
               isAuthenticated={isAuthenticated && !compact}
+              isOwn={isOwn}
               key={review.id}
               movieId={movieId}
               onDelete={(id) => void handleDelete(id)}
@@ -631,6 +692,7 @@ type InlineReviewFormProps = {
   expanded: boolean;
   isAuthenticated: boolean;
   myReview: MovieReview | null;
+  onDeleted?: () => void;
   onSubmitted: (review: MovieReview, wasUpdate: boolean) => void;
 };
 
@@ -639,6 +701,7 @@ function InlineReviewForm({
   isAuthenticated,
   movieId,
   myReview,
+  onDeleted,
   onSubmitted,
 }: InlineReviewFormProps) {
   const { t } = useI18n();
@@ -662,6 +725,7 @@ function InlineReviewForm({
         <ReviewForm
           existingReview={myReview}
           movieId={movieId}
+          onDeleted={onDeleted}
           onSubmitted={onSubmitted}
         />
       ) : (
@@ -728,6 +792,11 @@ function ReviewModal({
     setRefreshKey((k) => k + 1);
   }
 
+  function handleDeleted() {
+    setMyReview(null);
+    setRefreshKey((k) => k + 1);
+  }
+
   return (
     <div
       aria-labelledby="review-modal-title"
@@ -769,6 +838,7 @@ function ReviewModal({
           <ReviewForm
             existingReview={myReview}
             movieId={movie.id}
+            onDeleted={handleDeleted}
             onSubmitted={handleSubmitted}
           />
         ) : (
@@ -827,6 +897,11 @@ export function MovieReviewsPanel({
     setInlineRefreshKey((k) => k + 1);
   }
 
+  function handleDeleted() {
+    setMyReview(null);
+    setInlineRefreshKey((k) => k + 1);
+  }
+
   return (
     <section aria-labelledby="reviews-heading">
       <h2 className="sr-only" id="reviews-heading">
@@ -847,6 +922,7 @@ export function MovieReviewsPanel({
         isAuthenticated={isAuthenticated}
         movieId={movie.id}
         myReview={myReview}
+        onDeleted={handleDeleted}
         onSubmitted={handleSubmitted}
       />
 

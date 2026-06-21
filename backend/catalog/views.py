@@ -683,6 +683,7 @@ class MovieReviewListCreateView(APIView):
         if not created:
             review.votes.all().delete()
 
+        invalidate_movie_list_cache()
         out_qs = _review_queryset(movie, request).get(pk=review.pk)
         out = MovieReviewSerializer(out_qs)
         return Response(
@@ -706,10 +707,10 @@ class MovieReviewDetailView(APIView):
 
         serializer = MovieReviewSerializer(review, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-
-        # Reset votes so an edited review doesn't keep its previous reputation
-        review.votes.all().delete()
+        with transaction.atomic():
+            serializer.save()
+            # Reset votes so an edited review doesn't keep its previous reputation
+            review.votes.all().delete()
 
         movie = get_object_or_404(Movie, pk=movie_pk)
         out_qs = _review_queryset(movie, request).get(pk=review.pk)
@@ -726,6 +727,7 @@ class MovieReviewDetailView(APIView):
             )
 
         review.delete()
+        invalidate_movie_list_cache()
         return Response(status=http_status.HTTP_204_NO_CONTENT)
 
 
@@ -735,6 +737,11 @@ class MovieReviewVoteView(APIView):
 
     def post(self, request, movie_pk, review_pk):
         review = get_object_or_404(MovieReview, pk=review_pk, movie_id=movie_pk)
+        if review.user_id == request.user.id:
+            return Response(
+                {"error": {"code": "SELF_VOTE", "message": "Cannot vote on your own review.", "status": 400, "details": None}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
         vote_value = request.data.get("vote")
         if vote_value not in (MovieReviewVote.LIKE, MovieReviewVote.DISLIKE):
             return Response(
