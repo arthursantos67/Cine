@@ -391,6 +391,30 @@ def test_checkout_returns_410_when_session_started_more_than_10_min_ago():
 
 
 @pytest.mark.django_db
+def test_checkout_returns_410_at_exact_10_min_boundary():
+    context = _build_checkout_context()
+    session = context["session"]
+
+    Session.objects.filter(pk=session.pk).update(
+        start_time=timezone.now() - timedelta(minutes=10),
+        end_time=timezone.now() + timedelta(hours=2),
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=context["user"])
+
+    response = client.post(
+        "/api/v1/reservation/checkout/",
+        _checkout_payload(context["session_seats"], ["inteira"], "pix"),
+        format="json",
+    )
+
+    assert response.status_code == 410
+    assert response.data["error"]["code"] == "SESSION_EXPIRED"
+    assert Ticket.objects.filter(user=context["user"]).count() == 0
+
+
+@pytest.mark.django_db
 def test_checkout_is_allowed_within_10_min_of_session_start():
     context = _build_checkout_context()
     session = context["session"]

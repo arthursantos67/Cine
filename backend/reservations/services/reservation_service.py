@@ -5,6 +5,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from catalog.models import Session
+from reservations.constants import SESSION_SALE_CUTOFF_MINUTES
 from reservations.exceptions import (
     InvalidSeatSelectionError,
     SeatUnavailableError,
@@ -27,7 +28,6 @@ def _schedule_expiration_tasks(session_seat_ids, expires_at):
 
 class TemporaryReservationService:
     LOCK_DURATION_SECONDS = 600
-    SESSION_SALE_CUTOFF_MINUTES = 10
     SEAT_UNAVAILABLE_MESSAGE = "One or more selected seats are not available."
     INVALID_SELECTION_MESSAGE = (
         "One or more selected seats do not belong to this session."
@@ -64,9 +64,10 @@ class TemporaryReservationService:
         except Session.DoesNotExist:
             raise SessionNotFoundError("Session not found.")
 
-        cutoff = session.start_time + timedelta(minutes=self.SESSION_SALE_CUTOFF_MINUTES)
-        if timezone.now() >= cutoff:
-            raise SessionExpiredError("Ticket sales for this session have ended.")
+        now = timezone.now()
+        cutoff = session.start_time + timedelta(minutes=SESSION_SALE_CUTOFF_MINUTES)
+        if now >= cutoff:
+            raise SessionExpiredError()
 
         ordered_seat_ids = sorted(seat_ids)
 
@@ -86,7 +87,7 @@ class TemporaryReservationService:
         self._validate_companion_seat_rules(ordered_seat_ids)
 
         acquired_locks = []
-        expires_at = timezone.now() + timedelta(seconds=self.LOCK_DURATION_SECONDS)
+        expires_at = now + timedelta(seconds=self.LOCK_DURATION_SECONDS)
 
         try:
             for session_seat in session_seats:

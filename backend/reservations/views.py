@@ -55,7 +55,6 @@ from reservations.services.checkout_service import (
     InvalidSeatSelectionError as CheckoutInvalidSeatSelectionError,
     InvalidSubmittedTotalError,
     ReservationOwnershipError,
-    SessionExpiredError as CheckoutSessionExpiredError,
 )
 from reservations.services.release_service import (
     ExpiredReservationReleaseError,
@@ -330,7 +329,7 @@ class CheckoutView(GenericAPIView):
             raise ValidationError(detail={"total_amount": [str(exc)]}) from exc
         except ReservationOwnershipError as exc:
             raise PermissionDenied(detail=str(exc)) from exc
-        except CheckoutSessionExpiredError as exc:
+        except SessionExpiredError as exc:
             raise SessionExpiredApiException(detail=str(exc)) from exc
         except ExpiredReservationError as exc:
             raise SeatAlreadyReservedApiException(detail=str(exc)) from exc

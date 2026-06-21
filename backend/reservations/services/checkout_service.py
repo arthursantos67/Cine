@@ -6,6 +6,8 @@ from django.utils import timezone
 
 from cineprime_api.localization import DEFAULT_LOCALE, get_translation_value, normalize_locale
 from cineprime_api.logging_context import get_correlation_id
+from reservations.constants import SESSION_SALE_CUTOFF_MINUTES
+from reservations.exceptions import SessionExpiredError
 from reservations.locks import SeatLockManager
 from reservations.models import Seat, SessionSeat, SessionSeatStatus, Ticket
 
@@ -34,10 +36,6 @@ class InvalidSubmittedTotalError(CheckoutError):
     pass
 
 
-class SessionExpiredError(CheckoutError):
-    pass
-
-
 class CheckoutService:
     INVALID_SELECTION_MESSAGE = "One or more selected seats are invalid for checkout."
     OWNERSHIP_MESSAGE = "One or more selected seats are not locked by this user."
@@ -47,8 +45,6 @@ class CheckoutService:
     COMPANION_WITHOUT_ACCESSIBLE_MESSAGE = (
         "Companion seat must be purchased together with its paired accessible seat."
     )
-    SESSION_EXPIRED_MESSAGE = "Ticket sales for this session have ended."
-    SESSION_SALE_CUTOFF_MINUTES = 10
 
     def __init__(self):
         self.lock_manager = SeatLockManager()
@@ -83,10 +79,10 @@ class CheckoutService:
             if session_seat.session_id not in seen_session_ids:
                 seen_session_ids.add(session_seat.session_id)
                 cutoff = session_seat.session.start_time + timedelta(
-                    minutes=self.SESSION_SALE_CUTOFF_MINUTES
+                    minutes=SESSION_SALE_CUTOFF_MINUTES
                 )
                 if now >= cutoff:
-                    raise SessionExpiredError(self.SESSION_EXPIRED_MESSAGE)
+                    raise SessionExpiredError()
 
         self._validate_companion_seat_rules(session_seats)
 

@@ -581,10 +581,31 @@ def test_temporary_reservation_returns_410_when_session_started_more_than_10_min
     session = data["session"]
     seat = data["seats"][0]
 
-    # Backdate the session so it started 11 minutes ago
-    session.start_time = timezone.now() - timedelta(minutes=11)
-    session.end_time = timezone.now() + timedelta(hours=2)
-    session.save()
+    Session.objects.filter(pk=session.pk).update(
+        start_time=timezone.now() - timedelta(minutes=11),
+        end_time=timezone.now() + timedelta(hours=2),
+    )
+
+    url = reverse("temporary-seat-reservation", kwargs={"session_id": session.id})
+    response = client.post(url, {"seat_ids": [str(seat.id)]}, format="json")
+
+    assert response.status_code == 410
+    assert response.data["error"]["code"] == "SESSION_EXPIRED"
+
+
+def test_temporary_reservation_returns_410_at_exact_10_min_boundary():
+    client = APIClient()
+    user = create_user(email="boundary-session@example.com")
+    authenticate(client, user)
+
+    data = create_session_with_seats()
+    session = data["session"]
+    seat = data["seats"][0]
+
+    Session.objects.filter(pk=session.pk).update(
+        start_time=timezone.now() - timedelta(minutes=10),
+        end_time=timezone.now() + timedelta(hours=2),
+    )
 
     url = reverse("temporary-seat-reservation", kwargs={"session_id": session.id})
     response = client.post(url, {"seat_ids": [str(seat.id)]}, format="json")
@@ -603,9 +624,10 @@ def test_temporary_reservation_is_allowed_within_10_min_of_session_start():
     seat = data["seats"][0]
 
     # Session started 9 minutes ago — still within the grace period
-    session.start_time = timezone.now() - timedelta(minutes=9)
-    session.end_time = timezone.now() + timedelta(hours=2)
-    session.save()
+    Session.objects.filter(pk=session.pk).update(
+        start_time=timezone.now() - timedelta(minutes=9),
+        end_time=timezone.now() + timedelta(hours=2),
+    )
 
     url = reverse("temporary-seat-reservation", kwargs={"session_id": session.id})
     response = client.post(url, {"seat_ids": [str(seat.id)]}, format="json")
