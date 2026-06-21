@@ -31,6 +31,18 @@ class SessionNotFoundError(ReservationError):
     status_code = 404
 
 
+class SessionExpiredError(ReservationError):
+    default_code = "SESSION_EXPIRED"
+    default_message = "Ticket sales for this session have ended."
+    status_code = 410
+
+
+class SessionExpiredApiException(APIException):
+    status_code = 410
+    default_code = "SESSION_EXPIRED"
+    default_detail = "Ticket sales for this session have ended."
+
+
 class SeatAlreadyReservedApiException(APIException):
     status_code = 409
     default_code = "SEAT_ALREADY_RESERVED"

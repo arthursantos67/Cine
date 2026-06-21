@@ -22,6 +22,8 @@ from reservations.exceptions import (
     InvalidSeatSelectionError,
     SeatAlreadyReservedApiException,
     SeatUnavailableError,
+    SessionExpiredApiException,
+    SessionExpiredError,
     SessionNotFoundError,
 )
 from reservations.models import Seat, SeatRow, SessionSeat, Ticket
@@ -239,6 +241,8 @@ class TemporarySeatReservationView(GenericAPIView):
             )
         except SessionNotFoundError as exc:
             raise NotFound(detail=str(exc)) from exc
+        except SessionExpiredError as exc:
+            raise SessionExpiredApiException(detail=str(exc)) from exc
         except InvalidSeatSelectionError as exc:
             raise ValidationError(detail={"seat_ids": [str(exc)]}) from exc
         except SeatUnavailableError as exc:
@@ -325,6 +329,8 @@ class CheckoutView(GenericAPIView):
             raise ValidationError(detail={"total_amount": [str(exc)]}) from exc
         except ReservationOwnershipError as exc:
             raise PermissionDenied(detail=str(exc)) from exc
+        except SessionExpiredError as exc:
+            raise SessionExpiredApiException(detail=str(exc)) from exc
         except ExpiredReservationError as exc:
             raise SeatAlreadyReservedApiException(detail=str(exc)) from exc
         except InvalidSeatStateError as exc:

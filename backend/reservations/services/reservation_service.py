@@ -5,9 +5,11 @@ from django.db import transaction
 from django.utils import timezone
 
 from catalog.models import Session
+from reservations.constants import SESSION_SALE_CUTOFF_MINUTES
 from reservations.exceptions import (
     InvalidSeatSelectionError,
     SeatUnavailableError,
+    SessionExpiredError,
     SessionNotFoundError,
 )
 from reservations.locks import SeatLockManager
@@ -57,9 +59,15 @@ class TemporaryReservationService:
                     raise InvalidSeatSelectionError(self.COMPANION_WITHOUT_ACCESSIBLE_MESSAGE)
 
     def execute(self, *, session_id, seat_ids, user):
-        session_exists = Session.objects.filter(id=session_id).exists()
-        if not session_exists:
+        try:
+            session = Session.objects.get(id=session_id)
+        except Session.DoesNotExist:
             raise SessionNotFoundError("Session not found.")
+
+        now = timezone.now()
+        cutoff = session.start_time + timedelta(minutes=SESSION_SALE_CUTOFF_MINUTES)
+        if now >= cutoff:
+            raise SessionExpiredError()
 
         ordered_seat_ids = sorted(seat_ids)
 
@@ -79,7 +87,7 @@ class TemporaryReservationService:
         self._validate_companion_seat_rules(ordered_seat_ids)
 
         acquired_locks = []
-        expires_at = timezone.now() + timedelta(seconds=self.LOCK_DURATION_SECONDS)
+        expires_at = now + timedelta(seconds=self.LOCK_DURATION_SECONDS)
 
         try:
             for session_seat in session_seats:

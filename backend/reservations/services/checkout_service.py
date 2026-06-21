@@ -1,3 +1,4 @@
+from datetime import timedelta
 from decimal import Decimal
 
 from django.db import transaction
@@ -5,6 +6,8 @@ from django.utils import timezone
 
 from cineprime_api.localization import DEFAULT_LOCALE, get_translation_value, normalize_locale
 from cineprime_api.logging_context import get_correlation_id
+from reservations.constants import SESSION_SALE_CUTOFF_MINUTES
+from reservations.exceptions import SessionExpiredError
 from reservations.locks import SeatLockManager
 from reservations.models import Seat, SessionSeat, SessionSeatStatus, Ticket
 
@@ -70,6 +73,16 @@ class CheckoutService:
 
         if len(session_seats) != len(ordered_session_seat_ids):
             raise InvalidSeatSelectionError(self.INVALID_SELECTION_MESSAGE)
+
+        seen_session_ids = set()
+        for session_seat in session_seats:
+            if session_seat.session_id not in seen_session_ids:
+                seen_session_ids.add(session_seat.session_id)
+                cutoff = session_seat.session.start_time + timedelta(
+                    minutes=SESSION_SALE_CUTOFF_MINUTES
+                )
+                if now >= cutoff:
+                    raise SessionExpiredError()
 
         self._validate_companion_seat_rules(session_seats)
 

@@ -570,3 +570,66 @@ def test_release_temporary_reservation_rejects_ownership_mismatch():
     assert session_seat.status == SessionSeatStatus.RESERVED
     assert session_seat.locked_by_user == owner
     assert session_seat.lock_expires_at is not None
+
+
+def test_temporary_reservation_returns_410_when_session_started_more_than_10_min_ago():
+    client = APIClient()
+    user = create_user(email="expired-session@example.com")
+    authenticate(client, user)
+
+    data = create_session_with_seats()
+    session = data["session"]
+    seat = data["seats"][0]
+
+    Session.objects.filter(pk=session.pk).update(
+        start_time=timezone.now() - timedelta(minutes=11),
+        end_time=timezone.now() + timedelta(hours=2),
+    )
+
+    url = reverse("temporary-seat-reservation", kwargs={"session_id": session.id})
+    response = client.post(url, {"seat_ids": [str(seat.id)]}, format="json")
+
+    assert response.status_code == 410
+    assert response.data["error"]["code"] == "SESSION_EXPIRED"
+
+
+def test_temporary_reservation_returns_410_at_exact_10_min_boundary():
+    client = APIClient()
+    user = create_user(email="boundary-session@example.com")
+    authenticate(client, user)
+
+    data = create_session_with_seats()
+    session = data["session"]
+    seat = data["seats"][0]
+
+    Session.objects.filter(pk=session.pk).update(
+        start_time=timezone.now() - timedelta(minutes=10),
+        end_time=timezone.now() + timedelta(hours=2),
+    )
+
+    url = reverse("temporary-seat-reservation", kwargs={"session_id": session.id})
+    response = client.post(url, {"seat_ids": [str(seat.id)]}, format="json")
+
+    assert response.status_code == 410
+    assert response.data["error"]["code"] == "SESSION_EXPIRED"
+
+
+def test_temporary_reservation_is_allowed_within_10_min_of_session_start():
+    client = APIClient()
+    user = create_user(email="in-grace-period@example.com")
+    authenticate(client, user)
+
+    data = create_session_with_seats()
+    session = data["session"]
+    seat = data["seats"][0]
+
+    # Session started 9 minutes ago — still within the grace period
+    Session.objects.filter(pk=session.pk).update(
+        start_time=timezone.now() - timedelta(minutes=9),
+        end_time=timezone.now() + timedelta(hours=2),
+    )
+
+    url = reverse("temporary-seat-reservation", kwargs={"session_id": session.id})
+    response = client.post(url, {"seat_ids": [str(seat.id)]}, format="json")
+
+    assert response.status_code == 201
