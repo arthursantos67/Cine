@@ -215,6 +215,7 @@ frontend/dist/
 frontend/.next/
 frontend/.next.*/
 frontend/out/
+frontend/tmp/
 frontend/.env
 frontend/.env.local
 frontend/playwright-report/
