@@ -475,7 +475,7 @@ export function SeatMapView({
 
 const ZOOM_FACTOR = 1.15;
 const MAX_ZOOM_STEPS = 8;
-const MIN_DEFAULT_ZOOM = 0.75;
+const DEFAULT_TARGET_ZOOM = 0.67;
 
 export function SeatMapLayout({
   accessibleRowIndex,
@@ -506,7 +506,7 @@ export function SeatMapLayout({
 
   const effectiveZoom = fitZoom * Math.pow(ZOOM_FACTOR, zoomOffset);
   const canZoomIn = zoomOffset < MAX_ZOOM_STEPS;
-  const canZoomOut = zoomOffset > 0;
+  const canZoomOut = zoomOffset > -MAX_ZOOM_STEPS;
 
   useLayoutEffect(() => {
     const map = mapRef.current;
@@ -524,13 +524,8 @@ export function SeatMapLayout({
       const padding = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
       const available = scroll.clientWidth - padding;
       const newFitZoom = Math.min(1, available / naturalWidth);
-      const defaultOffset =
-        newFitZoom < MIN_DEFAULT_ZOOM
-          ? Math.min(
-              Math.ceil(Math.log(MIN_DEFAULT_ZOOM / newFitZoom) / Math.log(ZOOM_FACTOR)),
-              MAX_ZOOM_STEPS
-            )
-          : 0;
+      const rawOffset = Math.log(DEFAULT_TARGET_ZOOM / newFitZoom) / Math.log(ZOOM_FACTOR);
+      const defaultOffset = Math.min(Math.max(Math.round(rawOffset), -MAX_ZOOM_STEPS), MAX_ZOOM_STEPS);
       hasInitializedZoomRef.current = false;
       setFitZoom(newFitZoom);
       setZoomOffset(defaultOffset);
@@ -666,7 +661,7 @@ export function SeatMapLayout({
             aria-label={t("seats.zoomOut")}
             className="inline-flex h-8 w-8 items-center justify-center rounded border border-white/15 bg-white/5 text-text/60 transition hover:bg-white/10 hover:text-text disabled:pointer-events-none disabled:opacity-30"
             disabled={!canZoomOut}
-            onClick={() => setZoomOffset((o) => Math.max(o - 1, 0))}
+            onClick={() => setZoomOffset((o) => Math.max(o - 1, -MAX_ZOOM_STEPS))}
             type="button"
           >
             <ZoomOut size={14} />

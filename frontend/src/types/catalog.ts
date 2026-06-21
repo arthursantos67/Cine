@@ -50,6 +50,7 @@ export type CatalogMovie = {
   age_rating?: CatalogMovieAgeRating | null;
   average_rating?: number | null;
   cast?: string[] | null;
+  classification_description?: string | null;
   director?: string | null;
   duration_minutes: number;
   genres: CatalogGenre[];
