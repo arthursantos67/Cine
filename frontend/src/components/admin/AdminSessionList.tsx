@@ -6,6 +6,7 @@ import { adminApi } from "@/api/admin";
 import type { AdminRoom, AdminSession, CatalogMovieDetail } from "@/types/catalog";
 import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
+import { SelectMenu } from "@/components/ui/SelectMenu";
 import { AdminConfirmDialog, AdminTable, AdminToolbar } from "@/components/admin";
 import type { AdminTableColumn } from "@/components/admin";
 import { useI18n } from "@/i18n";
@@ -32,14 +33,12 @@ export function AdminSessionList() {
   const [rooms, setRooms] = useState<AdminRoom[]>([]);
 
   const dateFilterId = useId();
-  const movieFilterId = useId();
-  const roomFilterId = useId();
 
   useEffect(() => {
-    Promise.all([adminApi.listMovies(), adminApi.listRooms()]).then(
-      ([moviesRes, roomsRes]) => {
-        setMovies(moviesRes.results);
-        setRooms(roomsRes.results);
+    Promise.all([adminApi.listAllMovies(), adminApi.listAllRooms()]).then(
+      ([allMovies, allRooms]) => {
+        setMovies(allMovies);
+        setRooms(allRooms);
       }
     );
   }, []);
@@ -213,16 +212,16 @@ export function AdminSessionList() {
         title={t("admin.sessions")}
       />
 
-      <div className="flex flex-wrap items-end gap-4 rounded-[8px] border border-white/[0.07] bg-white/[0.02] p-4">
+      <div className="flex flex-wrap items-end gap-4">
         <div className="grid gap-1.5">
           <label
-            className="text-xs font-extrabold uppercase tracking-wider text-white/40"
+            className="text-sm font-extrabold text-white"
             htmlFor={dateFilterId}
           >
             {t("admin.session.date")}
           </label>
           <input
-            className="min-h-9 rounded-control border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none transition focus:border-brand focus:shadow-focus"
+            className="min-h-[var(--control-height-lg)] rounded-control border border-border bg-surface px-3 py-2 text-sm text-white outline-none transition focus:border-brand focus:shadow-focus"
             id={dateFilterId}
             onChange={(e) => setDateFilter(e.target.value)}
             type="date"
@@ -230,48 +229,24 @@ export function AdminSessionList() {
           />
         </div>
 
-        <div className="grid gap-1.5">
-          <label
-            className="text-xs font-extrabold uppercase tracking-wider text-white/40"
-            htmlFor={movieFilterId}
-          >
-            {t("admin.session.movie")}
-          </label>
-          <select
-            className="min-h-9 rounded-control border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none transition focus:border-brand focus:shadow-focus"
-            id={movieFilterId}
-            onChange={(e) => setMovieFilter(e.target.value)}
+        <div className="min-w-[200px]">
+          <SelectMenu
+            label={t("admin.session.movie")}
+            onChange={setMovieFilter}
+            options={movieOptions}
+            placeholder={t("admin.session.allMovies")}
             value={movieFilter}
-          >
-            <option value="">{t("admin.session.allMovies")}</option>
-            {movieOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+          />
         </div>
 
-        <div className="grid gap-1.5">
-          <label
-            className="text-xs font-extrabold uppercase tracking-wider text-white/40"
-            htmlFor={roomFilterId}
-          >
-            {t("admin.session.room")}
-          </label>
-          <select
-            className="min-h-9 rounded-control border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none transition focus:border-brand focus:shadow-focus"
-            id={roomFilterId}
-            onChange={(e) => setRoomFilter(e.target.value)}
+        <div className="min-w-[200px]">
+          <SelectMenu
+            label={t("admin.session.room")}
+            onChange={setRoomFilter}
+            options={roomOptions}
+            placeholder={t("admin.session.allRooms")}
             value={roomFilter}
-          >
-            <option value="">{t("admin.session.allRooms")}</option>
-            {roomOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+          />
         </div>
 
         {(dateFilter || movieFilter || roomFilter) && (
