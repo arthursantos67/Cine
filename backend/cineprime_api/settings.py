@@ -49,7 +49,14 @@ def _csv_env(name, default):
 DJANGO_ENV = os.getenv("DJANGO_ENV", os.getenv("ENVIRONMENT", "development")).lower()
 IS_PRODUCTION = DJANGO_ENV in PRODUCTION_ENVIRONMENTS
 
-SECRET_KEY = os.getenv("SECRET_KEY", "unsafe-secret-key").strip()
+SECRET_KEY = os.getenv("SECRET_KEY", "").strip()
+if not SECRET_KEY or SECRET_KEY in UNSAFE_SECRET_KEYS:
+    if not _env_bool("ALLOW_UNSAFE_SECRET_KEY"):
+        raise ImproperlyConfigured(
+            "SECRET_KEY must be set to a secure value. "
+            "For local development, set ALLOW_UNSAFE_SECRET_KEY=true in your environment."
+        )
+    SECRET_KEY = SECRET_KEY or "unsafe-secret-key"
 DEBUG = _env_bool("DEBUG", default=False)
 
 ALLOWED_HOSTS = _csv_env("ALLOWED_HOSTS", LOCAL_ALLOWED_HOSTS)
@@ -105,6 +112,12 @@ def _build_production_configuration_errors():
                     "CORS_ALLOWED_ORIGINS must not use localhost or loopback origins "
                     "in production."
                 )
+
+    if not os.getenv("SITE_CONFIG_ENCRYPTION_KEY"):
+        errors.append(
+            "SITE_CONFIG_ENCRYPTION_KEY is required when DJANGO_ENV=production. "
+            "Generate with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+        )
 
     return errors
 
@@ -357,6 +370,7 @@ REST_FRAMEWORK = {
         "anon": os.getenv("THROTTLE_ANON_RATE", "60/minute"),
         "user": os.getenv("THROTTLE_USER_RATE", "120/minute"),
         "login": os.getenv("THROTTLE_LOGIN_RATE", "5/minute"),
+        "registration": os.getenv("THROTTLE_REGISTRATION_RATE", "5/hour"),
         "reservation": os.getenv("THROTTLE_RESERVATION_RATE", "10/minute"),
     },
     "EXCEPTION_HANDLER": "cineprime_api.exception_handler.standardized_exception_handler",
@@ -466,4 +480,9 @@ INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY") or None
 # Fernet key for encrypting sensitive SiteConfig values (e.g. TMDB token).
 # Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 # Falls back to a SHA-256 derivation of SECRET_KEY if not set.
+SITE_CONFIG_ENCRYPTION_KEY = os.getenv("SITE_CONFIG_ENCRYPTION_KEY") or None
+HEALTH_DEEP_INTERNAL_KEY = os.getenv("HEALTH_DEEP_INTERNAL_KEY") or None
+
+# Fernet key for encrypting sensitive values stored in the site_config table.
+# Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 SITE_CONFIG_ENCRYPTION_KEY = os.getenv("SITE_CONFIG_ENCRYPTION_KEY") or None

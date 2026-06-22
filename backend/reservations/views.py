@@ -15,7 +15,7 @@ from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
 from cineprime_api.localization import get_request_locale
-from cineprime_api.throttling import ReservationRateThrottle
+from cineprime_api.throttling import GlobalAnonRateThrottle, ReservationRateThrottle
 
 from catalog.models import Room, Session
 from reservations.exceptions import (
@@ -179,6 +179,7 @@ class TicketDetailView(RetrieveDestroyAPIView):
 class SessionSeatMapView(ListAPIView):
     serializer_class = SessionSeatMapItemSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [GlobalAnonRateThrottle]
     pagination_class = None
 
     def get_queryset(self):

@@ -287,6 +287,7 @@ class TemporaryReservationRequestSerializer(serializers.Serializer):
     seat_ids = serializers.ListField(
         child=serializers.UUIDField(),
         allow_empty=False,
+        max_length=20,
     )
 
     def validate_seat_ids(self, value):
@@ -366,6 +367,7 @@ class CheckoutRequestSerializer(serializers.Serializer):
     seats = serializers.ListField(
         child=CheckoutSeatRequestSerializer(),
         allow_empty=False,
+        max_length=20,
     )
     payment_method = serializers.CharField()
     total_amount = serializers.DecimalField(

@@ -22,7 +22,7 @@ from cryptography.fernet import InvalidToken
 
 from cineprime_api.encryption import decrypt_value, encrypt_value
 from cineprime_api.permissions import IsMasterUser
-from cineprime_api.throttling import LoginRateThrottle
+from cineprime_api.throttling import LoginRateThrottle, RegistrationRateThrottle
 from reservations.models import SessionSeat, SessionSeatStatus, Ticket
 from users.models import AdminPermissionLog, SiteConfig, User
 from users.serializers import (
@@ -109,6 +109,7 @@ class CurrentUserResponseSerializer(serializers.Serializer):
 class UserRegistrationView(CreateAPIView):
     serializer_class = UserRegistrationSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [RegistrationRateThrottle]
 
 
 @extend_schema_view(
@@ -407,6 +408,11 @@ class AdminGrantView(APIView):
         target = self._get_target(user_id)
         self._check_not_protected(target)
 
+        if target.is_superuser:
+            other_masters = User.objects.filter(is_superuser=True).exclude(pk=target.pk).count()
+            if other_masters == 0:
+                raise ValidationError("Cannot revoke the last master admin.")
+
         if target.is_staff or target.is_superuser:
             revoked_role = (
                 AdminPermissionLog.Role.MASTER
@@ -599,7 +605,7 @@ class TmdbTokenView(APIView):
     def get(self, request, *args, **kwargs):
         try:
             cfg = SiteConfig.objects.get(key="tmdb_api_read_token")
-            plaintext = decrypt_value(cfg.value) if cfg.value else None
+            plaintext = cfg.get_value()
             configured = bool(plaintext)
             hint = plaintext[-4:] if configured else None
         except SiteConfig.DoesNotExist:
@@ -617,8 +623,7 @@ class TmdbTokenView(APIView):
         body = TmdbTokenBodySerializer(data=request.data)
         body.is_valid(raise_exception=True)
         plaintext = body.validated_data["value"]
-        SiteConfig.objects.update_or_create(
-            key="tmdb_api_read_token",
-            defaults={"value": encrypt_value(plaintext)},
-        )
+        cfg, _ = SiteConfig.objects.get_or_create(key="tmdb_api_read_token")
+        cfg.set_value(plaintext)
+        cfg.save()
         return Response({"configured": True, "hint": plaintext[-4:]})

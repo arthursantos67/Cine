@@ -13,10 +13,12 @@ BASE_PRODUCTION_ENV = {
     "SECRET_KEY": "production-secret-key-for-settings-tests",
     "ALLOWED_HOSTS": "api.example.com",
     "CORS_ALLOWED_ORIGINS": "https://app.example.com",
+    "SITE_CONFIG_ENCRYPTION_KEY": "BsB5RCI121YV2KdnpZ3bpFV6xectSpZGYSn6496wlEA=",
 }
 
 CONTROLLED_ENV_KEYS = {
     "ALLOW_INSECURE_PRODUCTION_CORS_ORIGINS",
+    "ALLOW_UNSAFE_SECRET_KEY",
     "ALLOW_WILDCARD_PRODUCTION_HOSTS",
     "ALLOWED_HOSTS",
     "CORS_ALLOWED_ORIGINS",
@@ -24,6 +26,7 @@ CONTROLLED_ENV_KEYS = {
     "DJANGO_ENV",
     "ENVIRONMENT",
     "SECRET_KEY",
+    "SITE_CONFIG_ENCRYPTION_KEY",
 }
 
 
@@ -57,28 +60,28 @@ def test_production_requires_secret_key():
     result = _production_import({"SECRET_KEY": ""})
 
     assert result.returncode != 0
-    assert "SECRET_KEY is required" in result.stderr
+    assert "SECRET_KEY must be set to a secure value" in result.stderr
 
 
 def test_production_rejects_whitespace_only_secret_key():
     result = _production_import({"SECRET_KEY": "   "})
 
     assert result.returncode != 0
-    assert "SECRET_KEY is required" in result.stderr
+    assert "SECRET_KEY must be set to a secure value" in result.stderr
 
 
 def test_production_rejects_unsafe_secret_key():
     result = _production_import({"SECRET_KEY": "unsafe-secret-key"})
 
     assert result.returncode != 0
-    assert "known unsafe development value" in result.stderr
+    assert "SECRET_KEY must be set to a secure value" in result.stderr
 
 
 def test_production_rejects_unsafe_secret_key_with_surrounding_whitespace():
     result = _production_import({"SECRET_KEY": " change-me "})
 
     assert result.returncode != 0
-    assert "known unsafe development value" in result.stderr
+    assert "SECRET_KEY must be set to a secure value" in result.stderr
 
 
 def test_production_rejects_debug_true():
