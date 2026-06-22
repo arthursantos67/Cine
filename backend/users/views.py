@@ -18,12 +18,17 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from cryptography.fernet import InvalidToken
+
+from cineprime_api.encryption import decrypt_value, encrypt_value
 from cineprime_api.permissions import IsMasterUser
 from cineprime_api.throttling import LoginRateThrottle
 from reservations.models import SessionSeat, SessionSeatStatus, Ticket
-from users.models import AdminPermissionLog, User
+from users.models import AdminPermissionLog, SiteConfig, User
 from users.serializers import (
     AdminPermissionLogSerializer,
+    TmdbTokenBodySerializer,
+    TmdbTokenResponseSerializer,
     UserLoginSerializer,
     UserListSerializer,
     UserRegistrationSerializer,
@@ -580,15 +585,6 @@ class UserDeleteView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class TmdbTokenResponseSerializer(serializers.Serializer):
-    configured = serializers.BooleanField()
-    hint = serializers.CharField(allow_null=True)
-
-
-class TmdbTokenBodySerializer(serializers.Serializer):
-    value = serializers.CharField(min_length=1)
-
-
 @extend_schema(
     tags=["Admin"],
     responses={
@@ -601,24 +597,28 @@ class TmdbTokenView(APIView):
 
     @extend_schema(summary="Get TMDB token status")
     def get(self, request, *args, **kwargs):
-        from users.models import SiteConfig
         try:
             cfg = SiteConfig.objects.get(key="tmdb_api_read_token")
-            value = cfg.value
-            configured = bool(value)
-            hint = value[-4:] if configured else None
+            plaintext = decrypt_value(cfg.value) if cfg.value else None
+            configured = bool(plaintext)
+            hint = plaintext[-4:] if configured else None
         except SiteConfig.DoesNotExist:
             configured = False
             hint = None
+        except InvalidToken:
+            return Response(
+                {"detail": "Falha ao descriptografar token — possível rotação de chave de criptografia."},
+                status=503,
+            )
         return Response({"configured": configured, "hint": hint})
 
     @extend_schema(summary="Set TMDB token", request=TmdbTokenBodySerializer)
     def put(self, request, *args, **kwargs):
-        from users.models import SiteConfig
         body = TmdbTokenBodySerializer(data=request.data)
         body.is_valid(raise_exception=True)
+        plaintext = body.validated_data["value"]
         SiteConfig.objects.update_or_create(
             key="tmdb_api_read_token",
-            defaults={"value": body.validated_data["value"]},
+            defaults={"value": encrypt_value(plaintext)},
         )
-        return Response({"configured": True, "hint": body.validated_data["value"][-4:]})
+        return Response({"configured": True, "hint": plaintext[-4:]})

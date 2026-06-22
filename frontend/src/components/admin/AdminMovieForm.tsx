@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { adminApi, type AdminMovieWritePayload } from "@/api/admin";
+import { revalidateTmdbToken } from "@/app/admin/actions";
 import { ApiError, getApiErrorUserMessage } from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
 import type { CatalogGenre, CatalogMovieDetail, CatalogMovieAgeRating, MovieStatus } from "@/types/catalog";
@@ -84,10 +85,12 @@ function TmdbTokenModal({
       setError(null);
       setSaved(false);
       setIsLoading(true);
-      adminApi.getTmdbTokenStatus()
+      const controller = new AbortController();
+      adminApi.getTmdbTokenStatus({ signal: controller.signal })
         .then((s) => setStatus(s))
         .catch(() => setStatus(null))
         .finally(() => setIsLoading(false));
+      return () => controller.abort();
     } else {
       dialog.close();
     }
@@ -100,6 +103,7 @@ function TmdbTokenModal({
     setError(null);
     try {
       await adminApi.setTmdbToken(value);
+      await revalidateTmdbToken();
       setStatus({ configured: true, hint: value.slice(-4) });
       setTokenInput("");
       setSaved(true);

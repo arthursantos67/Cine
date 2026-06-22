@@ -85,6 +85,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 class SiteConfig(models.Model):
     key = models.CharField(max_length=100, unique=True)
     value = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
