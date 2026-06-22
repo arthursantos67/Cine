@@ -290,20 +290,19 @@ class Ticket(models.Model):
         errors = {}
 
         if self.session_seat_id and self.user_id:
+            seat_errors = []
             if self.session_seat.status != SessionSeatStatus.PURCHASED:
-                errors["session_seat"] = (
-                    "Tickets can only be created for purchased session seats."
-                )
-
+                seat_errors.append("Tickets can only be created for purchased session seats.")
             if self.session_seat.locked_by_user is not None:
-                errors["session_seat"] = (
+                seat_errors.append(
                     "Purchased session seats linked to tickets cannot keep a locked user."
                 )
-
             if self.session_seat.lock_expires_at is not None:
-                errors["session_seat"] = (
+                seat_errors.append(
                     "Purchased session seats linked to tickets cannot keep a lock expiration."
                 )
+            if seat_errors:
+                errors["session_seat"] = seat_errors
 
         if self.session_seat_id and self.ticket_type in TicketType.values:
             expected_amount = self.calculate_amount(

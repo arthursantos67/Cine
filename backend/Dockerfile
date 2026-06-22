@@ -13,7 +13,7 @@ RUN apt-get update \
 
 COPY pyproject.toml poetry.lock ./
 
-RUN pip install --no-cache-dir poetry \
+RUN pip install --no-cache-dir poetry gunicorn \
     && poetry config virtualenvs.create false \
     && poetry install --no-root
 
@@ -21,4 +21,4 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"]
+CMD ["sh", "-c", "python manage.py migrate && gunicorn cineprime_api.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120"]
