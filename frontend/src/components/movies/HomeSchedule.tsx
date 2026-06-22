@@ -31,6 +31,7 @@ import {
   getSessionSeatsHref,
   groupSessionsByExperienceType,
   groupSessionsByMovie,
+  isSessionPurchasable,
   type MovieSessionGroup,
 } from "./session-selection";
 
@@ -457,6 +458,22 @@ function ExperienceGroupEntry({ group }: { group: ExperienceSessionGroup }) {
           const badgeDescription = badgeText
             ? t("schedule.badgeDescription", { badges: badgeText })
             : "";
+          const purchasable = isSessionPurchasable(session);
+
+          if (!purchasable) {
+            return (
+              <span
+                aria-disabled="true"
+                aria-label={t("schedule.sessionUnavailable", {
+                  time: formatSessionTime(session.start_time, locale),
+                })}
+                className="flex min-w-[4.5rem] cursor-not-allowed items-center justify-center rounded-control bg-white/10 px-4 py-3 font-extrabold text-muted/60"
+                key={session.id}
+              >
+                {formatSessionTime(session.start_time, locale)}
+              </span>
+            );
+          }
 
           return (
             <Link

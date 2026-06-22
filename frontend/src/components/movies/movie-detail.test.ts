@@ -56,7 +56,7 @@ test("movie detail session cards render room and session metadata badges", () =>
   const premiumSession: CatalogSession = {
     audio_format: "legendado",
     base_price: "54.00",
-    end_time: "2026-05-22T21:00:00-03:00",
+    end_time: "2099-12-31T21:00:00-03:00",
     id: "session-premium",
     movie,
     projection_format: "3d",
@@ -68,7 +68,7 @@ test("movie detail session cards render room and session metadata badges", () =>
       name: "Room VIP",
     },
     session_type: "preview",
-    start_time: "2026-05-22T18:30:00-03:00",
+    start_time: "2099-12-31T18:30:00-03:00",
   };
 
   const html = renderToStaticMarkup(
@@ -88,6 +88,44 @@ test("movie detail session cards render room and session metadata badges", () =>
   assert.match(html, /Legendado/);
   assert.match(html, /Pré-estreia/);
   assert.match(html, /formatos VIP, 3D, Legendado, Pré-estreia/);
+});
+
+test("past session renders disabled span instead of link", () => {
+  const pastSession: CatalogSession = {
+    audio_format: "legendado",
+    base_price: "54.00",
+    end_time: "2026-05-22T21:00:00-03:00",
+    id: "session-past",
+    movie,
+    projection_format: "3d",
+    room: {
+      capacity: 48,
+      display_name: "Sala VIP Prime",
+      experience_type: "vip",
+      id: "room-vip",
+      name: "Room VIP",
+    },
+    session_type: "preview",
+    start_time: "2026-05-22T18:30:00-03:00",
+  };
+
+  const html = renderToStaticMarkup(
+    createElement(SessionList, {
+      date: "2026-05-22",
+      onRetry: () => undefined,
+      state: {
+        sessions: [pastSession],
+        status: "success",
+      },
+    })
+  );
+
+  assert.match(html, /Sala VIP Prime/);
+  assert.match(html, /18:30/);
+  assert.match(html, /aria-disabled="true"/);
+  assert.match(html, /Sessão das 18:30 encerrada/);
+  assert.doesNotMatch(html, new RegExp(`href="/sessions/session-past/seats"`));
+  assert.doesNotMatch(html, /formatos VIP, 3D, Legendado, Pré-estreia/);
 });
 
 test("movie detail omits release date when unavailable", () => {

@@ -120,6 +120,14 @@ export function getSessionSeatsHref(sessionId: string) {
   return `/sessions/${sessionId}/seats`;
 }
 
+const SESSION_SALE_CUTOFF_MINUTES = 10;
+
+export function isSessionPurchasable(session: CatalogSession, now = new Date()): boolean {
+  const cutoff = new Date(session.start_time);
+  cutoff.setMinutes(cutoff.getMinutes() + SESSION_SALE_CUTOFF_MINUTES);
+  return now < cutoff;
+}
+
 export type MovieSessionGroup = {
   movie: CatalogMovie;
   roomGroups: SessionRoomGroup[];

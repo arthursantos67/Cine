@@ -15,6 +15,7 @@ import {
   getSessionSeatsHref,
   groupSessionsByMovie,
   groupSessionsByRoom,
+  isSessionPurchasable,
 } from "./session-selection";
 
 const movie = {
@@ -147,6 +148,44 @@ test("room display names and session badges use optional metadata", () => {
 
 test("session navigation targets seat selection route", () => {
   assert.equal(getSessionSeatsHref("session-123"), "/sessions/session-123/seats");
+});
+
+test("isSessionPurchasable returns true when session has not yet started", () => {
+  const futureSession = session(
+    "future",
+    { capacity: 80, id: "room-1", name: "Sala 1" },
+    "2099-12-31T20:00:00-03:00"
+  );
+  assert.equal(isSessionPurchasable(futureSession, new Date("2026-06-22T10:00:00-03:00")), true);
+});
+
+test("isSessionPurchasable returns true within 10-minute grace window after session start", () => {
+  const now = new Date("2026-05-22T18:09:00-03:00");
+  const recentlyStarted = session(
+    "recent",
+    { capacity: 80, id: "room-1", name: "Sala 1" },
+    "2026-05-22T18:00:00-03:00"
+  );
+  assert.equal(isSessionPurchasable(recentlyStarted, now), true);
+});
+
+test("isSessionPurchasable returns false when 10-minute grace window has passed", () => {
+  const now = new Date("2026-05-22T18:10:00-03:00");
+  const expiredSession = session(
+    "expired",
+    { capacity: 80, id: "room-1", name: "Sala 1" },
+    "2026-05-22T18:00:00-03:00"
+  );
+  assert.equal(isSessionPurchasable(expiredSession, now), false);
+});
+
+test("isSessionPurchasable returns false for sessions that started hours ago", () => {
+  const pastSession = session(
+    "past",
+    { capacity: 80, id: "room-1", name: "Sala 1" },
+    "2026-05-22T18:00:00-03:00"
+  );
+  assert.equal(isSessionPurchasable(pastSession, new Date("2026-06-22T10:00:00-03:00")), false);
 });
 
 const movieB = {

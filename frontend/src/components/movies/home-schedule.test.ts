@@ -43,12 +43,19 @@ const upcomingMovie: CatalogMovie = {
 const sessionA: CatalogSession = {
   audio_format: "legendado",
   base_price: "42.00",
-  end_time: "2026-05-22T20:10:00-03:00",
+  end_time: "2099-12-31T20:10:00-03:00",
   id: "session-a",
   movie: nowShowingMovie,
   projection_format: "3d",
   room,
   session_type: "preview",
+  start_time: "2099-12-31T18:00:00-03:00",
+};
+
+const pastSessionA: CatalogSession = {
+  ...sessionA,
+  end_time: "2026-05-22T20:10:00-03:00",
+  id: "session-past",
   start_time: "2026-05-22T18:00:00-03:00",
 };
 
@@ -235,6 +242,22 @@ test("SessionSchedule session buttons include accessible aria-label with badges"
 
   assert.match(html, /formatos VIP, 3D, Legendado, Pré-estreia/);
   assert.match(html, /Selecionar sessão das 18:00/);
+});
+
+test("SessionSchedule renders past session as disabled span without link", () => {
+  const html = renderToStaticMarkup(
+    createElement(SessionSchedule, {
+      date: "2026-05-22",
+      onRetry: () => undefined,
+      state: { sessions: [pastSessionA], status: "success" },
+    })
+  );
+
+  assert.match(html, /18:00/);
+  assert.match(html, /aria-disabled="true"/);
+  assert.match(html, /Sessão das 18:00 encerrada/);
+  assert.doesNotMatch(html, new RegExp(`href="/sessions/session-past/seats"`));
+  assert.doesNotMatch(html, /Selecionar sessão das 18:00/);
 });
 
 test("SessionSchedule filters out em_breve movies even if sessions slip through", () => {
