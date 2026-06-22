@@ -17,8 +17,15 @@ from reservations.services.ticket_confirmation_email_service import (
 logger = logging.getLogger(__name__)
 
 
-@shared_task
-def release_expired_session_seat(session_seat_id: str) -> None:
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    max_retries=5,
+    default_retry_delay=30,
+)
+def release_expired_session_seat(self, session_seat_id: str) -> None:
     service = ExpiredSeatReleaseService()
     service.execute(session_seat_id=session_seat_id)
 

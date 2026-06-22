@@ -37,6 +37,12 @@ class SessionExpiredError(ReservationError):
     status_code = 410
 
 
+class ReservationServiceUnavailableError(ReservationError):
+    default_code = "SERVICE_UNAVAILABLE"
+    default_message = "Reservation service temporarily unavailable."
+    status_code = 503
+
+
 class SessionExpiredApiException(APIException):
     status_code = 410
     default_code = "SESSION_EXPIRED"
