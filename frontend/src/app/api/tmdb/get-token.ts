@@ -1,3 +1,5 @@
+import "server-only";
+
 // BACKEND_INTERNAL_URL is a server-only var for server-to-server calls (e.g., Docker).
 // Falls back to NEXT_PUBLIC_API_BASE_URL if not set.
 const BACKEND_URL = (

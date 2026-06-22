@@ -26,7 +26,7 @@ def internal_tmdb_token(request):
     try:
         cfg = SiteConfig.objects.get(key="tmdb_api_read_token")
         plaintext = decrypt_value(cfg.value) if cfg.value else None
-        return JsonResponse({"value": plaintext or None})
+        return JsonResponse({"value": plaintext})
     except SiteConfig.DoesNotExist:
         return JsonResponse({"value": None})
     except InvalidToken:

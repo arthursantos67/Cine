@@ -599,7 +599,7 @@ class TmdbTokenView(APIView):
     def get(self, request, *args, **kwargs):
         try:
             cfg = SiteConfig.objects.get(key="tmdb_api_read_token")
-            plaintext = decrypt_value(cfg.value) if cfg.value else ""
+            plaintext = decrypt_value(cfg.value) if cfg.value else None
             configured = bool(plaintext)
             hint = plaintext[-4:] if configured else None
         except SiteConfig.DoesNotExist:

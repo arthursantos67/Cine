@@ -12,14 +12,19 @@ Encrypted values are stored with a "fernet:" prefix so legacy plaintext rows
 continue to be readable until they are re-saved.
 """
 import base64
+import functools
 import hashlib
+import logging
 
 from cryptography.fernet import Fernet
 from django.conf import settings
 
+logger = logging.getLogger(__name__)
+
 _ENCRYPTED_PREFIX = "fernet:"
 
 
+@functools.lru_cache(maxsize=1)
 def _get_fernet() -> Fernet:
     raw = getattr(settings, "SITE_CONFIG_ENCRYPTION_KEY", None)
     if raw:
@@ -39,6 +44,7 @@ def encrypt_value(plaintext: str) -> str:
 
 def decrypt_value(stored: str) -> str:
     if not stored.startswith(_ENCRYPTED_PREFIX):
+        logger.warning("SiteConfig value is unencrypted (plaintext); re-save to encrypt")
         return stored
     token = stored[len(_ENCRYPTED_PREFIX):]
     return _get_fernet().decrypt(token.encode()).decode()
