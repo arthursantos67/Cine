@@ -1,3 +1,5 @@
+from functools import partial
+
 from django.db import transaction
 from django.utils import timezone
 
@@ -86,9 +88,10 @@ class TemporaryReservationReleaseService:
             )
 
             transaction.on_commit(
-                lambda: self._release_redis_locks(
+                partial(
+                    self._release_redis_locks,
                     session_id=session_id,
-                    session_seats=session_seats,
+                    session_seats=list(session_seats),
                 )
             )
 

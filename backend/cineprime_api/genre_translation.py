@@ -15,6 +15,7 @@ _MYMEMORY_URL = "https://api.mymemory.translated.net/get"
 _REQUEST_TIMEOUT = 5
 _MAX_WORKERS = 4
 _MAX_RETRIES = 2
+_TOTAL_TRANSLATE_TIMEOUT = 10
 
 
 def _translate_one(name: str, source_locale: str, target_locale: str) -> tuple[str, str]:
@@ -58,7 +59,7 @@ def translate_genre_name(name: str, source_locale: str) -> dict[str, str]:
                 executor.submit(_translate_one, name, source_locale, loc): loc
                 for loc in target_locales
             }
-            for future in as_completed(futures):
+            for future in as_completed(futures, timeout=_TOTAL_TRANSLATE_TIMEOUT):
                 loc = futures[future]
                 try:
                     locale, translated = future.result()

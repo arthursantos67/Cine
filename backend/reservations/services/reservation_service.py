@@ -8,6 +8,7 @@ from catalog.models import Session
 from reservations.constants import SESSION_SALE_CUTOFF_MINUTES
 from reservations.exceptions import (
     InvalidSeatSelectionError,
+    ReservationServiceUnavailableError,
     SeatUnavailableError,
     SessionExpiredError,
     SessionNotFoundError,
@@ -91,11 +92,15 @@ class TemporaryReservationService:
 
         try:
             for session_seat in session_seats:
-                acquired = self.lock_manager.acquire(
-                    session_id=session_id,
-                    seat_id=session_seat.seat_id,
-                    owner_id=user.id,
-                )
+                try:
+                    acquired = self.lock_manager.acquire(
+                        session_id=session_id,
+                        seat_id=session_seat.seat_id,
+                        owner_id=user.id,
+                    )
+                except Exception as exc:
+                    raise ReservationServiceUnavailableError() from exc
+
                 if not acquired:
                     raise SeatUnavailableError(self.SEAT_UNAVAILABLE_MESSAGE)
 
