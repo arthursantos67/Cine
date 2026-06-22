@@ -48,5 +48,8 @@ def readiness_check(request):
 
 
 def deep_health_check(request):
+    internal_key = getattr(settings, "HEALTH_DEEP_INTERNAL_KEY", None)
+    if internal_key and request.headers.get("X-Internal-Key") != internal_key:
+        return JsonResponse({"error": "Forbidden"}, status=403)
     result = HealthCheckService().deep()
     return _health_response(result)

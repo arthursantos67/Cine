@@ -22,7 +22,7 @@ from cryptography.fernet import InvalidToken
 
 from cineprime_api.encryption import decrypt_value, encrypt_value
 from cineprime_api.permissions import IsMasterUser
-from cineprime_api.throttling import LoginRateThrottle
+from cineprime_api.throttling import LoginRateThrottle, RegistrationRateThrottle
 from reservations.models import SessionSeat, SessionSeatStatus, Ticket
 from users.models import AdminPermissionLog, SiteConfig, User
 from users.serializers import (
@@ -109,6 +109,7 @@ class CurrentUserResponseSerializer(serializers.Serializer):
 class UserRegistrationView(CreateAPIView):
     serializer_class = UserRegistrationSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [RegistrationRateThrottle]
 
 
 @extend_schema_view(
@@ -406,6 +407,11 @@ class AdminGrantView(APIView):
     def delete(self, request, user_id, *args, **kwargs):
         target = self._get_target(user_id)
         self._check_not_protected(target)
+
+        if target.is_superuser:
+            other_masters = User.objects.filter(is_superuser=True).exclude(pk=target.pk).count()
+            if other_masters == 0:
+                raise ValidationError("Cannot revoke the last master admin.")
 
         if target.is_staff or target.is_superuser:
             revoked_role = (

@@ -1,4 +1,5 @@
 import logging
+import re
 import uuid
 
 from .logging_context import (
@@ -9,6 +10,7 @@ from .logging_context import (
 )
 
 CORRELATION_ID_HEADER = "X-Correlation-ID"
+_CORRELATION_ID_PATTERN = re.compile(r"^[a-zA-Z0-9\-_]{1,64}$")
 
 logger = logging.getLogger("cineprime.observability")
 
@@ -18,7 +20,11 @@ class CorrelationIdMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        correlation_id = request.headers.get(CORRELATION_ID_HEADER) or str(uuid.uuid4())
+        raw = request.headers.get(CORRELATION_ID_HEADER, "")
+        if _CORRELATION_ID_PATTERN.match(raw):
+            correlation_id = raw
+        else:
+            correlation_id = str(uuid.uuid4())
         request.correlation_id = correlation_id
 
         correlation_token = set_correlation_id(correlation_id)
