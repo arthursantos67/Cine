@@ -4,10 +4,10 @@
 
 **Project:** cineprime
 **Document type:** Product Requirements Document (PRD) - Frontend only  
-**Version:** 1.2
-**Last update:** 2026-05-27
-**Derived from:** Full-Stack PRD v2.1 (2026-05-27)
-**Audited against:** current Next.js scaffold, backend serializers/views, README files, Docker configuration, and CI workflow
+**Version:** 2.0
+**Last update:** 2026-06-21
+**Derived from:** Full-Stack PRD v3.0 (2026-06-21)
+**Audited against:** current Next.js app, backend serializers/views, README files, Docker configuration, and CI workflow
 
 ---
 
@@ -38,7 +38,7 @@ This PRD is derived from the full-stack PRD and focuses only on frontend behavio
 
 ### 1.1 Current Repository State
 
-The current frontend is a Next.js App Router scaffold with placeholder pages, a shared HTTP client in `src/api/client.ts`, unit tests using the Node.js test runner with `tsx`, ESLint validation, and production build validation in GitHub Actions.
+The current frontend is a Next.js 15 App Router application with fully implemented user-facing purchase flows, a complete admin UI, i18n support, and an HTTP client in `src/api/client.ts`. Unit tests use the Node.js test runner with `tsx`. ESLint, unit tests, and production build validation run in GitHub Actions.
 
 This document describes the intended complete frontend product, while keeping routes, payloads, response fields, and implementation expectations aligned with the backend and scaffold that currently exist in the repository.
 
@@ -52,13 +52,16 @@ This document describes the intended complete frontend product, while keeping ro
 
 ### 1.3 In Scope
 
-- All frontend routes currently represented by the Next.js scaffold.
+- All frontend routes in `src/app/`: public purchase flow, admin panel, auth pages.
 - Shared UI components and page-specific behavior.
-- Authentication, route guarding, and JWT handling on the client.
+- Authentication, route guarding (user, admin, master), and JWT handling on the client.
 - API integration contracts for all backend endpoints used by the frontend.
 - Client-side reservation state and checkout state.
+- Admin UI: genre, movie, room, session, pricing, and user management pages.
+- TMDB integration proxy for admin movie creation.
+- Movie reviews and interest features.
+- i18n (pt-BR / en-US) and language switcher.
 - Frontend accessibility, responsiveness, performance, and testability requirements.
-- Alignment with the current scaffold routes: `/ticket-types`, `/confirmation`, and `/my-tickets`.
 
 ### 1.4 Out of Scope for This Document
 
@@ -90,8 +93,10 @@ Django/DRF REST API
 
 | Actor | Description | Frontend Capabilities |
 |---|---|---|
-| Visitor | Unauthenticated user | Browse home, catalog, movie details, and seat maps; access login and registration |
-| Authenticated User | User with a valid JWT access token | All visitor capabilities plus: reserve seats, choose ticket types, checkout, view profile, and view purchased tickets |
+| Visitor | Unauthenticated user | Browse home, catalog, movie details, and seat maps; access login and registration; see review/interest counts |
+| Authenticated User | User with a valid JWT access token | All visitor capabilities plus: reserve seats, choose ticket types, checkout, view profile, view tickets, submit reviews, vote on reviews, register movie interest |
+| Admin (Staff) | User with `is_staff = true` in the JWT payload | All authenticated capabilities plus: access `/admin/*` for catalog and session management, room layout editing, pricing configuration |
+| Master Admin | User with `is_superuser = true` | All staff capabilities plus: access `/admin/users/` for user role management and audit log |
 
 ### 2.3 Integration Constraints
 
@@ -114,41 +119,80 @@ Django/DRF REST API
 | Styling | Tailwind CSS v4 (primary); `src/styles/tokens.css` for design tokens; `src/app/globals.css` for CSS reset, theme-level variables, and accessibility rules; `src/styles/public-legacy.css` is a temporary migration shim — do not add new component CSS there |
 | State Management | React Context and custom hooks; Zustand/Jotai may be introduced if complexity justifies it |
 | API Communication | Native `fetch` wrapped by `src/api/client.ts` |
-| Tests | Node.js test runner with `tsx` for current pure modules; Testing Library and Playwright/Cypress when UI flows are implemented |
+| i18n | Custom `src/i18n/` layer with locale dictionaries (`pt-BR`, `en-US`), `I18nProvider`, `useI18n` hook, and `cineprime_locale` cookie persistence |
+| Tests | Node.js test runner with `tsx` for pure modules and logic; Testing Library when React component tests are added; Playwright for E2E |
 | Linting | ESLint |
 
-### 3.2 Suggested Directory Structure
+### 3.2 Directory Structure
 
 ```text
 frontend/
 `-- src/
     |-- app/
-    |   |-- page.tsx
-    |   |-- movies/[movieId]/page.tsx
+    |   |-- page.tsx                          # Home
+    |   |-- movies/[movieId]/page.tsx         # Movie detail
     |   |-- sessions/[sessionId]/seats/page.tsx
     |   |-- ticket-types/page.tsx
     |   |-- checkout/page.tsx
     |   |-- confirmation/page.tsx
     |   |-- my-tickets/page.tsx
     |   |-- login/page.tsx
-    |   `-- register/page.tsx
+    |   |-- register/page.tsx
+    |   |-- admin/                            # Admin panel
+    |   |   |-- page.tsx                      # Dashboard
+    |   |   |-- layout.tsx                    # Admin shell layout
+    |   |   |-- genres/page.tsx
+    |   |   |-- movies/page.tsx
+    |   |   |-- movies/new/page.tsx
+    |   |   |-- movies/[id]/edit/page.tsx
+    |   |   |-- rooms/page.tsx
+    |   |   |-- rooms/new/page.tsx
+    |   |   |-- rooms/[roomId]/edit/page.tsx
+    |   |   |-- rooms/[roomId]/layout/page.tsx
+    |   |   |-- sessions/page.tsx
+    |   |   |-- sessions/new/page.tsx
+    |   |   |-- sessions/[id]/edit/page.tsx
+    |   |   |-- pricing/page.tsx
+    |   |   `-- users/page.tsx
+    |   `-- api/
+    |       |-- tmdb/movie/[id]/route.ts      # TMDB proxy
+    |       `-- tmdb/search/route.ts
     |-- api/
     |   |-- client.ts
     |   |-- auth.ts
     |   |-- catalog.ts
     |   |-- reservation.ts
-    |   `-- tickets.ts
+    |   |-- checkout.ts
+    |   |-- tickets.ts
+    |   |-- reviews.ts
+    |   |-- interest.ts
+    |   `-- admin.ts
     |-- components/
-    |   |-- ui/
-    |   |-- layout/
-    |   |-- movies/
-    |   |-- seats/
-    |   |-- checkout/
-    |   `-- tickets/
+    |   |-- ui/                               # Button, Badge, Select, Tabs, etc.
+    |   |-- layout/                           # AppHeader, LanguageSwitcher
+    |   |-- auth/                             # LoginForm, RegisterForm, ProtectedRoute, AdminRoute, MasterRoute
+    |   |-- movies/                           # MovieCard, FeaturedMovieBanner, MovieDetail, SessionBadges, StarRating, MovieReviews
+    |   |-- seats/                            # SeatMap, SeatSelectionActions
+    |   |-- reservations/                     # TicketTypeSelection, CheckoutReview, CheckoutConfirmation, OrderSummaryPanel, PurchaseFlowGuard, CheckoutStepIndicator
+    |   |-- tickets/                          # TicketCard, MyTicketsClient
+    |   `-- admin/                            # AdminShell, AdminTable, AdminToolbar, AdminMovieForm, AdminRoomForm, AdminRoomLayoutEditor, AdminBatchSeatWizard, AdminSessionForm, AdminGenreList, AdminUserList, AdminPricingList
     |-- contexts/
+    |   |-- AuthContext.tsx
+    |   |-- auth-state.ts
+    |   |-- auth-persistence.ts
+    |   `-- ReservationContext.tsx
     |-- hooks/
+    |   `-- useReservationCountdown.ts
+    |-- i18n/
+    |   |-- index.ts
+    |   |-- locales.ts
+    |   |-- messages.ts
+    |   |-- I18nProvider.tsx
+    |   `-- server.ts
     `-- types/
-        `-- api.ts
+        |-- catalog.ts
+        |-- reservation.ts
+        `-- ticket.ts
 ```
 
 ### 3.3 API Client Layer
@@ -225,6 +269,8 @@ Requirements:
 - Display a countdown timer based on the backend `expires_at` value.
 - Persist both `seat_id` and `session_seat_id` in client state, because temporary reservation receives `seat_id`, while release and checkout receive `session_seat_id`.
 
+Page layout: the `CheckoutStepIndicator` must be placed inside the seat map column (stacked above the seat map), not as a separate full-width row outside the flex container. This ensures the step indicator's edges align with the seat map box and the order summary panel remains independent on the right. The seat map wrapper keeps its own `overflow-x-auto` with the `min-w-[900px]` inner div so horizontal scrolling is unaffected.
+
 ### FE-04 Ticket Type Selection Page
 
 After reserving at least one seat, the user must proceed to `/ticket-types`.
@@ -294,6 +340,103 @@ After successful login:
 - Attempt silent refresh through `/api/v1/auth/token/refresh/` when the access token expires.
 - Redirect to `/login?redirect=<original_url>` when refresh fails.
 - Redirect back to the original URL after successful login when a redirect parameter is present.
+
+### FE-08 Admin UI
+
+The frontend must provide a protected administration area at `/admin/*` visible only to staff and master admin users.
+
+**General admin requirements:**
+
+- All admin pages must be wrapped in `AdminShell` providing a sidebar navigation and consistent header.
+- The `/admin/*` route subtree must be protected by `AdminRoute` (redirects non-staff to `/`).
+- Admin list pages must use `AdminTable` with configurable columns and `AdminToolbar` for search/filter.
+- Destructive actions (delete genre, delete movie, delete user) must be confirmed through `AdminConfirmDialog` before proceeding.
+
+**Dashboard (`/admin/`):** display summary counts (total movies, now-showing movies, total rooms, sessions today) fetched from the admin summary endpoint.
+
+**Genre management (`/admin/genres/`):** list all genres with name and source language; create new genres including `name` and optional translations.
+
+**Movie management:**
+- List (`/admin/movies/`): paginated table with title, status badge, featured indicator, age rating. Filter by status.
+- Create (`/admin/movies/new/`): form with all movie fields including `title`, `synopsis`, `status`, `is_featured`, `poster_url`, `spotlight_url`, `duration_minutes`, `release_date`, `age_rating`, `classification_description`, `director`, cast members, genres, and translations. A TMDB search input allows searching by title and pre-filling all fields from the API result.
+- Edit (`/admin/movies/{id}/edit/`): same form pre-populated with existing data; allows updating any field.
+
+**Room management:**
+- List (`/admin/rooms/`): table with name, experience type, display name, capacity.
+- Create (`/admin/rooms/new/`): form with `name`, `capacity`, `experience_type`, `display_name`, `description`, and translations.
+- Edit (`/admin/rooms/{roomId}/edit/`): same form pre-populated.
+- Layout editor (`/admin/rooms/{roomId}/layout/`): visual seat row list; add rows via batch wizard (name + seat count per row, submitted to `/reservation/bulk-create-layout/`); add accessible-priority row (row name + accessible seat pair count, submitted to `/reservation/accessible-row/`); delete rows (blocked when future sessions exist).
+
+**Session management:**
+- List (`/admin/sessions/`): table with movie title, room, start/end times, base price, badges for format/audio/type. Filter by date and status.
+- Create (`/admin/sessions/new/`): form with movie, room (via searchable select), start time, end time, base price, audio format, projection format, session type.
+- Edit (`/admin/sessions/{id}/edit/`): same form pre-populated; sensitive fields locked when the session has reserved or purchased seats.
+
+**Pricing management (`/admin/pricing/`):** table listing experience types and their configured base prices; inline edit (PATCH) for each price entry.
+
+**User management (`/admin/users/`):** master-only (additionally protected by `MasterRoute`); table of all users filtered by role (master/staff/user); grant or revoke staff/master roles via inline actions with confirmation; expand row to show permission audit log; delete user account with confirmation.
+
+### FE-09 TMDB Integration (Admin Movie Import)
+
+The admin movie creation form at `/admin/movies/new/` must include a TMDB search input. When the admin types a query:
+
+1. The frontend calls `GET /api/tmdb/search?q=<query>` (Next.js proxy route).
+2. Up to eight results are shown as a dropdown with poster thumbnail, title, and year.
+3. Selecting a result calls `GET /api/tmdb/movie/{id}` (Next.js proxy route).
+4. The proxy returns `{ pt: { title, synopsis }, translations, poster_path, runtime, release_date, director, cast }`.
+5. The form fields are pre-filled; the admin may edit any field before saving.
+
+**Token resolution (`src/app/api/tmdb/get-token.ts`):**
+
+The proxy resolves the TMDB token using the following priority:
+
+1. `TMDB_API_READ_TOKEN` environment variable (server-only) — used directly if present.
+2. If absent and `INTERNAL_API_KEY` is set, the proxy calls `GET /api/v1/internal/tmdb-token/` on the Django backend with the `X-Internal-Key` header. The token returned is in-memory cached for 5 minutes.
+
+If neither resolves a token, the proxy returns an error and TMDB import is disabled in the UI.
+
+**Admin token management:**
+
+Master Admin users can set the TMDB token through the admin panel without requiring a server restart or environment variable change. The token is stored in the backend's `SiteConfig` table. The admin panel uses:
+
+- `adminApi.getTmdbTokenStatus()` → `GET /api/v1/users/config/tmdb-token/` — returns `{ configured: boolean, hint: "<last-4-chars>" | null }`.
+- `adminApi.setTmdbToken(value)` → `PUT /api/v1/users/config/tmdb-token/` — saves the token.
+
+The token value is never returned in full — only the last 4 characters are shown as a confirmation hint.
+
+**Server-to-server routing:**
+
+`BACKEND_INTERNAL_URL` (server-only) overrides the target host for the internal backend call, enabling efficient Docker service-to-service communication (e.g., `http://backend:8000`). Falls back to `NEXT_PUBLIC_API_BASE_URL` if not set.
+
+### FE-10 Movie Reviews UI
+
+The movie detail page must include a reviews section:
+
+- Display the movie's average rating (if any reviews exist) and total review count.
+- List published reviews (paginated). Each item shows author username, rating (star display), comment, date, and vote counts (like/dislike).
+- Authenticated users may cast or remove a like/dislike vote on any review that is not their own.
+- An authenticated user who has not yet reviewed the movie sees a review form (star rating + optional comment). On submission, their review appears in the list.
+- A user who already has a review sees their review highlighted with edit and delete actions.
+- Visitors see the review list read-only without any action controls.
+- Rating filter selector allows filtering the list by star value.
+
+### FE-11 Movie Interest UI
+
+On the movie detail page for upcoming movies (`status = em_breve`):
+
+- Display the total number of interested users.
+- Authenticated users see a toggle button ("Tenho interesse" / "Remover interesse") that calls `POST` or `DELETE` on the interest endpoint.
+- The count updates optimistically on toggle.
+- Visitors see the count with a call to action to log in.
+
+### FE-12 Language Switcher
+
+The global header must include a `LanguageSwitcher` component allowing the user to switch between `pt-BR` and `en-US`.
+
+- The selected locale is persisted in a `cineprime_locale` cookie.
+- On mount, the `I18nProvider` reads the cookie to initialize the locale.
+- All UI text, date/time/currency formatting, enum label translations, accessible labels, and backend error-code messages must come from the active locale dictionary.
+- The `Accept-Language` header is sent with API requests using the active locale.
 
 ---
 
@@ -366,11 +509,13 @@ After successful login:
 
 ### 6.1 Page Inventory
 
+**Public / User pages:**
+
 | Page | Route | Authentication |
 |---|---|---|
 | Home | `/` | No |
 | Movie Detail | `/movies/{movieId}` | No |
-| Seat Selection | `/sessions/{sessionId}/seats` | Partial: map is public, reservation actions require authentication |
+| Seat Selection | `/sessions/{sessionId}/seats` | Partial: map public; reservation actions require auth |
 | Ticket Type Selection | `/ticket-types` | Yes |
 | Checkout | `/checkout` | Yes |
 | Order Confirmation | `/confirmation` | Yes |
@@ -378,27 +523,59 @@ After successful login:
 | Login | `/login` | No |
 | Register | `/register` | No |
 
-These routes reflect the current scaffold in `frontend/src/app`. If the product later requires direct order recovery or reload-safe reservation URLs, new parameterized routes and matching backend endpoints must be added together.
+**Admin pages:**
+
+| Page | Route | Role Required |
+|---|---|---|
+| Admin Dashboard | `/admin/` | Staff |
+| Genre Management | `/admin/genres/` | Staff |
+| Movie List | `/admin/movies/` | Staff |
+| Create Movie | `/admin/movies/new/` | Staff |
+| Edit Movie | `/admin/movies/{id}/edit/` | Staff |
+| Room List | `/admin/rooms/` | Staff |
+| Create Room | `/admin/rooms/new/` | Staff |
+| Edit Room | `/admin/rooms/{roomId}/edit/` | Staff |
+| Room Layout Editor | `/admin/rooms/{roomId}/layout/` | Staff |
+| Session List | `/admin/sessions/` | Staff |
+| Create Session | `/admin/sessions/new/` | Staff |
+| Edit Session | `/admin/sessions/{id}/edit/` | Staff |
+| Pricing Management | `/admin/pricing/` | Staff |
+| User Management | `/admin/users/` | Master |
 
 ### 6.2 Shared Components
 
-#### Navigation Bar
+#### Navigation Bar (`AppHeader`)
 
 - Shows the CinePrime brand.
 - Provides links for the main movie programming areas.
 - Shows "Log in" and "Register" actions for visitors.
 - Shows "My Tickets" and "Log out" actions for authenticated users.
+- Shows "Admin" link for staff/master users.
+- Includes the `LanguageSwitcher` component.
 
-#### Movie Card
+#### Language Switcher (`LanguageSwitcher`)
+
+- Renders locale options (`pt-BR`, `en-US`).
+- Writes the selection to `cineprime_locale` cookie.
+- Triggers locale change through `I18nProvider`.
+
+#### Movie Card (`MovieCard`)
 
 - Shows poster, title, genres, and duration.
 - Navigates to `/movies/{movieId}`.
-- Displays age rating only after the backend supports it.
+- Shows age rating badge when `age_rating` is present in the API response.
 
-#### Featured Banner
+#### Featured Banner (`FeaturedMovieBanner`)
 
 - Displays movies marked with `is_featured = true`.
-- Shows poster imagery, title, and a primary purchase/session-selection action.
+- Shows spotlight image (`spotlight_url`) when available; falls back to `poster_url`.
+- Shows title, genre tags, and a primary session-selection action.
+
+#### Star Rating (`StarRating`)
+
+- Interactive half-star rating input (0.5–5.0 in 0.5 increments) for review submission.
+- Read-only display mode for review lists showing filled/half/empty star glyphs.
+- Accessible labels for each selectable value.
 
 #### Countdown Timer
 
@@ -407,28 +584,62 @@ These routes reflect the current scaffold in `frontend/src/app`. If the product 
 - Applies warning styling when 60 seconds or less remain.
 - Triggers reservation reset behavior when time reaches zero.
 
-#### Order Summary Panel
+#### Order Summary Panel (`OrderSummaryPanel`)
 
 - Appears during seat selection, ticket type selection, and checkout.
 - Uses a sidebar layout on desktop and a bottom sheet layout on mobile.
 - Shows seats, ticket types, unit prices, and total amount.
 
+#### Checkout Step Indicator (`CheckoutStepIndicator`)
+
+- Shows progress: Session → Seats → Ticket Types → Checkout → Confirmation.
+- Highlights the current step.
+- Visible during all purchase flow pages.
+
+#### Purchase Flow Guard (`PurchaseFlowGuard`)
+
+- Wraps `/ticket-types` and `/checkout` pages.
+- Redirects to the last known session if `reservedSeats` is empty.
+- Falls back to `/` with an explanatory message if no session context exists.
+
+#### Admin Shell (`AdminShell`)
+
+- Shared layout wrapper for all `/admin/*` pages.
+- Provides sidebar navigation with links to all admin sections.
+- Shows the active section highlighted.
+- Accessible to staff and master users only.
+
+#### Admin Table (`AdminTable`)
+
+- Reusable table component for admin list views.
+- Configurable columns with `AdminTableColumn` type.
+- Used by genre, movie, room, session, pricing, and user list pages.
+
+#### Admin Confirm Dialog (`AdminConfirmDialog`)
+
+- Modal confirmation dialog for destructive actions.
+- Accepts a title, message, and confirm/cancel callbacks.
+
 #### Error Toast or Alert Banner
 
-The frontend must map backend `error.code` values to user-friendly messages.
+The frontend must map backend `error.code` values to user-friendly messages in the active locale.
 
-| `error.code` | User Message |
+| `error.code` | Default User Message (pt-BR) |
 |---|---|
-| `VALIDATION_FAILED` | "Please check the provided information and try again." |
-| `INVALID_CREDENTIALS` | "Email or password is incorrect." |
-| `NOT_AUTHENTICATED` | "Your session has expired. Please log in again." |
-| `PERMISSION_DENIED` | "You do not have permission to perform this action." |
-| `RESOURCE_NOT_FOUND` | "The requested resource could not be found." |
-| `SEAT_ALREADY_RESERVED` | "This seat was reserved by another user. Please choose another seat." |
-| `INVALID_TICKET_TYPE` | "The selected ticket type is invalid." |
-| `INVALID_PAYMENT_METHOD` | "The selected payment method is invalid." |
-| `THROTTLED` | "Too many attempts. Please wait and try again." |
-| `INTERNAL_SERVER_ERROR` | "An unexpected error occurred. Please try again later." |
+| `VALIDATION_FAILED` | "Verifique as informações fornecidas e tente novamente." |
+| `INVALID_CREDENTIALS` | "E-mail ou senha incorretos." |
+| `NOT_AUTHENTICATED` | "Sua sessão expirou. Faça login novamente." |
+| `PERMISSION_DENIED` | "Você não tem permissão para realizar esta ação." |
+| `RESOURCE_NOT_FOUND` | "O recurso solicitado não foi encontrado." |
+| `SEAT_ALREADY_RESERVED` | "Este assento foi reservado por outro usuário. Escolha outro assento." |
+| `INVALID_TICKET_TYPE` | "O tipo de ingresso selecionado é inválido." |
+| `INVALID_PAYMENT_METHOD` | "O método de pagamento selecionado é inválido." |
+| `THROTTLED` | "Muitas tentativas. Aguarde e tente novamente." |
+| `INTERNAL_SERVER_ERROR` | "Ocorreu um erro inesperado. Tente novamente mais tarde." |
+| `REVIEW_ALREADY_EXISTS` | "Você já avaliou este filme." |
+| `CANNOT_VOTE_OWN_REVIEW` | "Você não pode votar na sua própria avaliação." |
+| `LAST_MASTER_ADMIN` | "Não é possível remover o único administrador master." |
+| `ROOM_LAYOUT_LOCKED` | "O layout desta sala não pode ser alterado pois existem sessões futuras." |
 
 ### 6.3 Seat Map
 
@@ -518,13 +729,18 @@ Relevant `Movie` fields:
 
 - `id`
 - `title`
-- `genres`
+- `genres` (list of `{ id, name }`)
 - `synopsis`
 - `duration_minutes`
 - `release_date`
 - `poster_url`
-- `status`
+- `spotlight_url` (optional hero image for banners)
+- `status` (`em_cartaz` | `pre_venda` | `em_breve`)
 - `is_featured`
+- `age_rating` (optional: `L` | `10` | `12` | `14` | `16` | `18`)
+- `classification_description` (optional)
+- `director` (optional)
+- `cast` (list of `{ id, name, order }`)
 - `created_at`
 - `updated_at`
 
@@ -652,7 +868,140 @@ Success response:
 
 The backend accepts optional `total_amount` validation, but the frontend must not send it by default.
 
-### 7.6 My Tickets
+### 7.6 Movie Reviews
+
+| Operation | Method | Endpoint | Auth |
+|---|---|---|---|
+| List reviews | `GET` | `/api/v1/catalog/movies/{movieId}/reviews/` | Optional |
+| Submit review | `POST` | `/api/v1/catalog/movies/{movieId}/reviews/` | Yes |
+| Update own review | `PATCH` | `/api/v1/catalog/movies/{movieId}/reviews/{reviewId}/` | Yes (owner) |
+| Delete own review | `DELETE` | `/api/v1/catalog/movies/{movieId}/reviews/{reviewId}/` | Yes (owner) |
+| Vote on review | `POST` | `/api/v1/catalog/movies/{movieId}/reviews/{reviewId}/vote/` | Yes |
+| Remove vote | `DELETE` | `/api/v1/catalog/movies/{movieId}/reviews/{reviewId}/vote/` | Yes |
+
+Submit review payload:
+
+```json
+{
+  "rating": 4.5,
+  "comment": "Excelente filme, ótima cinematografia."
+}
+```
+
+Review list response fields per item:
+
+- `id`
+- `user` (`{ id, username }`)
+- `rating` (decimal string, e.g. `"4.5"`)
+- `comment`
+- `created_at`
+- `updated_at`
+- `vote_counts` (`{ like: number, dislike: number }`)
+- `user_vote` (`"like"` | `"dislike"` | `null`) — present when request is authenticated
+
+Query parameters: `page`, `rating` (integer filter).
+
+Vote payload:
+
+```json
+{ "vote": "like" }
+```
+
+### 7.7 Movie Interest
+
+| Operation | Method | Endpoint | Auth |
+|---|---|---|---|
+| Get interest status | `GET` | `/api/v1/catalog/movies/{movieId}/interest/` | Optional |
+| Mark interest | `POST` | `/api/v1/catalog/movies/{movieId}/interest/` | Yes |
+| Remove interest | `DELETE` | `/api/v1/catalog/movies/{movieId}/interest/` | Yes |
+
+GET response:
+
+```json
+{
+  "count": 142,
+  "user_interested": true
+}
+```
+
+`user_interested` is `null` for unauthenticated requests.
+
+### 7.8 Room Type Pricing
+
+| Operation | Method | Endpoint | Auth |
+|---|---|---|---|
+| List pricing | `GET` | `/api/v1/catalog/room-type-pricing/` | Admin |
+| Get entry | `GET` | `/api/v1/catalog/room-type-pricing/{id}/` | Admin |
+| Update entry | `PATCH` | `/api/v1/catalog/room-type-pricing/{id}/` | Admin |
+
+PATCH payload:
+
+```json
+{ "base_price": "65.00" }
+```
+
+Response fields: `id`, `experience_type`, `base_price`, `updated_at`.
+
+### 7.9 Admin Endpoints
+
+The `src/api/admin.ts` module wraps additional admin-only endpoints.
+
+**Admin summary:**
+
+| Operation | Method | Endpoint | Auth |
+|---|---|---|---|
+| Get summary | `GET` | `/api/v1/admin/summary/` | Admin |
+
+Returns `{ movieCount, nowShowingCount, roomCount, sessionsTodayCount }`.
+
+**Bulk layout:**
+
+| Operation | Method | Endpoint | Auth |
+|---|---|---|---|
+| Bulk create rows/seats | `POST` | `/api/v1/reservation/bulk-create-layout/` | Admin |
+
+Payload:
+
+```json
+{
+  "room": "<room_uuid>",
+  "rows": [
+    { "name": "A", "seats": [{ "number": 1 }, { "number": 2 }] }
+  ]
+}
+```
+
+**Accessible row:**
+
+| Operation | Method | Endpoint | Auth |
+|---|---|---|---|
+| Create accessible row | `POST` | `/api/v1/reservation/accessible-row/` | Admin |
+
+Payload:
+
+```json
+{
+  "room": "<room_uuid>",
+  "name": "PCD",
+  "accessible_seat_count": 3
+}
+```
+
+Creates 3 wheelchair-accessible seats each paired with a companion seat.
+
+**User management:**
+
+| Operation | Method | Endpoint | Auth |
+|---|---|---|---|
+| List users | `GET` | `/api/v1/users/?role=<filter>` | Master |
+| Grant role | `POST` | `/api/v1/users/{userId}/admin/` | Master |
+| Revoke role | `DELETE` | `/api/v1/users/{userId}/admin/` | Master |
+| Permission logs | `GET` | `/api/v1/users/{userId}/admin/logs/` | Master |
+| Delete user | `DELETE` | `/api/v1/users/{userId}/` | Master |
+
+Grant payload: `{ "role": "staff" }` or `{ "role": "master" }`.
+
+### 7.10 My Tickets
 
 | Operation | Method | Endpoint | Auth | Query Parameters |
 |---|---|---|---|---|
@@ -702,23 +1051,6 @@ Expected nested shape:
   }
 }
 ```
-
-### 7.7 Standard Error Envelope
-
-All API errors follow:
-
-```json
-{
-  "error": {
-    "code": "SEAT_ALREADY_RESERVED",
-    "message": "One or more selected seats are already reserved or purchased.",
-    "status": 409,
-    "details": {}
-  }
-}
-```
-
-The frontend must map `error.code` to a user-facing message and must not display raw backend `error.message` directly.
 
 ---
 
@@ -857,14 +1189,22 @@ The `/confirmation` page may render tickets stored in memory immediately after c
 
 ### 10.1 Route Guards
 
-Protected routes:
+**Authentication-protected routes** (redirect to `/login?redirect=<url>` if not authenticated):
 
 - `/ticket-types`
 - `/checkout`
 - `/confirmation`
 - `/my-tickets`
 
-The seat map route `/sessions/{sessionId}/seats` is public for viewing, but reservation and release actions require authentication. If a visitor attempts a protected action from that page, the app must redirect to `/login?redirect=<current_url>`.
+The seat map route `/sessions/{sessionId}/seats` is public for viewing, but reservation and release actions require authentication. If a visitor attempts a protected action, redirect to `/login?redirect=<current_url>`.
+
+**Admin-protected routes** (redirect to `/` if not staff or master):
+
+- `/admin/*` — guarded by `AdminRoute`
+
+**Master-protected routes** (redirect to `/admin/` if staff but not master):
+
+- `/admin/users/` — additionally guarded by `MasterRoute`
 
 ### 10.2 Token Handling
 
@@ -877,7 +1217,11 @@ The seat map route `/sessions/{sessionId}/seats` is public for viewing, but rese
 | Refresh failure | Clear auth state and redirect to login |
 | Explicit logout | Clear auth and reservation state, then redirect to `/` |
 
-### 10.3 Price Manipulation Protection
+### 10.3 TMDB Token Security
+
+The TMDB token is never sent to or stored in the browser. The Next.js proxy (`src/app/api/tmdb/get-token.ts`) resolves the token server-side only. The `INTERNAL_API_KEY` shared secret must be kept in server-only environment variables and must never be referenced in `NEXT_PUBLIC_*` variables or client-side code.
+
+### 10.4 Price Manipulation Protection
 
 The frontend must not trust its own price calculation as authoritative. It displays totals for user clarity only. Checkout must send only `session_seat_id`, `ticket_type`, and `payment_method`; the backend calculates and validates final prices.
 
@@ -942,9 +1286,12 @@ The frontend CI workflow must run:
 
 ### 12.1 Environment Variables
 
-| Variable | Description | Example |
-|---|---|---|
-| `NEXT_PUBLIC_API_BASE_URL` | Backend REST API base URL compiled into browser code at build time | `http://localhost:8000` |
+| Variable | Scope | Description | Example |
+|---|---|---|---|
+| `NEXT_PUBLIC_API_BASE_URL` | Browser (build-time) | Backend REST API base URL compiled into browser code | `http://localhost:8000` |
+| `TMDB_API_READ_TOKEN` | Server-only (runtime) | TMDB token used directly by the proxy; takes priority over the database-stored token; optional if `INTERNAL_API_KEY` is configured | `eyJhbGci...` |
+| `INTERNAL_API_KEY` | Server-only (runtime) | Shared secret for server-to-server calls between Next.js and Django (`X-Internal-Key` header); required for database-backed TMDB token retrieval; must match `INTERNAL_API_KEY` in the Django backend | `super-secret-key` |
+| `BACKEND_INTERNAL_URL` | Server-only (runtime) | Internal hostname for Next.js → Django server-to-server calls (Docker-only); falls back to `NEXT_PUBLIC_API_BASE_URL` | `http://backend:8000` |
 
 ### 12.2 Local Commands
 
@@ -974,28 +1321,38 @@ The development server runs on `http://localhost:3000`.
 
 | Requirement | Frontend Artifact |
 |---|---|
-| FE-01 Home Page | `src/app/page.tsx`, `src/components/movies/FeaturedBanner`, `src/components/movies/MovieGrid`, `src/api/catalog.ts` |
-| FE-02 Movie Detail | `src/app/movies/[movieId]/page.tsx`, `src/components/movies/SessionPicker`, `src/components/movies/DateSelector` |
-| FE-03 Seat Selection | `src/app/sessions/[sessionId]/seats/page.tsx`, `src/components/seats/SeatMap`, `src/components/seats/SeatCell`, `src/components/seats/CountdownTimer`, `src/api/reservation.ts` |
-| FE-04 Ticket Type Selection | `src/app/ticket-types/page.tsx`, `src/components/checkout/TicketTypeSelector`, `src/components/checkout/OrderSummaryPanel` |
-| FE-05 Checkout | `src/app/checkout/page.tsx`, `src/components/checkout/PaymentMethodSelector`, `src/api/checkout.ts` |
-| FE-06 Confirmation and My Tickets | `src/app/confirmation/page.tsx`, `src/app/my-tickets/page.tsx`, `src/components/tickets/TicketCard` |
-| FE-07 Authentication | `src/app/login/page.tsx`, `src/app/register/page.tsx`, `src/api/auth.ts`, `src/hooks/useAuth.ts`, `src/contexts/AuthContext.tsx` |
-| Accessibility | `src/components/seats/SeatMap`, `src/components/seats/SeatLegend`, all forms |
-| Reservation Expiration | `src/hooks/useCountdown.ts`, `src/contexts/ReservationContext.tsx` |
-| Client Security | `src/api/client.ts`, `src/contexts/AuthContext.tsx` |
-| Reservation Conflict | `src/components/seats/SeatMap`, `src/components/ui/ErrorToast` |
-| Route Guards | `src/components/layout/AuthGuard.tsx` or equivalent client-side guard |
+| FE-01 Home Page | `src/app/page.tsx`, `src/app/HomeCatalog.tsx`, `src/components/movies/FeaturedMovieBanner.tsx`, `src/components/movies/MovieGrid.tsx`, `src/components/movies/TabbedMovieCatalog.tsx`, `src/components/movies/HomeSchedule.tsx`, `src/api/catalog.ts` |
+| FE-02 Movie Detail | `src/app/movies/[movieId]/page.tsx`, `src/components/movies/MovieDetail.tsx`, `src/components/movies/SessionBadges.tsx`, `src/components/movies/session-selection.ts` |
+| FE-03 Seat Selection | `src/app/sessions/[sessionId]/seats/page.tsx`, `src/components/seats/SeatMap.tsx`, `src/components/seats/SeatSelectionActions.tsx`, `src/hooks/useReservationCountdown.ts`, `src/api/reservation.ts` |
+| FE-04 Ticket Type Selection | `src/app/ticket-types/page.tsx`, `src/components/reservations/TicketTypeSelection.tsx`, `src/components/reservations/OrderSummaryPanel.tsx`, `src/components/reservations/ticket-type-selection.ts` |
+| FE-05 Checkout | `src/app/checkout/page.tsx`, `src/components/reservations/CheckoutReview.tsx`, `src/components/reservations/checkout-flow.ts`, `src/api/checkout.ts` |
+| FE-06 Confirmation and My Tickets | `src/app/confirmation/page.tsx`, `src/components/reservations/CheckoutConfirmation.tsx`, `src/app/my-tickets/page.tsx`, `src/components/tickets/TicketCard.tsx`, `src/components/tickets/MyTicketsClient.tsx`, `src/api/tickets.ts` |
+| FE-07 Authentication | `src/app/login/page.tsx`, `src/app/register/page.tsx`, `src/components/auth/LoginForm.tsx`, `src/components/auth/RegisterForm.tsx`, `src/api/auth.ts`, `src/contexts/AuthContext.tsx`, `src/contexts/auth-state.ts`, `src/contexts/auth-persistence.ts` |
+| FE-08 Admin UI | `src/app/admin/**`, `src/components/admin/**`, `src/api/admin.ts`, `src/components/auth/AdminRoute.tsx`, `src/components/auth/MasterRoute.tsx` |
+| FE-09 TMDB Integration | `src/app/api/tmdb/movie/[id]/route.ts`, `src/app/api/tmdb/search/route.ts`, `src/components/admin/AdminMovieForm.tsx` |
+| FE-10 Movie Reviews | `src/api/reviews.ts`, `src/components/movies/MovieReviews.tsx`, `src/components/movies/StarRating.tsx`, `src/components/admin/AdminMovieReviewList.tsx` |
+| FE-11 Movie Interest | `src/api/interest.ts`, `src/components/movies/MovieDetail.tsx` |
+| FE-12 Language Switcher | `src/components/layout/LanguageSwitcher.tsx`, `src/i18n/I18nProvider.tsx`, `src/i18n/locales.ts`, `src/i18n/messages.ts` |
+| Accessibility | `src/components/seats/SeatMap.tsx`, all form components |
+| Reservation Expiration | `src/hooks/useReservationCountdown.ts`, `src/utils/reservation-countdown.ts`, `src/contexts/ReservationContext.tsx` |
+| Client Security | `src/api/client.ts`, `src/contexts/AuthContext.tsx`, `src/contexts/auth-state.ts` |
+| Reservation Conflict | `src/components/seats/SeatMap.tsx` (optimistic revert on 409) |
+| Purchase Flow Guards | `src/components/reservations/PurchaseFlowGuard.tsx`, `src/components/reservations/purchase-flow-guards.ts` |
+| Route Guards | `src/components/auth/ProtectedRoute.tsx`, `src/components/auth/AdminRoute.tsx`, `src/components/auth/MasterRoute.tsx`, `src/components/auth/route-guards.ts` |
+| Checkout Step Indicator | `src/components/reservations/CheckoutStepIndicator.tsx`, `src/components/reservations/checkout-steps.ts` |
+| Order Summary | `src/components/reservations/OrderSummaryPanel.tsx`, `src/components/reservations/order-summary.ts` |
+| i18n | `src/i18n/**`, `src/utils/formatters.ts` |
 
 ---
 
 ## 14. Out of Scope
 
-- Real payment gateway processing.
+- Real payment gateway processing (Stripe, PagSeguro, Mercado Pago, etc.).
 - Native iOS or Android applications.
-- Admin catalog management UI.
-- Loyalty program, cashback, or real coupon validation.
-- Concession ordering.
+- Loyalty program, cashback, or real coupon validation beyond the voucher input field.
+- Concession / bomboniére ordering.
 - Real QR code validation at physical entrance.
-- Movie age rating and trailer playback until backend `age_rating` and `trailer_url` fields are available.
-- Server-side rendering requirements beyond what the current Next.js app naturally supports.
+- Movie trailer playback (`trailer_url` is not exposed by the backend).
+- Review moderation or flagging UI beyond what Django admin provides.
+- Multi-tenant or franchise cinema chain support.
+- Server-side rendering (SSR) for authenticated or personalized content — the app uses client-side data fetching; Next.js SSR is only used for static or public pages where naturally applicable.
