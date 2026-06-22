@@ -18,12 +18,15 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from cineprime_api.encryption import decrypt_value, encrypt_value
 from cineprime_api.permissions import IsMasterUser
 from cineprime_api.throttling import LoginRateThrottle
 from reservations.models import SessionSeat, SessionSeatStatus, Ticket
-from users.models import AdminPermissionLog, User
+from users.models import AdminPermissionLog, SiteConfig, User
 from users.serializers import (
     AdminPermissionLogSerializer,
+    TmdbTokenBodySerializer,
+    TmdbTokenResponseSerializer,
     UserLoginSerializer,
     UserListSerializer,
     UserRegistrationSerializer,
@@ -578,3 +581,37 @@ class UserDeleteView(APIView):
 
         _delete_user_cascade(user)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@extend_schema(
+    tags=["Admin"],
+    responses={
+        200: TmdbTokenResponseSerializer,
+        403: OpenApiResponse(description="Master access required."),
+    },
+)
+class TmdbTokenView(APIView):
+    permission_classes = [IsMasterUser]
+
+    @extend_schema(summary="Get TMDB token status")
+    def get(self, request, *args, **kwargs):
+        try:
+            cfg = SiteConfig.objects.get(key="tmdb_api_read_token")
+            plaintext = decrypt_value(cfg.value) if cfg.value else ""
+            configured = bool(plaintext)
+            hint = plaintext[-4:] if configured else None
+        except SiteConfig.DoesNotExist:
+            configured = False
+            hint = None
+        return Response({"configured": configured, "hint": hint})
+
+    @extend_schema(summary="Set TMDB token", request=TmdbTokenBodySerializer)
+    def put(self, request, *args, **kwargs):
+        body = TmdbTokenBodySerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        plaintext = body.validated_data["value"]
+        SiteConfig.objects.update_or_create(
+            key="tmdb_api_read_token",
+            defaults={"value": encrypt_value(plaintext)},
+        )
+        return Response({"configured": True, "hint": plaintext[-4:]})

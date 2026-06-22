@@ -1,93 +1,140 @@
 # CinePrime
 
-Full-stack cinema reservation system with a Django/DRF backend and a browser-based SPA frontend.
+Sistema completo de reserva de ingressos de cinema — backend REST em Django/DRF e frontend web em Next.js.
 
-Detailed product requirements are in [`product-requirements-document.md`](./product-requirements-document.md).
+---
 
-## Repository Layout
+## Funcionalidades
 
-| Path | Ownership |
-| --- | --- |
-| [`backend/`](./backend/) | Django API, DRF apps, tests, Python dependency files, backend Dockerfile, Postman collection |
-| [`frontend/`](./frontend/) | Next.js App Router app, API client boundary, frontend Dockerfiles, tests |
-| [`docker-compose.yml`](./docker-compose.yml) | Full-stack local runtime wiring |
-| [`.github/workflows/`](./.github/workflows/) | Independent backend, frontend, and Docker validation |
-| [`product-requirements-document.md`](./product-requirements-document.md) | Full-stack PRD |
+### Para usuários
 
-## Local Development
+- Catálogo de filmes com banner de destaque, filmes em cartaz, pré-venda e em breve
+- Detalhes do filme: sinopse, elenco, diretor, classificação etária e sessões disponíveis
+- Seleção de sessão com filtro por data e badges de formato (3D, IMAX, Legendado, Dublado, Pré-estreia)
+- Mapa de assentos interativo com estados visuais: disponível, selecionado, ocupado e acessível
+- Reserva temporária de assentos com contador regressivo de 10 minutos
+- Seleção de tipo de ingresso por assento: inteira ou meia-entrada (50% de desconto)
+- Checkout com seleção de forma de pagamento: Cartão de Crédito ou PIX
+- Tela de confirmação com código do ingresso
+- Área "Meus Ingressos" com filtro por sessões futuras ou passadas
+- Avaliações de filmes com meia-estrela (0,5 a 5,0) e votos de utilidade nas reviews
+- Interesse em filmes em breve (contador público + ação autenticada)
+- Suporte a dois idiomas: Português (pt-BR) e English (en-US)
 
-Create the root Compose environment file, then start the stack:
+### Para administradores
+
+- Painel admin em `/admin/` com resumo de operações do dia
+- Gerenciamento de gêneros com suporte a traduções
+- Gerenciamento de filmes: criação com importação via TMDB, edição de todos os campos incluindo classificação etária, elenco e URL de spotlight
+- Gerenciamento de salas: tipo de experiência, nome de exibição e descrição
+- Editor de layout de sala: adicionar fileiras via wizard em lote e fileira acessível PCD com pares cadeira + acompanhante
+- Gerenciamento de sessões: preço base, formato de áudio/projeção e tipo de sessão
+- Configuração de preço por tipo de sala (Standard, VIP, Premium, IMAX)
+- Gerenciamento de usuários (Master): promover/rebaixar papel (Staff/Master), log de auditoria de permissões, exclusão de contas
+
+---
+
+## Tecnologias
+
+| Camada | Tecnologia |
+|---|---|
+| Backend | Python 3.14 · Django 6 · Django REST Framework |
+| Autenticação | JWT via `djangorestframework-simplejwt` |
+| Banco de dados | PostgreSQL 17 |
+| Cache e locks | Redis 7 (`django-redis`) |
+| Tarefas assíncronas | Celery (broker Redis) |
+| API docs | OpenAPI 3 + Swagger UI via `drf-spectacular` |
+| Frontend | Next.js 15 (App Router) · TypeScript · Tailwind CSS v4 |
+| Testes backend | Pytest + pytest-django |
+| Testes frontend | Node.js test runner + tsx · Playwright (E2E) |
+| Infraestrutura | Docker · Docker Compose · GitHub Actions CI |
+
+---
+
+## Estrutura do repositório
+
+```
+cineprime-api/
+├── backend/          Django API — apps, serviços, testes, Dockerfile
+├── frontend/         Next.js app — páginas, componentes, API client, Dockerfiles
+├── docker-compose.yml
+└── product-requirements-document.md   PRD completo (backend + frontend)
+```
+
+Documentação detalhada por camada:
+
+- [`backend/README.md`](./backend/README.md) — comandos, variáveis de ambiente, testes e referência de rotas
+- [`frontend/README.md`](./frontend/README.md) — comandos, variáveis de ambiente e build
+- [`product-requirements-document.md`](./product-requirements-document.md) — requisitos funcionais, modelo de dados, contrato de API e rastreabilidade
+- [`frontend/frontend-product-requirements-document.md`](./frontend/frontend-product-requirements-document.md) — PRD específico do frontend
+
+---
+
+## Como rodar localmente
+
+### Pré-requisitos
+
+- Docker e Docker Compose instalados
+
+### 1. Configurar variáveis de ambiente
 
 ```bash
 cp .env.example .env
+```
+
+Edite `.env` conforme necessário. As variáveis essenciais para desenvolvimento local já estão preenchidas no `.env.example`.
+
+**Token TMDB para importação de filmes no admin**
+
+Há duas formas de configurar o token da API do TMDB:
+
+- **Via variável de ambiente** (prioridade): defina `TMDB_API_READ_TOKEN=<seu-token>` no `.env` do frontend. Requer reinício do container.
+- **Via painel admin** (sem reinício): configure `INTERNAL_API_KEY=<chave-secreta>` no `.env` do backend e no `.env` do frontend (server-only). Com isso, usuários Master Admin podem definir e atualizar o token pelo painel em `/admin/` a qualquer momento — o valor fica salvo no banco de dados e nunca é exposto no browser.
+
+### 2. Subir o stack completo
+
+```bash
 docker compose up --build
 ```
 
-The backend container uses its Dockerfile startup command, which applies Django
-migrations before starting the development server.
+O container do backend executa as migrações automaticamente antes de iniciar o servidor.
 
-## Rename Compatibility Notes
+### Serviços disponíveis
 
-- The tracked project files do not intentionally retain legacy project branding.
-- Historical Git refs and untracked local planning files are outside this branch
-  content and were left untouched.
-- Existing local PostgreSQL Docker volumes may already contain a database
-  created before the rename. PostgreSQL only applies `POSTGRES_DB` on first
-  volume initialization, so recreate the local DB volume or create the new
-  database manually before reusing an older volume.
-- After the remote repository is renamed, collaborators should point `origin` to
-  `git@github.com:arthursantos67/cineprime-api.git`.
+| Serviço | URL |
+|---|---|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:8000 |
+| Swagger UI | http://localhost:8000/api/docs/ |
+| Health check | http://localhost:8000/health/ |
+| PostgreSQL | localhost:5432 |
+| Redis | localhost:6379 |
 
-Services:
-
-- Backend API: `http://localhost:8000`
-- API docs: `http://localhost:8000/api/docs/`
-- Health checks: `http://localhost:8000/health/live/`, `/health/ready/`, `/health/deep/`
-- Frontend dev server: `http://localhost:3000`
-- PostgreSQL: `localhost:5432`
-- Redis: `localhost:6379`
-
-## Backend
-
-Backend commands and API documentation live in [`backend/README.md`](./backend/README.md).
-
-> Backend commands must run inside Docker. Do not run `poetry run` on the host;
-> use `docker compose exec backend ...` or `docker compose run --rm backend ...`.
-
-Common root-level Docker commands:
+### Comandos úteis
 
 ```bash
+# Rodar migrações manualmente
 docker compose exec backend python manage.py migrate
+
+# Executar testes do backend
 docker compose exec backend pytest -q
+
+# Verificar worker Celery
 docker compose exec celery celery -A cineprime_api inspect ping
+
+# Testes do frontend (fora do Docker)
+cd frontend && npm ci && npm run test
+
+# Build de produção do frontend
+cd frontend && npm run build
 ```
 
-## Frontend
-
-Frontend commands, Docker usage, and deployment notes live in [`frontend/README.md`](./frontend/README.md).
-
-Common local commands:
-
-```bash
-cd frontend
-npm ci
-npm run dev
-npm run lint
-npm run test
-npm run e2e:ci
-npm run build
-```
-
-The frontend requires `NEXT_PUBLIC_API_BASE_URL`. Local Compose injects
-`http://localhost:8000` for the frontend dev service; production frontend Docker
-builds must receive the deployed API origin as a build argument. Set
-`NEXT_IMAGE_REMOTE_HOSTNAMES` at build time when production poster images come
-from a known CDN or asset host.
+---
 
 ## CI
 
-GitHub Actions validates the two apps independently:
+O GitHub Actions valida backend e frontend de forma independente a cada push e pull request para `main`:
 
-- backend Docker Compose checks, migrations, and tests
-- frontend install, lint, unit/integration tests, Playwright E2E, and build from `frontend/`
-- Docker Compose config plus backend and production frontend image builds
+1. **Backend** — `manage.py check`, migrações e suite de testes completa dentro do container
+2. **Frontend** — install, lint, testes unitários/integração, Playwright E2E e build de produção
+3. **Docker** — validação do `docker-compose.yml` e build das imagens de backend e frontend

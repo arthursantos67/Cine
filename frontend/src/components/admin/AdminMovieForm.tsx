@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { adminApi, type AdminMovieWritePayload } from "@/api/admin";
 import { ApiError, getApiErrorUserMessage } from "@/api/client";
+import { useAuth } from "@/contexts/AuthContext";
 import type { CatalogGenre, CatalogMovieDetail, CatalogMovieAgeRating, MovieStatus } from "@/types/catalog";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
@@ -57,6 +58,125 @@ export function extractFieldErrors(error: unknown): FieldErrors {
   }
 
   return result;
+}
+
+function TmdbTokenModal({
+  isOpen,
+  onClose,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [tokenInput, setTokenInput] = useState("");
+  const [status, setStatus] = useState<{ configured: boolean; hint: string | null } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (isOpen) {
+      dialog.showModal();
+      setTokenInput("");
+      setError(null);
+      setSaved(false);
+      setIsLoading(true);
+      const controller = new AbortController();
+      adminApi.getTmdbTokenStatus({ signal: controller.signal })
+        .then((s) => setStatus(s))
+        .catch(() => setStatus(null))
+        .finally(() => setIsLoading(false));
+      return () => controller.abort();
+    } else {
+      dialog.close();
+    }
+  }, [isOpen]);
+
+  async function handleSave() {
+    const value = tokenInput.trim();
+    if (!value) return;
+    setIsSaving(true);
+    setError(null);
+    try {
+      await adminApi.setTmdbToken(value);
+      setStatus({ configured: true, hint: value.slice(-4) });
+      setTokenInput("");
+      setSaved(true);
+    } catch {
+      setError("Erro ao salvar token. Verifique sua conexão e tente novamente.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  if (!isOpen) return null;
+
+  return (
+    <dialog
+      className="w-full max-w-sm rounded-[10px] border border-white/[0.10] bg-[#1a2030] p-6 text-white shadow-xl backdrop:bg-black/60 open:flex open:flex-col open:gap-4"
+      onCancel={onClose}
+      ref={dialogRef}
+    >
+      <div className="flex flex-col gap-1">
+        <strong className="text-base font-[850]">Configurar token TMDB</strong>
+        <p className="text-sm text-white/60">
+          Obtenha o token em{" "}
+          <a
+            className="text-brand underline"
+            href="https://www.themoviedb.org/settings/api"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            themoviedb.org/settings/api
+          </a>
+          {" "}(API Read Access Token).
+        </p>
+      </div>
+
+      {isLoading ? (
+        <div className="h-5 w-40 animate-pulse rounded bg-white/10" />
+      ) : status?.configured ? (
+        <p className="text-sm text-brand/80">
+          Token configurado — termina em <span className="font-mono font-bold">…{status.hint}</span>
+        </p>
+      ) : (
+        <p className="text-sm text-white/40">Nenhum token configurado.</p>
+      )}
+
+      {saved ? (
+        <p className="text-sm font-bold text-brand">Token salvo com sucesso.</p>
+      ) : null}
+
+      <div className="grid gap-2">
+        <label className="text-xs font-bold text-white/60">Novo token</label>
+        <input
+          autoComplete="off"
+          className="min-h-[var(--control-height-lg)] w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-white placeholder:text-white/30 outline-none transition focus:border-brand focus:shadow-focus"
+          disabled={isSaving}
+          onChange={(e) => { setTokenInput(e.target.value); setSaved(false); }}
+          placeholder="eyJhbGciOiJIUzI1NiJ9..."
+          type="password"
+          value={tokenInput}
+        />
+        {error ? <p className="text-sm font-bold text-error">{error}</p> : null}
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <Button onClick={onClose} variant="ghost">Fechar</Button>
+        <Button
+          disabled={isSaving || !tokenInput.trim()}
+          isLoading={isSaving}
+          onClick={handleSave}
+          variant="primary"
+        >
+          Salvar
+        </Button>
+      </div>
+    </dialog>
+  );
 }
 
 function FormField({
@@ -130,7 +250,10 @@ function Textarea({
 export function AdminMovieForm({ movie }: AdminMovieFormProps) {
   const router = useRouter();
   const { locale, t } = useI18n();
+  const { user } = useAuth();
+  const isMaster = user?.role === "master";
   const isEditing = movie !== undefined;
+  const [showTmdbTokenModal, setShowTmdbTokenModal] = useState(false);
 
   const [title, setTitle] = useState(movie?.title ?? "");
   const [synopsis, setSynopsis] = useState(movie?.synopsis ?? "");
@@ -538,7 +661,18 @@ export function AdminMovieForm({ movie }: AdminMovieFormProps) {
         {tmdbFilled ? (
           <p className="text-sm font-bold text-brand/80">{t("admin.movie.tmdbFilled")}</p>
         ) : null}
+        {isMaster ? (
+          <button
+            className="self-start text-xs text-white/40 underline-offset-2 transition hover:text-white/70 hover:underline"
+            onClick={() => setShowTmdbTokenModal(true)}
+            type="button"
+          >
+            Configurar token TMDB
+          </button>
+        ) : null}
       </div>
+
+      <TmdbTokenModal isOpen={showTmdbTokenModal} onClose={() => setShowTmdbTokenModal(false)} />
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Left column */}

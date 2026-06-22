@@ -459,3 +459,11 @@ LOGGING = {
 
 # Username that cannot be demoted or have permissions revoked via the API.
 PROTECTED_SUPERUSER_USERNAME = os.getenv("PROTECTED_SUPERUSER_USERNAME") or None
+
+# Internal API key shared between Next.js server and Django for server-to-server calls.
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY") or None
+
+# Fernet key for encrypting sensitive SiteConfig values (e.g. TMDB token).
+# Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Falls back to a SHA-256 derivation of SECRET_KEY if not set.
+SITE_CONFIG_ENCRYPTION_KEY = os.getenv("SITE_CONFIG_ENCRYPTION_KEY") or None
