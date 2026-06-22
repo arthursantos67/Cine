@@ -38,6 +38,16 @@ class LoginRateThrottle(SimpleRateThrottle):
         }
 
 
+class RegistrationRateThrottle(SimpleRateThrottle):
+    scope = "registration"
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {
+            "scope": self.scope,
+            "ident": self.get_ident(request),
+        }
+
+
 class ReservationRateThrottle(SimpleRateThrottle):
     scope = "reservation"
 

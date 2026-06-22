@@ -1,8 +1,10 @@
 import uuid
 
+from cryptography.fernet import Fernet
 from django.conf import settings
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
+from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 
 
@@ -93,6 +95,22 @@ class SiteConfig(models.Model):
 
     def __str__(self):
         return self.key
+
+    def _cipher(self) -> Fernet:
+        key = getattr(settings, "SITE_CONFIG_ENCRYPTION_KEY", None)
+        if not key:
+            raise ImproperlyConfigured(
+                "SITE_CONFIG_ENCRYPTION_KEY must be set to read or write encrypted site config values."
+            )
+        return Fernet(key)
+
+    def set_value(self, plaintext: str) -> None:
+        self.value = self._cipher().encrypt(plaintext.encode()).decode()
+
+    def get_value(self) -> str | None:
+        if not self.value:
+            return None
+        return self._cipher().decrypt(self.value.encode()).decode()
 
 
 class AdminPermissionLog(models.Model):

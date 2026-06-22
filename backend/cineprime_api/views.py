@@ -25,8 +25,7 @@ def internal_tmdb_token(request):
     from users.models import SiteConfig
     try:
         cfg = SiteConfig.objects.get(key="tmdb_api_read_token")
-        plaintext = decrypt_value(cfg.value) if cfg.value else None
-        return JsonResponse({"value": plaintext})
+        return JsonResponse({"value": cfg.get_value()})
     except SiteConfig.DoesNotExist:
         return JsonResponse({"value": None})
     except InvalidToken:
@@ -48,5 +47,8 @@ def readiness_check(request):
 
 
 def deep_health_check(request):
+    internal_key = getattr(settings, "HEALTH_DEEP_INTERNAL_KEY", None)
+    if internal_key and request.headers.get("X-Internal-Key") != internal_key:
+        return JsonResponse({"error": "Forbidden"}, status=403)
     result = HealthCheckService().deep()
     return _health_response(result)
