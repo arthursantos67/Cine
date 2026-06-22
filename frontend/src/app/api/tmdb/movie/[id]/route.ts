@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { getTmdbToken } from "../../get-token";
+
 const TRANSLATION_LOCALES = ["en-US", "es-ES", "fr-FR", "de-DE", "it-IT", "zh-CN", "ja-JP"] as const;
 
 export async function GET(
@@ -12,7 +14,7 @@ export async function GET(
     return NextResponse.json({ error: "Invalid movie id" }, { status: 400 });
   }
 
-  const token = process.env.TMDB_API_READ_TOKEN;
+  const token = await getTmdbToken();
   if (!token) {
     return NextResponse.json({ error: "TMDB not configured" }, { status: 500 });
   }

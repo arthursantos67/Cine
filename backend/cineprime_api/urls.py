@@ -2,11 +2,12 @@ from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
-from .views import deep_health_check, health_check, liveness_check, readiness_check
+from .views import deep_health_check, health_check, internal_tmdb_token, liveness_check, readiness_check
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("health/", health_check, name="health-check"),
+    path("api/v1/internal/tmdb-token/", internal_tmdb_token, name="internal-tmdb-token"),
     path("health/live/", liveness_check, name="health-live"),
     path("health/ready/", readiness_check, name="health-ready"),
     path("health/deep/", deep_health_check, name="health-deep"),

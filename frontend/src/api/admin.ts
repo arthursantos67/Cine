@@ -626,6 +626,23 @@ export const adminApi = {
       method: "DELETE",
     });
   },
+
+  async getTmdbTokenStatus(): Promise<{ configured: boolean; hint: string | null }> {
+    const response = await apiRequest<unknown>("/api/v1/users/config/tmdb-token/", {
+      auth: "required",
+      method: "GET",
+    });
+    const r = response as { configured: boolean; hint: string | null };
+    return { configured: r.configured, hint: r.hint ?? null };
+  },
+
+  async setTmdbToken(value: string): Promise<void> {
+    await apiRequest<unknown>("/api/v1/users/config/tmdb-token/", {
+      auth: "required",
+      json: { value },
+      method: "PUT",
+    });
+  },
 };
 
 function buildMoviesPath({

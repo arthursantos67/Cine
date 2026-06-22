@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { getTmdbToken } from "../get-token";
+
 export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams.get("q")?.trim();
   if (!query) {
     return NextResponse.json({ results: [] });
   }
 
-  const token = process.env.TMDB_API_READ_TOKEN;
+  const token = await getTmdbToken();
   if (!token) {
     return NextResponse.json({ error: "TMDB not configured" }, { status: 500 });
   }
