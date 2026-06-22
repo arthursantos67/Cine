@@ -1,5 +1,6 @@
 import hmac
 
+from cryptography.fernet import InvalidToken
 from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
@@ -28,6 +29,8 @@ def internal_tmdb_token(request):
         return JsonResponse({"value": plaintext or None})
     except SiteConfig.DoesNotExist:
         return JsonResponse({"value": None})
+    except InvalidToken:
+        return JsonResponse({"error": "Token de criptografia inválido — possível rotação de chave"}, status=503)
 
 
 def health_check(request):

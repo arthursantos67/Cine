@@ -13,14 +13,17 @@ export async function getTmdbToken(): Promise<string | null> {
     return process.env.TMDB_API_READ_TOKEN;
   }
 
-  if (!INTERNAL_API_KEY) return null;
+  if (!INTERNAL_API_KEY) {
+    console.warn("[getTmdbToken] INTERNAL_API_KEY não configurada — TMDB indisponível");
+    return null;
+  }
 
   try {
     const res = await fetch(`${BACKEND_URL}/api/v1/internal/tmdb-token/`, {
       headers: { "X-Internal-Key": INTERNAL_API_KEY },
       // Next.js data cache: revalidate every 5 min. Works correctly across
       // serverless invocations and multi-worker deployments unlike module-level vars.
-      next: { revalidate: 300 },
+      next: { revalidate: 300, tags: ["tmdb-token"] },
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { value: string | null };

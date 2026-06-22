@@ -18,6 +18,8 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from cryptography.fernet import InvalidToken
+
 from cineprime_api.encryption import decrypt_value, encrypt_value
 from cineprime_api.permissions import IsMasterUser
 from cineprime_api.throttling import LoginRateThrottle
@@ -603,6 +605,11 @@ class TmdbTokenView(APIView):
         except SiteConfig.DoesNotExist:
             configured = False
             hint = None
+        except InvalidToken:
+            return Response(
+                {"detail": "Falha ao descriptografar token — possível rotação de chave de criptografia."},
+                status=503,
+            )
         return Response({"configured": configured, "hint": hint})
 
     @extend_schema(summary="Set TMDB token", request=TmdbTokenBodySerializer)
