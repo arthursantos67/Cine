@@ -36,6 +36,7 @@ import {
   getSessionSeatsHref,
   getSessionBadges,
   groupSessionsByRoom,
+  isSessionPurchasable,
 } from "./session-selection";
 
 type MovieDetailStatus = "error" | "loading" | "not-found" | "success";
@@ -704,6 +705,22 @@ export function SessionList({
               const badgeDescription = badgeText
                 ? t("schedule.badgeDescription", { badges: badgeText })
                 : "";
+              const purchasable = isSessionPurchasable(session);
+
+              if (!purchasable) {
+                return (
+                  <span
+                    aria-disabled="true"
+                    aria-label={t("schedule.sessionUnavailable", {
+                      time: formatSessionTime(session.start_time, locale),
+                    })}
+                    className="session-option cursor-not-allowed opacity-40"
+                    key={session.id}
+                  >
+                    <strong>{formatSessionTime(session.start_time, locale)}</strong>
+                  </span>
+                );
+              }
 
               return (
                 <Link
