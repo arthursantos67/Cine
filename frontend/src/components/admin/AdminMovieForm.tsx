@@ -84,10 +84,12 @@ function TmdbTokenModal({
       setError(null);
       setSaved(false);
       setIsLoading(true);
-      adminApi.getTmdbTokenStatus()
+      const controller = new AbortController();
+      adminApi.getTmdbTokenStatus({ signal: controller.signal })
         .then((s) => setStatus(s))
         .catch(() => setStatus(null))
         .finally(() => setIsLoading(false));
+      return () => controller.abort();
     } else {
       dialog.close();
     }

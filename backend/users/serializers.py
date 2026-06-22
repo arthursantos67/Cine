@@ -8,6 +8,15 @@ from users.models import AdminPermissionLog, User
 from reservations.models import Ticket
 
 
+class TmdbTokenResponseSerializer(serializers.Serializer):
+    configured = serializers.BooleanField()
+    hint = serializers.CharField(allow_null=True)
+
+
+class TmdbTokenBodySerializer(serializers.Serializer):
+    value = serializers.CharField(min_length=1, max_length=2000)
+
+
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
         write_only=True,

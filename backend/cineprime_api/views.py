@@ -1,6 +1,10 @@
+import hmac
+
 from django.conf import settings
 from django.http import JsonResponse
+from django.views.decorators.http import require_GET
 
+from .encryption import decrypt_value
 from .health import HealthCheckService
 
 
@@ -9,16 +13,19 @@ def _health_response(result):
     return JsonResponse(result, status=status_code)
 
 
+@require_GET
 def internal_tmdb_token(request):
     """Server-to-server endpoint for Next.js to retrieve the stored TMDB token."""
     internal_key = getattr(settings, "INTERNAL_API_KEY", None)
-    if not internal_key or request.headers.get("X-Internal-Key") != internal_key:
+    provided_key = request.headers.get("X-Internal-Key", "")
+    if not internal_key or not hmac.compare_digest(provided_key, internal_key):
         return JsonResponse({"error": "Forbidden"}, status=403)
 
     from users.models import SiteConfig
     try:
         cfg = SiteConfig.objects.get(key="tmdb_api_read_token")
-        return JsonResponse({"value": cfg.value or None})
+        plaintext = decrypt_value(cfg.value) if cfg.value else None
+        return JsonResponse({"value": plaintext or None})
     except SiteConfig.DoesNotExist:
         return JsonResponse({"value": None})
 
