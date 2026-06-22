@@ -113,6 +113,12 @@ def _build_production_configuration_errors():
                     "in production."
                 )
 
+    if not os.getenv("SITE_CONFIG_ENCRYPTION_KEY"):
+        errors.append(
+            "SITE_CONFIG_ENCRYPTION_KEY is required when DJANGO_ENV=production. "
+            "Generate with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+        )
+
     return errors
 
 
@@ -476,3 +482,7 @@ INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY") or None
 # Falls back to a SHA-256 derivation of SECRET_KEY if not set.
 SITE_CONFIG_ENCRYPTION_KEY = os.getenv("SITE_CONFIG_ENCRYPTION_KEY") or None
 HEALTH_DEEP_INTERNAL_KEY = os.getenv("HEALTH_DEEP_INTERNAL_KEY") or None
+
+# Fernet key for encrypting sensitive values stored in the site_config table.
+# Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+SITE_CONFIG_ENCRYPTION_KEY = os.getenv("SITE_CONFIG_ENCRYPTION_KEY") or None

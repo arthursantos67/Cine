@@ -28,9 +28,19 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         model = User
         fields = ("id", "email", "username", "password", "created_at")
         read_only_fields = ("id", "created_at")
+        # Disable the auto-added UniqueValidator so we can return a generic message
+        # that does not confirm whether a given email address is already registered.
+        extra_kwargs = {
+            "email": {"validators": []},
+        }
 
     def validate_email(self, value):
-        return value.strip().lower()
+        normalized = value.strip().lower()
+        if User.objects.filter(email=normalized).exists():
+            raise serializers.ValidationError(
+                "Unable to register with the provided details."
+            )
+        return normalized
 
     def validate_username(self, value):
         value = value.strip()

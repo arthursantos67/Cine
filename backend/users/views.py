@@ -605,7 +605,7 @@ class TmdbTokenView(APIView):
     def get(self, request, *args, **kwargs):
         try:
             cfg = SiteConfig.objects.get(key="tmdb_api_read_token")
-            plaintext = decrypt_value(cfg.value) if cfg.value else None
+            plaintext = cfg.get_value()
             configured = bool(plaintext)
             hint = plaintext[-4:] if configured else None
         except SiteConfig.DoesNotExist:
@@ -623,8 +623,7 @@ class TmdbTokenView(APIView):
         body = TmdbTokenBodySerializer(data=request.data)
         body.is_valid(raise_exception=True)
         plaintext = body.validated_data["value"]
-        SiteConfig.objects.update_or_create(
-            key="tmdb_api_read_token",
-            defaults={"value": encrypt_value(plaintext)},
-        )
+        cfg, _ = SiteConfig.objects.get_or_create(key="tmdb_api_read_token")
+        cfg.set_value(plaintext)
+        cfg.save()
         return Response({"configured": True, "hint": plaintext[-4:]})
