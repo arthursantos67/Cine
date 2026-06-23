@@ -5,7 +5,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from catalog.models import Session
-from reservations.constants import SESSION_SALE_CUTOFF_MINUTES
+from reservations.constants import SESSION_PRESALE_CUTOFF_MINUTES
 from reservations.exceptions import (
     InvalidSeatSelectionError,
     ReservationServiceUnavailableError,
@@ -66,7 +66,7 @@ class TemporaryReservationService:
             raise SessionNotFoundError("Session not found.")
 
         now = timezone.now()
-        cutoff = session.start_time + timedelta(minutes=SESSION_SALE_CUTOFF_MINUTES)
+        cutoff = session.start_time - timedelta(minutes=SESSION_PRESALE_CUTOFF_MINUTES)
         if now >= cutoff:
             raise SessionExpiredError()
 

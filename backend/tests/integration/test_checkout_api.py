@@ -365,14 +365,13 @@ def test_list_movies_should_use_cache_on_second_request():
 
 
 @pytest.mark.django_db
-def test_checkout_returns_410_when_session_started_more_than_10_min_ago():
+def test_checkout_returns_410_when_session_starts_in_less_than_15_min():
     context = _build_checkout_context()
     session = context["session"]
 
-    # Backdate the session so it started 11 minutes ago — bypass model
-    # validation via queryset update to avoid the reserved-seats guard
+    # Session starts in 14 minutes — past the 15-minute presale cutoff
     Session.objects.filter(pk=session.pk).update(
-        start_time=timezone.now() - timedelta(minutes=11),
+        start_time=timezone.now() + timedelta(minutes=14),
         end_time=timezone.now() + timedelta(hours=2),
     )
 
@@ -391,12 +390,13 @@ def test_checkout_returns_410_when_session_started_more_than_10_min_ago():
 
 
 @pytest.mark.django_db
-def test_checkout_returns_410_at_exact_10_min_boundary():
+def test_checkout_returns_410_at_exact_15_min_presale_boundary():
     context = _build_checkout_context()
     session = context["session"]
 
+    # Session starts in exactly 15 minutes — at the cutoff boundary (now >= cutoff)
     Session.objects.filter(pk=session.pk).update(
-        start_time=timezone.now() - timedelta(minutes=10),
+        start_time=timezone.now() + timedelta(minutes=15),
         end_time=timezone.now() + timedelta(hours=2),
     )
 
@@ -415,13 +415,13 @@ def test_checkout_returns_410_at_exact_10_min_boundary():
 
 
 @pytest.mark.django_db
-def test_checkout_is_allowed_within_10_min_of_session_start():
+def test_checkout_is_allowed_when_session_starts_more_than_15_min_away():
     context = _build_checkout_context()
     session = context["session"]
 
-    # Session started 9 minutes ago — bypass model validation via queryset update
+    # Session starts in 16 minutes — before the presale cutoff
     Session.objects.filter(pk=session.pk).update(
-        start_time=timezone.now() - timedelta(minutes=9),
+        start_time=timezone.now() + timedelta(minutes=16),
         end_time=timezone.now() + timedelta(hours=2),
     )
 

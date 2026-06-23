@@ -572,7 +572,7 @@ def test_release_temporary_reservation_rejects_ownership_mismatch():
     assert session_seat.lock_expires_at is not None
 
 
-def test_temporary_reservation_returns_410_when_session_started_more_than_10_min_ago():
+def test_temporary_reservation_returns_410_when_session_starts_in_less_than_15_min():
     client = APIClient()
     user = create_user(email="expired-session@example.com")
     authenticate(client, user)
@@ -581,8 +581,9 @@ def test_temporary_reservation_returns_410_when_session_started_more_than_10_min
     session = data["session"]
     seat = data["seats"][0]
 
+    # Session starts in 14 minutes — past the 15-minute presale cutoff
     Session.objects.filter(pk=session.pk).update(
-        start_time=timezone.now() - timedelta(minutes=11),
+        start_time=timezone.now() + timedelta(minutes=14),
         end_time=timezone.now() + timedelta(hours=2),
     )
 
@@ -593,7 +594,7 @@ def test_temporary_reservation_returns_410_when_session_started_more_than_10_min
     assert response.data["error"]["code"] == "SESSION_EXPIRED"
 
 
-def test_temporary_reservation_returns_410_at_exact_10_min_boundary():
+def test_temporary_reservation_returns_410_at_exact_15_min_presale_boundary():
     client = APIClient()
     user = create_user(email="boundary-session@example.com")
     authenticate(client, user)
@@ -602,8 +603,9 @@ def test_temporary_reservation_returns_410_at_exact_10_min_boundary():
     session = data["session"]
     seat = data["seats"][0]
 
+    # Session starts in exactly 15 minutes — at the cutoff boundary (now >= cutoff)
     Session.objects.filter(pk=session.pk).update(
-        start_time=timezone.now() - timedelta(minutes=10),
+        start_time=timezone.now() + timedelta(minutes=15),
         end_time=timezone.now() + timedelta(hours=2),
     )
 
@@ -614,18 +616,18 @@ def test_temporary_reservation_returns_410_at_exact_10_min_boundary():
     assert response.data["error"]["code"] == "SESSION_EXPIRED"
 
 
-def test_temporary_reservation_is_allowed_within_10_min_of_session_start():
+def test_temporary_reservation_is_allowed_when_session_starts_more_than_15_min_away():
     client = APIClient()
-    user = create_user(email="in-grace-period@example.com")
+    user = create_user(email="in-presale-window@example.com")
     authenticate(client, user)
 
     data = create_session_with_seats()
     session = data["session"]
     seat = data["seats"][0]
 
-    # Session started 9 minutes ago — still within the grace period
+    # Session starts in 16 minutes — before the presale cutoff
     Session.objects.filter(pk=session.pk).update(
-        start_time=timezone.now() - timedelta(minutes=9),
+        start_time=timezone.now() + timedelta(minutes=16),
         end_time=timezone.now() + timedelta(hours=2),
     )
 

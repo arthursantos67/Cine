@@ -120,11 +120,11 @@ export function getSessionSeatsHref(sessionId: string) {
   return `/sessions/${sessionId}/seats`;
 }
 
-const SESSION_SALE_CUTOFF_MINUTES = 10;
+const SESSION_PRESALE_CUTOFF_MINUTES = 15;
 
 export function isSessionPurchasable(session: CatalogSession, now = new Date()): boolean {
   const cutoff = new Date(session.start_time);
-  cutoff.setMinutes(cutoff.getMinutes() + SESSION_SALE_CUTOFF_MINUTES);
+  cutoff.setMinutes(cutoff.getMinutes() - SESSION_PRESALE_CUTOFF_MINUTES);
   return now < cutoff;
 }
 

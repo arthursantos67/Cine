@@ -18,6 +18,7 @@ from rest_framework.views import APIView
 
 from cineprime_api.permissions import IsAdminUserOrReadOnly
 from rest_framework.generics import ListAPIView, RetrieveUpdateAPIView
+from reservations.models import SessionSeatStatus
 
 from cineprime_api.localization import DEFAULT_LOCALE, get_request_locale
 from catalog.models import (
@@ -556,7 +557,14 @@ class RoomTypePricingDetailView(RetrieveUpdateAPIView):
                 room__experience_type=instance.experience_type,
                 start_time__gt=timezone.now(),
             )
+            .exclude(
+                session_seats__status__in=[
+                    SessionSeatStatus.RESERVED,
+                    SessionSeatStatus.PURCHASED,
+                ]
+            )
             .select_related("room")
+            .distinct()
         )
         for session in sessions.iterator():
             new_price = compute_session_price(instance.base_price, session.start_time)

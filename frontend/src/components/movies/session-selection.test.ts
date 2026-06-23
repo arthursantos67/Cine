@@ -159,24 +159,37 @@ test("isSessionPurchasable returns true when session has not yet started", () =>
   assert.equal(isSessionPurchasable(futureSession, new Date("2026-06-22T10:00:00-03:00")), true);
 });
 
-test("isSessionPurchasable returns true within 10-minute grace window after session start", () => {
-  const now = new Date("2026-05-22T18:09:00-03:00");
-  const recentlyStarted = session(
-    "recent",
+test("isSessionPurchasable returns true when session starts in 16 minutes", () => {
+  // cutoff = 17:45; now = 17:44 → now < cutoff → purchasable
+  const now = new Date("2026-05-22T17:44:00-03:00");
+  const soonSession = session(
+    "soon",
     { capacity: 80, id: "room-1", name: "Sala 1" },
     "2026-05-22T18:00:00-03:00"
   );
-  assert.equal(isSessionPurchasable(recentlyStarted, now), true);
+  assert.equal(isSessionPurchasable(soonSession, now), true);
 });
 
-test("isSessionPurchasable returns false when 10-minute grace window has passed", () => {
-  const now = new Date("2026-05-22T18:10:00-03:00");
-  const expiredSession = session(
-    "expired",
+test("isSessionPurchasable returns false at exact 15-minute presale cutoff boundary", () => {
+  // cutoff = 17:45; now = 17:45 → now >= cutoff → not purchasable
+  const now = new Date("2026-05-22T17:45:00-03:00");
+  const boundarySession = session(
+    "boundary",
     { capacity: 80, id: "room-1", name: "Sala 1" },
     "2026-05-22T18:00:00-03:00"
   );
-  assert.equal(isSessionPurchasable(expiredSession, now), false);
+  assert.equal(isSessionPurchasable(boundarySession, now), false);
+});
+
+test("isSessionPurchasable returns false when session starts in less than 15 minutes", () => {
+  // cutoff = 17:45; now = 17:46 → now > cutoff → not purchasable
+  const now = new Date("2026-05-22T17:46:00-03:00");
+  const imminentSession = session(
+    "imminent",
+    { capacity: 80, id: "room-1", name: "Sala 1" },
+    "2026-05-22T18:00:00-03:00"
+  );
+  assert.equal(isSessionPurchasable(imminentSession, now), false);
 });
 
 test("isSessionPurchasable returns false for sessions that started hours ago", () => {
