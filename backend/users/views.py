@@ -66,7 +66,10 @@ class WrongPassword(APIException):
 
 def _delete_user_cascade(user):
     with transaction.atomic():
-        SessionSeat.objects.filter(ticket__user=user).update(
+        SessionSeat.objects.filter(
+            ticket__user=user,
+            session__start_time__gt=timezone.now(),
+        ).update(
             status=SessionSeatStatus.AVAILABLE,
             locked_by_user=None,
             lock_expires_at=None,
