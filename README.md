@@ -1,6 +1,6 @@
 # CinePrime
 
-Sistema completo de reserva de ingressos de cinema — backend REST em Django/DRF e frontend web em Next.js.
+Sistema completo de reserva de ingressos de cinema — backend REST em Node.js/Express e frontend web em Next.js.
 
 ---
 
@@ -12,24 +12,23 @@ Sistema completo de reserva de ingressos de cinema — backend REST em Django/DR
 - Detalhes do filme: sinopse, elenco, diretor, classificação etária e sessões disponíveis
 - Seleção de sessão com filtro por data e badges de formato (3D, IMAX, Legendado, Dublado, Pré-estreia)
 - Mapa de assentos interativo com estados visuais: disponível, selecionado, ocupado e acessível
-- Reserva temporária de assentos com contador regressivo de 10 minutos
+- Reserva temporária de assentos com contador regressivo de 15 minutos
 - Seleção de tipo de ingresso por assento: inteira ou meia-entrada (50% de desconto)
 - Checkout com seleção de forma de pagamento: Cartão de Crédito ou PIX
 - Tela de confirmação com código do ingresso
 - Área "Meus Ingressos" com filtro por sessões futuras ou passadas
 - Avaliações de filmes com meia-estrela (0,5 a 5,0) e votos de utilidade nas reviews
 - Interesse em filmes em breve (contador público + ação autenticada)
-- Suporte a dois idiomas: Português (pt-BR) e English (en-US)
+- Suporte a múltiplos idiomas via `Accept-Language` (pt-BR, en-US, es-ES)
 
 ### Para administradores
 
-- Painel admin em `/admin/` com resumo de operações do dia
-- Gerenciamento de gêneros com suporte a traduções
-- Gerenciamento de filmes: criação com importação via TMDB, edição de todos os campos incluindo classificação etária, elenco e URL de spotlight
+- Gerenciamento de gêneros com suporte a tradução automática
+- Gerenciamento de filmes: criação com importação via TMDB, edição de todos os campos incluindo classificação etária e URL de spotlight
 - Gerenciamento de salas: tipo de experiência, nome de exibição e descrição
 - Editor de layout de sala: adicionar fileiras via wizard em lote e fileira acessível PCD com pares cadeira + acompanhante
-- Gerenciamento de sessões: preço base, formato de áudio/projeção e tipo de sessão
-- Configuração de preço por tipo de sala (Standard, VIP, Premium, IMAX)
+- Gerenciamento de sessões: preço base, formato de áudio/projeção, tipo de sessão e replicação em múltiplas datas
+- Configuração de preço por tipo de sala (Standard, VIP, Premium, IMAX) com multiplicador de fim de semana
 - Gerenciamento de usuários (Master): promover/rebaixar papel (Staff/Master), log de auditoria de permissões, exclusão de contas
 
 ---
@@ -38,35 +37,27 @@ Sistema completo de reserva de ingressos de cinema — backend REST em Django/DR
 
 | Camada | Tecnologia |
 |---|---|
-| Backend | Python 3.14 · Django 6 · Django REST Framework |
-| Autenticação | JWT via `djangorestframework-simplejwt` |
-| Banco de dados | PostgreSQL 17 |
-| Cache e locks | Redis 7 (`django-redis`) |
-| Tarefas assíncronas | Celery (broker Redis) |
-| API docs | OpenAPI 3 + Swagger UI via `drf-spectacular` |
+| Backend | Node.js 20 · Express 4 · MongoDB (Mongoose 8) |
+| Autenticação | JWT via `jsonwebtoken` |
+| Banco de dados | MongoDB Atlas |
+| Validação | Zod |
+| API docs | OpenAPI 3 · Swagger UI via `swagger-ui-express` |
 | Frontend | Next.js 15 (App Router) · TypeScript · Tailwind CSS v4 |
-| Testes backend | Pytest + pytest-django |
 | Testes frontend | Node.js test runner + tsx · Playwright (E2E) |
-| Infraestrutura | Docker · Docker Compose · GitHub Actions CI |
+| Infraestrutura | Docker · Docker Compose · GitHub Actions CI · Render |
 
 ---
 
 ## Estrutura do repositório
 
 ```
-cineprime-api/
-├── backend/          Django API — apps, serviços, testes, Dockerfile
+cineprime/
+├── node-backend/     Node.js API — rotas, controllers, models, Dockerfile
 ├── frontend/         Next.js app — páginas, componentes, API client, Dockerfiles
 ├── docker-compose.yml
-└── product-requirements-document.md   PRD completo (backend + frontend)
+├── render.yaml
+└── product-requirements-document.md
 ```
-
-Documentação detalhada por camada:
-
-- [`backend/README.md`](./backend/README.md) — comandos, variáveis de ambiente, testes e referência de rotas
-- [`frontend/README.md`](./frontend/README.md) — comandos, variáveis de ambiente e build
-- [`product-requirements-document.md`](./product-requirements-document.md) — requisitos funcionais, modelo de dados, contrato de API e rastreabilidade
-- [`frontend/frontend-product-requirements-document.md`](./frontend/frontend-product-requirements-document.md) — PRD específico do frontend
 
 ---
 
@@ -80,16 +71,14 @@ Documentação detalhada por camada:
 
 ```bash
 cp .env.example .env
+cp node-backend/.env.example node-backend/.env
 ```
 
-Edite `.env` conforme necessário. As variáveis essenciais para desenvolvimento local já estão preenchidas no `.env.example`.
+Edite `node-backend/.env` com sua URI do MongoDB Atlas e segredos JWT.
 
-**Token TMDB para importação de filmes no admin**
+**Token TMDB para importação de filmes**
 
-Há duas formas de configurar o token da API do TMDB:
-
-- **Via variável de ambiente** (prioridade): defina `TMDB_API_READ_TOKEN=<seu-token>` no `.env` do frontend. Requer reinício do container.
-- **Via painel admin** (sem reinício): configure `INTERNAL_API_KEY=<chave-secreta>` no `.env` do backend e no `.env` do frontend (server-only). Com isso, usuários Master Admin podem definir e atualizar o token pelo painel em `/admin/` a qualquer momento — o valor fica salvo no banco de dados e nunca é exposto no browser.
+Usuários com role `master` podem configurar o token TMDB diretamente pelo painel em `/admin/` — o valor fica salvo no banco e nunca é exposto no browser. Também pode ser passado via variável de ambiente no frontend.
 
 ### 2. Subir o stack completo
 
@@ -97,30 +86,20 @@ Há duas formas de configurar o token da API do TMDB:
 docker compose up --build
 ```
 
-O container do backend executa as migrações automaticamente antes de iniciar o servidor.
-
 ### Serviços disponíveis
 
 | Serviço | URL |
 |---|---|
 | Frontend | http://localhost:3000 |
-| Backend API | http://localhost:8000 |
-| Swagger UI | http://localhost:8000/api/docs/ |
-| Health check | http://localhost:8000/health/ |
-| PostgreSQL | localhost:5432 |
-| Redis | localhost:6379 |
+| Backend API | http://localhost:8000/api/v1 |
+| Swagger UI | http://localhost:8000/api/docs |
+| Health check | http://localhost:8000/health |
 
 ### Comandos úteis
 
 ```bash
-# Rodar migrações manualmente
-docker compose exec backend python manage.py migrate
-
-# Executar testes do backend
-docker compose exec backend pytest -q
-
-# Verificar worker Celery
-docker compose exec celery celery -A cineprime_api inspect ping
+# Rodar seed do banco (dados de exemplo)
+docker compose exec backend npm run seed
 
 # Testes do frontend (fora do Docker)
 cd frontend && npm ci && npm run test
@@ -131,10 +110,32 @@ cd frontend && npm run build
 
 ---
 
+## Variáveis de ambiente — Backend (`node-backend/.env`)
+
+| Variável | Descrição |
+|---|---|
+| `PORT` | Porta do servidor (padrão: `8000`) |
+| `MONGODB_URI` | URI de conexão com o MongoDB Atlas |
+| `JWT_SECRET` | Segredo para tokens de acesso (mín. 32 chars) |
+| `JWT_EXPIRES_IN` | Expiração do access token (ex: `1d`) |
+| `JWT_REFRESH_SECRET` | Segredo para refresh tokens |
+| `JWT_REFRESH_EXPIRES_IN` | Expiração do refresh token (ex: `7d`) |
+| `CORS_ORIGIN` | Origem(s) permitidas pelo CORS (ex: `http://localhost:3000`) |
+| `INTERNAL_API_KEY` | Chave compartilhada com o Next.js para comunicação interna |
+| `NODE_ENV` | `development` ou `production` |
+
+---
+
+## Deploy
+
+O projeto está configurado para deploy automático no **Render** via `render.yaml`. Cada push na branch `main` dispara um novo deploy do backend.
+
+---
+
 ## CI
 
-O GitHub Actions valida backend e frontend de forma independente a cada push e pull request para `main`:
+O GitHub Actions valida backend e frontend a cada push e pull request para `main`:
 
-1. **Backend** — `manage.py check`, migrações e suite de testes completa dentro do container
+1. **Backend** — instala dependências e valida que o módulo principal carrega sem erros
 2. **Frontend** — install, lint, testes unitários/integração, Playwright E2E e build de produção
-3. **Docker** — validação do `docker-compose.yml` e build das imagens de backend e frontend
+3. **Docker** — build das imagens de backend e frontend
