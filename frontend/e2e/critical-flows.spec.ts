@@ -393,7 +393,7 @@ async function login(page: Page, redirectPath = "/") {
 
   await page.goto(loginPath);
   await page.getByLabel("E-mail").fill("ana@example.com");
-  await page.getByLabel("Senha").fill("senha-super-segura");
+  await page.getByLabel("Senha", { exact: true }).fill("senha-super-segura");
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page).toHaveURL(redirectPath);
 }
