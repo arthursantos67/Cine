@@ -55,7 +55,7 @@ function applyRoomTranslation(r, locale) {
   return result
 }
 
-function toMovieDTO(m, locale) {
+function toMovieDTO(m, locale, showTranslations = false) {
   const mt = applyMovieTranslation(m, locale)
   return {
     id: String(m._id),
@@ -63,7 +63,11 @@ function toMovieDTO(m, locale) {
     synopsis: mt.synopsis ?? m.synopsis ?? '',
     genres: (m.genres || []).map((g) => {
       const gt = applyGenreTranslation(g, locale)
-      return { id: String(g._id ?? g), name: gt.name ?? g.name ?? '', translations: g.translations ?? {} }
+      return {
+        id: String(g._id ?? g),
+        name: gt.name ?? g.name ?? '',
+        ...(showTranslations && { translations: g.translations ?? {} }),
+      }
     }),
     duration_minutes: m.durationMin,
     release_date: m.releaseDate ? new Date(m.releaseDate).toISOString().split('T')[0] : null,
@@ -73,24 +77,24 @@ function toMovieDTO(m, locale) {
     age_rating: m.ageRating ?? null,
     director: m.director ?? null,
     is_featured: m.isFeatured,
-    translations: m.translations ?? {},
+    ...(showTranslations && { translations: m.translations ?? {} }),
     created_at: m.createdAt?.toISOString?.() ?? m.createdAt,
     updated_at: m.updatedAt?.toISOString?.() ?? m.updatedAt,
   }
 }
 
-function toGenreDTO(g, locale) {
+function toGenreDTO(g, locale, showTranslations = false) {
   const gt = applyGenreTranslation(g, locale)
   return {
     id: String(g._id),
     name: gt.name ?? g.name,
-    translations: g.translations ?? {},
+    ...(showTranslations && { translations: g.translations ?? {} }),
     created_at: g.createdAt?.toISOString?.() ?? g.createdAt,
     updated_at: g.updatedAt?.toISOString?.() ?? g.updatedAt,
   }
 }
 
-function toRoomDTO(r, locale) {
+function toRoomDTO(r, locale, showTranslations = false) {
   const rt = applyRoomTranslation(r, locale)
   return {
     id: String(r._id),
@@ -100,7 +104,7 @@ function toRoomDTO(r, locale) {
     display_name: rt.display_name ?? r.displayName ?? null,
     description: rt.description ?? r.description ?? null,
     base_price: r.basePrice != null ? Number(r.basePrice).toFixed(2) : null,
-    translations: r.translations ?? {},
+    ...(showTranslations && { translations: r.translations ?? {} }),
     accessible_row_index: r.accessibleRowIndex ?? 0,
     max_center_seats_per_row: r.maxCenterSeatsPerRow ?? null,
     created_at: r.createdAt?.toISOString?.() ?? r.createdAt,
@@ -220,7 +224,7 @@ router.get('/movies', async (req, res, next) => {
 
     const q = Movie.find(filter).populate('genres', 'name translations').sort('-createdAt')
     const result = await paginate(q, req.query, req)
-    res.json({ ...result, results: result.results.map((m) => toMovieDTO(m, req.locale)) })
+    res.json({ ...result, results: result.results.map((m) => toMovieDTO(m, req.locale, req.query.include_translations === 'true')) })
   } catch (err) { next(err) }
 })
 
@@ -233,7 +237,7 @@ router.get('/movies/:id', async (req, res, next) => {
       { $group: { _id: null, avg: { $avg: '$rating' }, count: { $sum: 1 } } },
     ])
     res.json({
-      ...toMovieDTO(movie, req.locale),
+      ...toMovieDTO(movie, req.locale, req.query.include_translations === 'true'),
       average_rating: stats?.avg ?? null,
       review_count: stats?.count ?? 0,
     })
@@ -245,7 +249,7 @@ router.post('/movies', authenticate, authorize('staff', 'master'), async (req, r
     const data = movieFromPayload(req.body)
     const movie = await Movie.create(data)
     await movie.populate('genres', 'name translations')
-    res.status(201).json(toMovieDTO(movie, req.locale))
+    res.status(201).json(toMovieDTO(movie, req.locale, req.query.include_translations === 'true'))
   } catch (err) { next(err) }
 })
 
@@ -254,7 +258,7 @@ router.patch('/movies/:id', authenticate, authorize('staff', 'master'), async (r
     const data = movieFromPayload(req.body)
     const movie = await Movie.findByIdAndUpdate(req.params.id, data, { new: true, runValidators: true }).populate('genres', 'name translations')
     if (!movie) throw new AppError('Filme não encontrado', 404, 'RESOURCE_NOT_FOUND')
-    res.json(toMovieDTO(movie, req.locale))
+    res.json(toMovieDTO(movie, req.locale, req.query.include_translations === 'true'))
   } catch (err) { next(err) }
 })
 
@@ -506,7 +510,7 @@ router.get('/genres', async (req, res, next) => {
     if (req.query.search) filter.name = { $regex: req.query.search, $options: 'i' }
     const q = Genre.find(filter).sort('name')
     const result = await paginate(q, req.query, req)
-    res.json({ ...result, results: result.results.map((g) => toGenreDTO(g, req.locale)) })
+    res.json({ ...result, results: result.results.map((g) => toGenreDTO(g, req.locale, req.query.include_translations === 'true')) })
   } catch (err) { next(err) }
 })
 
@@ -529,7 +533,7 @@ router.post('/genres', authenticate, authorize('staff', 'master'), async (req, r
     }
 
     const genre = await Genre.create(genreData)
-    res.status(201).json(toGenreDTO(genre, req.locale))
+    res.status(201).json(toGenreDTO(genre, req.locale, req.query.include_translations === 'true'))
   } catch (err) { next(err) }
 })
 
@@ -554,7 +558,7 @@ router.patch('/genres/:id', authenticate, authorize('staff', 'master'), async (r
 
     const genre = await Genre.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true })
     if (!genre) throw new AppError('Gênero não encontrado', 404, 'RESOURCE_NOT_FOUND')
-    res.json(toGenreDTO(genre, req.locale))
+    res.json(toGenreDTO(genre, req.locale, req.query.include_translations === 'true'))
   } catch (err) { next(err) }
 })
 
@@ -590,7 +594,7 @@ router.get('/rooms', async (req, res, next) => {
     if (req.query.search) filter.name = { $regex: req.query.search, $options: 'i' }
     const q = Room.find(filter).sort('name')
     const result = await paginate(q, req.query, req)
-    res.json({ ...result, results: result.results.map((r) => toRoomDTO(r, req.locale)) })
+    res.json({ ...result, results: result.results.map((r) => toRoomDTO(r, req.locale, req.query.include_translations === 'true')) })
   } catch (err) { next(err) }
 })
 
@@ -598,7 +602,7 @@ router.get('/rooms/:id', async (req, res, next) => {
   try {
     const room = await Room.findById(req.params.id)
     if (!room) throw new AppError('Sala não encontrada', 404, 'RESOURCE_NOT_FOUND')
-    res.json(toRoomDTO(room, req.locale))
+    res.json(toRoomDTO(room, req.locale, req.query.include_translations === 'true'))
   } catch (err) { next(err) }
 })
 
@@ -610,7 +614,7 @@ router.post('/rooms', authenticate, authorize('master'), async (req, res, next) 
       await applyRoomDisplayNameTranslation(data, sourceLanguage)
     }
     const room = await Room.create(data)
-    res.status(201).json(toRoomDTO(room, req.locale))
+    res.status(201).json(toRoomDTO(room, req.locale, req.query.include_translations === 'true'))
   } catch (err) { next(err) }
 })
 
@@ -623,7 +627,7 @@ router.patch('/rooms/:id', authenticate, authorize('master'), async (req, res, n
     }
     const room = await Room.findByIdAndUpdate(req.params.id, data, { new: true, runValidators: true })
     if (!room) throw new AppError('Sala não encontrada', 404, 'RESOURCE_NOT_FOUND')
-    res.json(toRoomDTO(room, req.locale))
+    res.json(toRoomDTO(room, req.locale, req.query.include_translations === 'true'))
   } catch (err) { next(err) }
 })
 
