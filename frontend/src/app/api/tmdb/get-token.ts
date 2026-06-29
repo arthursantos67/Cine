@@ -11,26 +11,24 @@ const BACKEND_URL = (
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY ?? "";
 
 export async function getTmdbToken(): Promise<string | null> {
-  if (process.env.TMDB_API_READ_TOKEN) {
-    return process.env.TMDB_API_READ_TOKEN;
+  // Database takes priority: token configured via admin UI overrides env var.
+  // TMDB_API_READ_TOKEN is only a fallback when the database has no token.
+  if (INTERNAL_API_KEY) {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/internal/tmdb-token/`, {
+        headers: { "X-Internal-Key": INTERNAL_API_KEY },
+        next: { revalidate: 300, tags: ["tmdb-token"] },
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { value: string | null };
+        if (data.value) return data.value;
+      }
+    } catch {
+      // fall through to env var fallback
+    }
+  } else {
+    console.warn("[getTmdbToken] INTERNAL_API_KEY não configurada — tentando TMDB_API_READ_TOKEN");
   }
 
-  if (!INTERNAL_API_KEY) {
-    console.warn("[getTmdbToken] INTERNAL_API_KEY não configurada — TMDB indisponível");
-    return null;
-  }
-
-  try {
-    const res = await fetch(`${BACKEND_URL}/api/v1/internal/tmdb-token/`, {
-      headers: { "X-Internal-Key": INTERNAL_API_KEY },
-      // Next.js data cache: revalidate every 5 min. Works correctly across
-      // serverless invocations and multi-worker deployments unlike module-level vars.
-      next: { revalidate: 300, tags: ["tmdb-token"] },
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { value: string | null };
-    return data.value ?? null;
-  } catch {
-    return null;
-  }
+  return process.env.TMDB_API_READ_TOKEN ?? null;
 }

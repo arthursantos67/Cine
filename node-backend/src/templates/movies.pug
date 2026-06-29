@@ -1,0 +1,43 @@
+extends layout
+
+block content
+  style.
+    .page-title { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .page-subtitle { color: #9ca3af; margin-bottom: 2rem; }
+    .movies-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.5rem; }
+    .movie-card { background: #111827; border-radius: 0.75rem; overflow: hidden; transition: transform 0.2s; border: 1px solid #1f2937; }
+    .movie-card:hover { transform: translateY(-4px); border-color: #f59e0b44; }
+    .movie-poster { width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block; background: #1f2937; }
+    .movie-info { padding: 0.75rem; }
+    .movie-title { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.4rem; line-height: 1.3; }
+    .movie-meta { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+    .movie-director { font-size: 0.75rem; color: #6b7280; }
+    .movie-link { display: block; color: inherit; text-decoration: none; }
+    .empty-state { text-align: center; padding: 4rem 1rem; color: #4b5563; }
+    .empty-state p { font-size: 1.1rem; }
+
+  h1.page-title Em Cartaz
+  p.page-subtitle Confira os filmes disponíveis agora no CinePrime
+
+  if movies && movies.length
+    .movies-grid
+      each movie in movies
+        .movie-card
+          a.movie-link(href=`/movies/${movie._id}`)
+            img.movie-poster(src=movie.posterUrl alt=movie.title loading="lazy")
+            .movie-info
+              h2.movie-title= movie.title
+              .movie-meta
+                if movie.ageRating
+                  span.badge.badge-age= movie.ageRating
+                if movie.status === 'em_cartaz'
+                  span.badge.badge-cartaz Em Cartaz
+                else if movie.status === 'pre_venda'
+                  span.badge.badge-prevenda Pré-Venda
+                else
+                  span.badge.badge-embreve Em Breve
+              if movie.director
+                p.movie-director= movie.director
+  else
+    .empty-state
+      p Nenhum filme disponível no momento.

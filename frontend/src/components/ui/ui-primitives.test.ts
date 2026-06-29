@@ -26,7 +26,7 @@ test("button and badge primitives expose shared tokenized variants", () => {
         { href: "/login", variant: "ghost" },
         "Entrar"
       ),
-      createElement(Badge, { tone: "accent" }, "Pre-venda")
+      createElement(Badge, { tone: "accent", children: "Pre-venda" })
     )
   );
 

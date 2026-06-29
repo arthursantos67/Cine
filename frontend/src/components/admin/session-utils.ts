@@ -33,13 +33,14 @@ export function extractSessionFieldErrors(error: unknown): FieldErrors {
 }
 
 export function isConflictError(error: unknown): boolean {
-  return (
-    error instanceof ApiError &&
-    (error.status === 409 ||
-      (error.status === 400 &&
-        typeof error.message === "string" &&
-        /overlap|conflict|conflito|horário de sessão/i.test(error.message)))
-  );
+  if (!(error instanceof ApiError)) return false;
+  if (error.status === 409) return true;
+  if (
+    (error.status === 400 || error.status === 422) &&
+    typeof error.message === "string" &&
+    /overlap|conflict|conflito|horário|sessão|Já existe/i.test(error.message)
+  ) return true;
+  return false;
 }
 
 export function splitLocalDateTime(isoString: string): {

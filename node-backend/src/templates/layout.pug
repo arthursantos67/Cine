@@ -1,0 +1,32 @@
+doctype html
+html(lang="pt-BR")
+  head
+    meta(charset="UTF-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    title= title || 'CinePrime'
+    style.
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: system-ui, sans-serif; background: #0a0a0f; color: #e2e8f0; min-height: 100vh; }
+      a { color: #f59e0b; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      header { background: #111827; border-bottom: 1px solid #1f2937; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+      header .brand { font-size: 1.5rem; font-weight: 700; color: #f59e0b; letter-spacing: 0.05em; }
+      nav a { margin-left: 1.5rem; color: #9ca3af; font-size: 0.9rem; }
+      nav a:hover { color: #f59e0b; text-decoration: none; }
+      main { max-width: 1200px; margin: 0 auto; padding: 2rem 1rem; }
+      footer { text-align: center; padding: 2rem; color: #4b5563; font-size: 0.8rem; border-top: 1px solid #1f2937; margin-top: 4rem; }
+      .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }
+      .badge-cartaz { background: #065f46; color: #6ee7b7; }
+      .badge-prevenda { background: #1e3a5f; color: #93c5fd; }
+      .badge-embreve { background: #3b1f5e; color: #c4b5fd; }
+      .badge-age { background: #1f2937; color: #9ca3af; }
+  body
+    header
+      span.brand 🎬 CinePrime
+      nav
+        a(href="/movies") Em Cartaz
+        a(href="/api/v1/movies") API
+    main
+      block content
+    footer
+      p &copy; #{new Date().getFullYear()} CinePrime. Todos os direitos reservados.

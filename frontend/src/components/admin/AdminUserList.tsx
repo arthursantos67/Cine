@@ -22,8 +22,27 @@ type PendingAction = {
 
 function getAuditLabel(
   entry: AdminPermissionLogEntry,
-  t: (key: string) => string
+  t: (key: string, vars?: Record<string, string>) => string,
+  viewedUsername: string
 ): string {
+  const isActor = entry.actor === viewedUsername;
+
+  if (entry.action === "deleted") {
+    return isActor
+      ? t("admin.user.actorDeleted", { target: entry.target })
+      : t("admin.user.accountDeleted", { actor: entry.actor });
+  }
+
+  if (isActor) {
+    if (entry.action === "granted") {
+      if (entry.role === "master") return t("admin.user.actorGrantedMaster", { target: entry.target });
+      return t("admin.user.actorGrantedStaff", { target: entry.target });
+    }
+    if (entry.role === "master") return t("admin.user.actorRevokedMaster", { target: entry.target });
+    if (entry.role === "staff") return t("admin.user.actorRevokedStaff", { target: entry.target });
+    return t("admin.user.actorRevoked", { target: entry.target });
+  }
+
   if (entry.action === "granted") {
     if (entry.role === "master") return t("admin.user.permissionGrantedMaster");
     if (entry.role === "staff") return t("admin.user.permissionGrantedStaff");
@@ -62,19 +81,25 @@ function AuditPanel({ logs, onClose, username }: AuditPanelProps) {
         <p className="text-sm text-white/40">{t("admin.user.auditEmpty")}</p>
       ) : (
         <ul className="space-y-2">
-          {logs.map((entry) => (
-            <li className="flex flex-wrap items-center gap-2 text-sm" key={`${entry.created_at}-${entry.action}`}>
-              <Badge size="sm" tone={entry.action === "granted" ? "success" : "danger"}>
-                {getAuditLabel(entry, t)}
-              </Badge>
-              <span className="text-white/60">
-                {t("admin.user.byActor", { actor: entry.actor })}
-              </span>
-              <span className="text-white/30 tabular-nums">
-                {formatDateTime(entry.created_at)}
-              </span>
-            </li>
-          ))}
+          {logs.map((entry) => {
+            const isActor = entry.actor === username;
+            const badgeTone = entry.action === "granted" ? "success" : "danger";
+            return (
+              <li className="flex flex-wrap items-center gap-2 text-sm" key={`${entry.created_at}-${entry.action}-${entry.target}`}>
+                <Badge size="sm" tone={badgeTone}>
+                  {getAuditLabel(entry, t, username)}
+                </Badge>
+                {!isActor && (
+                  <span className="text-white/60">
+                    {t("admin.user.byActor", { actor: entry.actor })}
+                  </span>
+                )}
+                <span className="text-white/30 tabular-nums">
+                  {formatDateTime(entry.created_at)}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

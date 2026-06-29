@@ -181,7 +181,8 @@ function PreviewRow({
     isAccessible ? "w-7 text-brand/60" : "w-5 text-white/40"
   );
 
-  // Compute namoradeiras split for non-last, non-accessible rows when limit is set
+  // Compute namoradeiras split for non-accessible, non-last rows when limit is set.
+  // The last row is special: it can exceed the limit with all seats rendered inline (bigger center gap).
   const shouldSplit =
     !isLast &&
     !isAccessible &&
@@ -195,7 +196,6 @@ function PreviewRow({
   if (shouldSplit) {
     const excess = seats.length - maxCenterSeatsPerRow;
     const leftExcess = Math.ceil(excess / 2);
-    const rightExcess = Math.floor(excess / 2);
     leftNam = seats.slice(0, leftExcess);
     centerSeats = seats.slice(leftExcess, leftExcess + maxCenterSeatsPerRow);
     rightNam = seats.slice(leftExcess + maxCenterSeatsPerRow);
@@ -203,7 +203,9 @@ function PreviewRow({
 
   const leftPad = maxLeftNam - leftNam.length;
   const rightPad = maxRightNam - rightNam.length;
-  const hasAnyNam = !isLast && (maxLeftNam > 0 || maxRightNam > 0);
+  // Show namoradeiras section when this row has actual namoradeiras OR when any row does (ghost padding for alignment).
+  // The last row also gets ghost padding (and the wider center aisle) when namoradeiras exist elsewhere.
+  const hasAnyNam = leftNam.length > 0 || rightNam.length > 0 || (maxLeftNam > 0 || maxRightNam > 0);
 
   const halfIndex = Math.ceil(centerSeats.length / 2);
   const leftCenter = centerSeats.slice(0, halfIndex);
@@ -252,37 +254,11 @@ function PreviewRow({
           </>
         )}
         <div className="flex gap-1">
-          {isLast ? (
-            <>
-              <div className="flex gap-1 opacity-30">
-                {[1, 2, 3].map((n) => (
-                  <div
-                    className="flex h-6 w-6 items-center justify-center rounded-[3px] border border-dashed border-white/[0.20] text-[9px] text-white/30"
-                    key={`extra-left-${n}`}
-                  />
-                ))}
-              </div>
-              <div className="w-1" />
-            </>
-          ) : null}
           {leftCenter.map((seat) => <SeatCell allSeats={allSeats} key={seat.id} rowName={row.name} seat={seat} />)}
         </div>
-        <div className="w-5 flex-shrink-0" />
+        <div className={cn("flex-shrink-0", isLast && hasAnyNam ? "w-9" : "w-5")} />
         <div className="flex gap-1">
           {rightCenter.map((seat) => <SeatCell allSeats={allSeats} key={seat.id} rowName={row.name} seat={seat} />)}
-          {isLast ? (
-            <>
-              <div className="w-1" />
-              <div className="flex gap-1 opacity-30">
-                {[1, 2, 3].map((n) => (
-                  <div
-                    className="flex h-6 w-6 items-center justify-center rounded-[3px] border border-dashed border-white/[0.20] text-[9px] text-white/30"
-                    key={`extra-right-${n}`}
-                  />
-                ))}
-              </div>
-            </>
-          ) : null}
         </div>
         {hasAnyNam && (
           <>
@@ -710,15 +686,19 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
   const [moveError, setMoveError] = useState<string | null>(null);
 
   const createRowInputRef = useRef<HTMLInputElement>(null);
+  const loadGenRef = useRef(0);
 
   const loadLayout = useCallback(async () => {
     setState({ status: "loading" });
+    const gen = ++loadGenRef.current;
     try {
       const [room, rows, allSeats] = await Promise.all([
         adminApi.getRoom(roomId),
         adminApi.listAllSeatRows(roomId),
         adminApi.listAllSeats(roomId),
       ]);
+
+      if (gen !== loadGenRef.current) return;
 
       const sortedRows = orderRows(rows, room.accessible_row_index ?? 0);
 
@@ -732,6 +712,7 @@ export function AdminRoomLayoutEditor({ roomId }: AdminRoomLayoutEditorProps) {
 
       setState({ room, rows: sortedRows, seatsByRow, status: "ready" });
     } catch {
+      if (gen !== loadGenRef.current) return;
       setState({
         message: t("admin.layout.loadError"),
         status: "error",

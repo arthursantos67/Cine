@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { adminApi, type AdminSessionWritePayload } from "@/api/admin";
-import { getApiErrorUserMessage } from "@/api/client";
+import { MultiDatePicker } from "./MultiDatePicker";
+import { ApiError, getApiErrorUserMessage } from "@/api/client";
 import type {
   AdminRoom,
   AdminSession,
@@ -162,10 +163,13 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
   const [rooms, setRooms] = useState<AdminRoom[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
 
+  const [extraDates, setExtraDates] = useState<string[]>([]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [conflictError, setConflictError] = useState<string | null>(null);
+  const [repeatSuccessCount, setRepeatSuccessCount] = useState<number | null>(null);
 
   const startDateId = useId();
   const startTimeId = useId();
@@ -220,6 +224,7 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
     setFieldErrors({});
     setGlobalError(null);
     setConflictError(null);
+    setRepeatSuccessCount(null);
     setIsSubmitting(true);
 
     try {
@@ -231,20 +236,31 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
         room: roomId,
         session_type: sessionType || undefined,
         start_time: combineLocalDateTime(startDate, startTime),
+        extra_dates: !isEditing && extraDates.length > 0 ? extraDates : undefined,
       };
 
       if (isEditing) {
         await adminApi.updateSession(session.id, payload);
+        router.push("/admin/sessions");
+        router.refresh();
       } else {
-        await adminApi.createSession(payload);
+        const result = await adminApi.createSession(payload);
+        if (result.sessions) {
+          setRepeatSuccessCount(result.count);
+          setTimeout(() => {
+            router.push("/admin/sessions");
+            router.refresh();
+          }, 1500);
+        } else {
+          router.push("/admin/sessions");
+          router.refresh();
+        }
       }
-      router.push("/admin/sessions");
-      router.refresh();
     } catch (err) {
       if (isConflictError(err)) {
         setConflictError(
           t("admin.session.conflictDescription", {
-            message: getApiErrorUserMessage(err, locale),
+            message: err instanceof ApiError ? err.message : getApiErrorUserMessage(err, locale),
           })
         );
         return;
@@ -323,6 +339,17 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
           </p>
           <p className="mt-1 text-xs text-white/50">
             {t("admin.session.autoSeatsDescription")}
+          </p>
+        </div>
+      ) : null}
+
+      {repeatSuccessCount !== null ? (
+        <div
+          className="rounded-[8px] border border-green-500/30 bg-green-500/10 px-4 py-3"
+          role="alert"
+        >
+          <p className="text-sm font-bold text-green-400">
+            {t("admin.session.repeatCreated", { count: String(repeatSuccessCount) })}
           </p>
         </div>
       ) : null}
@@ -586,6 +613,25 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
         </div>
       ) : null}
 
+      {!isEditing ? (
+        <div className="grid gap-2">
+          <div>
+            <span className="text-sm font-extrabold text-white">
+              {t("admin.session.extraDatesLabel")}
+            </span>
+            <p className="mt-1 text-xs text-white/40">
+              {t("admin.session.extraDatesHint")}
+            </p>
+          </div>
+          <MultiDatePicker
+            baseDate={startDate}
+            disabled={formDisabled}
+            onChange={(dates) => setExtraDates(dates.filter((d) => d !== startDate))}
+            selectedDates={extraDates}
+          />
+        </div>
+      ) : null}
+
       <div className="flex justify-end gap-2 border-t border-white/[0.07] pt-4">
         <Button
           disabled={isSubmitting}
@@ -596,7 +642,11 @@ export function AdminSessionForm({ session }: AdminSessionFormProps) {
           {t("admin.cancel")}
         </Button>
         <Button isLoading={isSubmitting} type="submit" variant="primary">
-          {isEditing ? t("admin.saveChanges") : t("admin.session.create")}
+          {isEditing
+            ? t("admin.saveChanges")
+            : extraDates.length > 0
+              ? t("admin.session.createMultiple", { count: String(extraDates.length + 1) })
+              : t("admin.session.create")}
         </Button>
       </div>
     </form>

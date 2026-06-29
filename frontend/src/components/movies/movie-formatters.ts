@@ -1,4 +1,4 @@
-import type { CatalogMovie } from "@/types/catalog";
+import type { CatalogGenre, CatalogMovie, CatalogTranslationLocale } from "@/types/catalog";
 import { DEFAULT_LOCALE, type Locale, resolveLocale } from "@/i18n/locales";
 import { messages } from "@/i18n/messages";
 
@@ -32,7 +32,13 @@ export function formatMovieGenres(
     return t(locale, "movie.genreUnavailable");
   }
 
-  return genres.map((genre) => genre.name).join(", ");
+  const resolvedLocale = resolveLocale(locale) as CatalogTranslationLocale;
+  return genres
+    .map(
+      (genre: CatalogGenre) =>
+        genre.translations?.[resolvedLocale]?.name ?? genre.name
+    )
+    .join(", ");
 }
 
 export function formatMovieReleaseDate(

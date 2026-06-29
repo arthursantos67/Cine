@@ -52,6 +52,7 @@ export type SeatMapLayoutModel = {
   accessibleRightPairs: SeatMapAccessiblePair[];
   accessibleRowIndex: number;
   accessibleRowLabel: string | null;
+  anyRowHasNamoradeiras: boolean;
   maxCenterSeatsPerRow: number | null;
   rows: SeatMapRenderedRow[];
 };
@@ -724,7 +725,7 @@ export function SeatMapLayout({
 
           <div className="seat-map__rows">
             {layout.rows.slice(0, layout.accessibleRowIndex).map((row, index) =>
-              renderRegularRow({ globalIndex: index, onSeatToggle, pendingSeatIds, row, selectedSeatIds, t, totalRows: layout.rows.length })
+              renderRegularRow({ anyRowHasNamoradeiras: layout.anyRowHasNamoradeiras, globalIndex: index, onSeatToggle, pendingSeatIds, row, selectedSeatIds, t, totalRows: layout.rows.length })
             )}
 
             <div
@@ -766,7 +767,7 @@ export function SeatMapLayout({
             </div>
 
             {layout.rows.slice(layout.accessibleRowIndex).map((row, index) =>
-              renderRegularRow({ globalIndex: layout.accessibleRowIndex + index, onSeatToggle, pendingSeatIds, row, selectedSeatIds, t, totalRows: layout.rows.length })
+              renderRegularRow({ anyRowHasNamoradeiras: layout.anyRowHasNamoradeiras, globalIndex: layout.accessibleRowIndex + index, onSeatToggle, pendingSeatIds, row, selectedSeatIds, t, totalRows: layout.rows.length })
             )}
           </div>
 
@@ -778,6 +779,7 @@ export function SeatMapLayout({
 }
 
 function renderRegularRow({
+  anyRowHasNamoradeiras,
   globalIndex,
   onSeatToggle,
   pendingSeatIds,
@@ -786,6 +788,7 @@ function renderRegularRow({
   t,
   totalRows,
 }: {
+  anyRowHasNamoradeiras: boolean;
   globalIndex: number;
   onSeatToggle?: (seat: SessionSeatMapItem) => void;
   pendingSeatIds: ReadonlySet<string>;
@@ -797,6 +800,7 @@ function renderRegularRow({
   const isLastRow = globalIndex === totalRows - 1;
   const hasNamoradeiras =
     row.leftNamoradeiras.length > 0 || row.rightNamoradeiras.length > 0;
+  const isLastRowWithNamAisle = isLastRow && anyRowHasNamoradeiras && !hasNamoradeiras;
 
   return (
     <div
@@ -826,7 +830,7 @@ function renderRegularRow({
               t,
             })
           )}
-          {hasNamoradeiras && !isLastRow && (
+          {hasNamoradeiras && (
             <span aria-hidden="true" className="block w-5 flex-shrink-0" />
           )}
           {row.leftSeats.map((seat) =>
@@ -840,13 +844,13 @@ function renderRegularRow({
               t,
             })
           )}
-          {hasNamoradeiras && isLastRow && (
+          {isLastRowWithNamAisle && (
             <span aria-hidden="true" className="block w-5 flex-shrink-0" />
           )}
         </div>
         <span aria-hidden="true" className="seat-map__center-aisle" />
         <div className="seat-map__seat-group seat-map__seat-group--right">
-          {hasNamoradeiras && isLastRow && (
+          {isLastRowWithNamAisle && (
             <span aria-hidden="true" className="block w-5 flex-shrink-0" />
           )}
           {row.rightSeats.map((seat) =>
@@ -860,7 +864,7 @@ function renderRegularRow({
               t,
             })
           )}
-          {hasNamoradeiras && !isLastRow && (
+          {hasNamoradeiras && (
             <span aria-hidden="true" className="block w-5 flex-shrink-0" />
           )}
           {hasNamoradeiras && row.rightNamoradeiras.map((seat) =>
@@ -1132,22 +1136,30 @@ export function buildSeatMapLayout(
       ? Math.min(Math.max(0, accessibleRowIndex), roomRows.length)
       : 0;
 
+  const mappedRows = roomRows.map((row, index) => {
+    const displaySeats = withDisplayNumbers(row.seats);
+    const isLastRow = index === roomRows.length - 1;
+
+    if (!isLastRow && maxCenterSeatsPerRow !== null && displaySeats.length > maxCenterSeatsPerRow) {
+      return { ...row, ...splitRowSeatsWithNamoradeiras(displaySeats, maxCenterSeatsPerRow) };
+    }
+
+    const { leftSeats, rightSeats } = splitRowSeats(displaySeats);
+    return { ...row, leftSeats, rightSeats, leftNamoradeiras: [], rightNamoradeiras: [] };
+  });
+
+  const anyRowHasNamoradeiras = mappedRows.some(
+    (r) => r.leftNamoradeiras.length > 0 || r.rightNamoradeiras.length > 0
+  );
+
   return {
     accessibleLeftPairs: accessiblePairs.slice(0, ACCESSIBLE_SEATS_PER_SIDE),
     accessibleRightPairs: accessiblePairs.slice(ACCESSIBLE_SEATS_PER_SIDE),
     accessibleRowIndex: resolvedAccessibleRowIndex,
     accessibleRowLabel,
+    anyRowHasNamoradeiras,
     maxCenterSeatsPerRow,
-    rows: roomRows.map((row) => {
-      const displaySeats = withDisplayNumbers(row.seats);
-
-      if (maxCenterSeatsPerRow !== null && displaySeats.length > maxCenterSeatsPerRow) {
-        return { ...row, ...splitRowSeatsWithNamoradeiras(displaySeats, maxCenterSeatsPerRow) };
-      }
-
-      const { leftSeats, rightSeats } = splitRowSeats(displaySeats);
-      return { ...row, leftSeats, rightSeats, leftNamoradeiras: [], rightNamoradeiras: [] };
-    }),
+    rows: mappedRows,
   };
 }
 

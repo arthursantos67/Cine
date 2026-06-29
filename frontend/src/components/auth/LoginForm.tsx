@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 
+import { Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,23 +27,29 @@ export function LoginFormView({
   onSubmit,
 }: LoginFormViewProps) {
   const { t } = useI18n();
+  const [showPassword, setShowPassword] = useState(false);
   const formErrorId = errorMessage ? "login-form-error" : undefined;
 
   return (
-    <div className="panel">
+    <div className="grid gap-5 rounded-lg border border-white/[0.1] bg-white/[0.04] p-6">
       {confirmationMessage ? (
         <p className="inline-status inline-status-success" role="status">
           {confirmationMessage}
         </p>
       ) : null}
       <form
+        action=""
         aria-describedby={formErrorId}
-        className="form-grid"
+        className="grid gap-5"
+        method="post"
         onSubmit={onSubmit}
       >
-        <div className="form-field">
-          <label htmlFor="email">{t("auth.email")}</label>
+        <div className="grid gap-1.5">
+          <label className="text-sm font-[800] text-text" htmlFor="email">
+            {t("auth.email")}
+          </label>
           <input
+            className="auth-field"
             aria-describedby={formErrorId}
             aria-invalid={errorMessage ? "true" : undefined}
             autoComplete="email"
@@ -54,28 +61,47 @@ export function LoginFormView({
             type="email"
           />
         </div>
-        <div className="form-field">
-          <label htmlFor="password">{t("auth.password")}</label>
-          <input
-            aria-describedby={formErrorId}
-            aria-invalid={errorMessage ? "true" : undefined}
-            autoComplete="current-password"
-            disabled={isSubmitting}
-            id="password"
-            name="password"
-            placeholder={t("auth.passwordPlaceholder")}
-            required
-            type="password"
-          />
+        <div className="grid gap-1.5">
+          <label className="text-sm font-[800] text-text" htmlFor="password">
+            {t("auth.password")}
+          </label>
+          <div className="relative">
+            <input
+              className="auth-field pr-11"
+              aria-describedby={formErrorId}
+              aria-invalid={errorMessage ? "true" : undefined}
+              autoComplete="current-password"
+              disabled={isSubmitting}
+              id="password"
+              name="password"
+              placeholder={t("auth.passwordPlaceholder")}
+              required
+              type={showPassword ? "text" : "password"}
+            />
+            <button
+              aria-label={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-text/50 transition-colors hover:text-text"
+              disabled={isSubmitting}
+              onClick={() => setShowPassword((v) => !v)}
+              type="button"
+            >
+              {showPassword
+                ? <EyeOff aria-hidden="true" size={18} />
+                : <Eye aria-hidden="true" size={18} />}
+            </button>
+          </div>
         </div>
-        <div className="form-field form-field-checkbox">
-          <label htmlFor="stayLoggedIn">{t("auth.stayLoggedIn")}</label>
+        <div className="flex items-center gap-2">
           <input
+            className="h-[18px] w-[18px] flex-shrink-0 cursor-pointer"
             disabled={isSubmitting}
             id="stayLoggedIn"
             name="stayLoggedIn"
             type="checkbox"
           />
+          <label className="cursor-pointer text-sm text-text/70" htmlFor="stayLoggedIn">
+            {t("auth.stayLoggedIn")}
+          </label>
         </div>
         {errorMessage ? (
           <p className="form-error" id="login-form-error" role="alert">

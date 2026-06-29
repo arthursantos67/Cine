@@ -498,6 +498,7 @@ function StarFilter({ onChange, selected }: StarFilterProps) {
     { label: "★★★", value: 3 },
     { label: "★★", value: 2 },
     { label: "★", value: 1 },
+    { label: "½★", value: 0.5 },
   ];
 
   return (

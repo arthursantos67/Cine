@@ -142,7 +142,10 @@ function TmdbTokenModal({
         <div className="h-5 w-40 animate-pulse rounded bg-white/10" />
       ) : status?.configured ? (
         <p className="text-sm text-brand/80">
-          Token configurado — termina em <span className="font-mono font-bold">…{status.hint}</span>
+          Token configurado
+          {status.hint ? (
+            <> — termina em <span className="font-mono font-bold">…{status.hint}</span></>
+          ) : null}
         </p>
       ) : (
         <p className="text-sm text-white/40">Nenhum token configurado.</p>

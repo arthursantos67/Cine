@@ -1,0 +1,73 @@
+extends layout
+
+block content
+  style.
+    .back-link { display: inline-flex; align-items: center; gap: 0.4rem; color: #9ca3af; font-size: 0.85rem; margin-bottom: 1.5rem; }
+    .back-link:hover { color: #f59e0b; text-decoration: none; }
+    .movie-hero { display: grid; grid-template-columns: 280px 1fr; gap: 2.5rem; margin-bottom: 3rem; }
+    @media (max-width: 640px) { .movie-hero { grid-template-columns: 1fr; } }
+    .poster { width: 100%; border-radius: 0.75rem; box-shadow: 0 20px 40px rgba(0,0,0,0.6); }
+    .movie-details h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.75rem; line-height: 1.2; }
+    .meta-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; align-items: center; }
+    .meta-item { color: #9ca3af; font-size: 0.9rem; }
+    .meta-sep { color: #4b5563; }
+    .synopsis { color: #d1d5db; line-height: 1.7; margin-top: 1rem; }
+    .genres { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.75rem; }
+    .genre-tag { background: #1f2937; color: #93c5fd; border-radius: 999px; padding: 0.2rem 0.75rem; font-size: 0.75rem; }
+    .sessions-section h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 1.25rem; border-bottom: 1px solid #1f2937; padding-bottom: 0.5rem; }
+    .sessions-list { display: flex; flex-direction: column; gap: 0.75rem; }
+    .session-card { background: #111827; border: 1px solid #1f2937; border-radius: 0.5rem; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; }
+    .session-time { font-size: 1.1rem; font-weight: 600; }
+    .session-meta { color: #9ca3af; font-size: 0.85rem; }
+    .session-price { font-size: 1rem; font-weight: 600; color: #f59e0b; }
+    .no-sessions { color: #4b5563; font-style: italic; }
+
+  a.back-link(href="/movies") ← Voltar para filmes
+
+  if movie
+    .movie-hero
+      img.poster(src=movie.posterUrl alt=movie.title)
+      .movie-details
+        h1= movie.title
+        .meta-row
+          if movie.ageRating
+            span.badge.badge-age= movie.ageRating
+          if movie.status === 'em_cartaz'
+            span.badge.badge-cartaz Em Cartaz
+          else if movie.status === 'pre_venda'
+            span.badge.badge-prevenda Pré-Venda
+          else
+            span.badge.badge-embreve Em Breve
+        .meta-row
+          if movie.director
+            span.meta-item Direção: #{movie.director}
+            span.meta-sep ·
+          span.meta-item #{movie.durationMin} min
+          if movie.releaseDate
+            span.meta-sep ·
+            span.meta-item= new Date(movie.releaseDate).toLocaleDateString('pt-BR')
+        if movie.genres && movie.genres.length
+          .genres
+            each genre in movie.genres
+              span.genre-tag= genre.name
+        p.synopsis= movie.synopsis
+
+    .sessions-section
+      h2 Sessões Disponíveis
+      if sessions && sessions.length
+        .sessions-list
+          each s in sessions
+            .session-card
+              div
+                p.session-time= new Date(s.startTime).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+                p.session-meta
+                  | #{s.room ? s.room.name : '—'}
+                  if s.audioFormat
+                    |  · #{s.audioFormat}
+                  if s.projectionFormat
+                    |  · #{s.projectionFormat.toUpperCase()}
+              p.session-price R$ #{(s.basePrice || 0).toFixed(2)}
+      else
+        p.no-sessions Nenhuma sessão disponível para este filme.
+  else
+    p Filme não encontrado.

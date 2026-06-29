@@ -277,12 +277,14 @@ function MovieDetailSuccess({
           )}
         </div>
 
-        <MovieReviewsPanel
-          currentUserId={currentUserId}
-          isAdmin={isAdmin}
-          isAuthenticated={isAuthenticated}
-          movie={movie}
-        />
+        {movie.status !== "em_breve" && (
+          <MovieReviewsPanel
+            currentUserId={currentUserId}
+            isAdmin={isAdmin}
+            isAuthenticated={isAuthenticated}
+            movie={movie}
+          />
+        )}
       </div>
 
       <article className="movie-detail__content">

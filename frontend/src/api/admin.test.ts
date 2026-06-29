@@ -479,7 +479,8 @@ test("adminApi.createSession posts the session payload", async () => {
       start_time: "2026-06-10T19:30:00Z",
     });
 
-    assert.equal(created.id, "session-1");
+    assert.ok("session" in created && created.session !== undefined);
+    assert.equal(created.session!.id, "session-1");
   } finally {
     globalThis.fetch = originalFetch;
   }

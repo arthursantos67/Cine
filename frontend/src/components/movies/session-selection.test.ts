@@ -40,7 +40,6 @@ function session(
     id,
     movie,
     room: {
-      capacity: 80,
       ...room,
     },
     start_time,

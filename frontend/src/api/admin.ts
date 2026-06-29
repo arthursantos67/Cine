@@ -106,12 +106,17 @@ export type AdminSeatWritePayload = {
 export type AdminSessionWritePayload = {
   audio_format?: CatalogAudioFormat;
   end_time: string;
+  extra_dates?: string[];
   movie: string;
   projection_format?: CatalogProjectionFormat;
   room: string;
   session_type?: CatalogSessionType;
   start_time: string;
 };
+
+export type AdminCreateSessionResult =
+  | { session: AdminSession; sessions?: never; count?: never }
+  | { sessions: AdminSession[]; count: number; session?: never };
 
 export type ListSessionsParams = {
   date?: string;
@@ -138,7 +143,7 @@ export type AdminUser = {
 export type AdminPermissionLogEntry = {
   actor: string;
   target: string;
-  action: "granted" | "revoked";
+  action: "granted" | "revoked" | "deleted";
   role?: "staff" | "master" | null;
   created_at: string;
 };
@@ -592,18 +597,26 @@ export const adminApi = {
     return response satisfies AdminSession;
   },
 
-  async createSession(payload: AdminSessionWritePayload) {
+  async createSession(payload: AdminSessionWritePayload): Promise<AdminCreateSessionResult> {
     const response = await apiRequest<unknown>(SESSIONS_PATH, {
       auth: "required",
       json: payload,
       method: "POST",
     });
 
-    if (!isAdminSession(response)) {
-      throw new Error("Unexpected admin create session response.");
+    if (
+      isRecord(response) &&
+      Array.isArray((response as Record<string, unknown>).sessions)
+    ) {
+      const r = response as Record<string, unknown>;
+      return { sessions: r.sessions as AdminSession[], count: r.count as number };
     }
 
-    return response satisfies AdminSession;
+    if (isAdminSession(response)) {
+      return { session: response };
+    }
+
+    throw new Error("Unexpected admin create session response.");
   },
 
   async updateSession(sessionId: string, payload: Partial<AdminSessionWritePayload>) {
@@ -846,7 +859,7 @@ function isAdminPermissionLogEntry(value: unknown): value is AdminPermissionLogE
     isRecord(value) &&
     typeof value.actor === "string" &&
     typeof value.target === "string" &&
-    (value.action === "granted" || value.action === "revoked") &&
+    (value.action === "granted" || value.action === "revoked" || value.action === "deleted") &&
     (value.role === "staff" || value.role === "master" || value.role === null || value.role === undefined) &&
     typeof value.created_at === "string"
   );
