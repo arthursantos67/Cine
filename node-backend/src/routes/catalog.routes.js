@@ -103,7 +103,7 @@ function toRoomDTO(r, locale, showTranslations = false) {
     experience_type: r.experienceType ?? null,
     display_name: rt.display_name ?? r.displayName ?? null,
     description: rt.description ?? r.description ?? null,
-    base_price: r.basePrice != null ? Number(r.basePrice).toFixed(2) : null,
+    base_price: (r.basePrice != null && r.basePrice > 0) ? Number(r.basePrice).toFixed(2) : null,
     ...(showTranslations && { translations: r.translations ?? {} }),
     accessible_row_index: r.accessibleRowIndex ?? 0,
     max_center_seats_per_row: r.maxCenterSeatsPerRow ?? null,
@@ -613,6 +613,11 @@ router.post('/rooms', authenticate, authorize('master'), async (req, res, next) 
     if (sourceLanguage && data.displayName) {
       await applyRoomDisplayNameTranslation(data, sourceLanguage)
     }
+    if (!data.basePrice) {
+      const effectiveType = data.experienceType ?? 'standard'
+      const ref = await Room.findOne({ experienceType: effectiveType, basePrice: { $gt: 0 } })
+      if (ref) data.basePrice = ref.basePrice
+    }
     const room = await Room.create(data)
     res.status(201).json(toRoomDTO(room, req.locale, req.query.include_translations === 'true'))
   } catch (err) { next(err) }
@@ -624,6 +629,10 @@ router.patch('/rooms/:id', authenticate, authorize('master'), async (req, res, n
     const sourceLanguage = req.body.source_language
     if (sourceLanguage && data.displayName) {
       await applyRoomDisplayNameTranslation(data, sourceLanguage)
+    }
+    if (data.experienceType && data.basePrice == null) {
+      const ref = await Room.findOne({ experienceType: data.experienceType, basePrice: { $gt: 0 }, _id: { $ne: req.params.id } })
+      if (ref) data.basePrice = ref.basePrice
     }
     const room = await Room.findByIdAndUpdate(req.params.id, data, { new: true, runValidators: true })
     if (!room) throw new AppError('Sala não encontrada', 404, 'RESOURCE_NOT_FOUND')
@@ -658,10 +667,10 @@ function roomFromPayload(body) {
 router.get('/room-type-pricing', authenticate, async (req, res, next) => {
   try {
     const types = ['standard', 'vip', 'premium', 'imax']
-    const rooms = await Room.find()
+    const rooms = await Room.find({ experienceType: { $in: types }, basePrice: { $gt: 0 } })
     const pricingMap = {}
     for (const room of rooms) {
-      if (room.experienceType && !pricingMap[room.experienceType]) {
+      if (!(room.experienceType in pricingMap)) {
         pricingMap[room.experienceType] = room.basePrice
       }
     }
@@ -741,7 +750,7 @@ router.post('/sessions', authenticate, authorize('staff', 'master'), async (req,
     const data = sessionFromPayload(req.body)
     const room = await Room.findById(data.room)
     if (!room) throw new AppError('Sala não encontrada', 404)
-    if (!data.basePrice) data.basePrice = room.basePrice
+    if (data.basePrice == null && room.basePrice) data.basePrice = room.basePrice
 
     const baseStart = new Date(data.startTime)
     const baseEnd = new Date(data.endTime)
