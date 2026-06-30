@@ -1,6 +1,23 @@
 import { userRepository } from '../repositories/user.repository.js'
 import { AppError } from '../middlewares/error.middleware.js'
 import AdminLog from '../models/AdminLog.js'
+import Review from '../models/Review.js'
+import ReviewVote from '../models/ReviewVote.js'
+import MovieInterest from '../models/MovieInterest.js'
+
+// Remove todo conteúdo gerado pelo usuário para não deixar referências
+// órfãs (ex: avaliações cujo autor foi excluído quebravam a listagem).
+async function deleteUserContent(userId) {
+  const ownReviews = await Review.find({ user: userId }, '_id')
+  const ownReviewIds = ownReviews.map((r) => r._id)
+
+  await Promise.all([
+    Review.deleteMany({ user: userId }),
+    ReviewVote.deleteMany({ user: userId }),
+    ReviewVote.deleteMany({ review: { $in: ownReviewIds } }),
+    MovieInterest.deleteMany({ user: userId }),
+  ])
+}
 
 export const userService = {
   async getMe(id) {
@@ -28,6 +45,7 @@ export const userService = {
         403
       )
     }
+    await deleteUserContent(id)
     await userRepository.deleteById(id)
   },
 
@@ -96,6 +114,7 @@ export const userService = {
       role: null,
     })
 
+    await deleteUserContent(targetId)
     await userRepository.deleteById(targetId)
   },
 

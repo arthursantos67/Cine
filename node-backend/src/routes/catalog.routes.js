@@ -368,10 +368,12 @@ router.get('/movies/:id/reviews/', authenticateOptional, async (req, res, next) 
     const pageSize = 20
     const skip = (page - 1) * pageSize
 
-    const [count, reviews] = await Promise.all([
+    const [count, reviewsRaw] = await Promise.all([
       Review.countDocuments(filter),
       Review.find(filter).populate('user', 'username email').sort('-createdAt').skip(skip).limit(pageSize),
     ])
+    // Avaliações cujo autor foi excluído ficam com user=null após o populate
+    const reviews = reviewsRaw.filter((r) => r.user != null)
 
     let votesMap = {}
     let myReview = null

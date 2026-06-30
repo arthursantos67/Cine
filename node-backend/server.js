@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import mongoose from 'mongoose'
 import app from './app.js'
+import { cleanupOrphanedContent } from './src/scripts/cleanupOrphanedContent.js'
 
 const PORT = process.env.PORT || 3000
 const MONGODB_URI = process.env.MONGODB_URI
@@ -16,8 +17,14 @@ mongoose
     socketTimeoutMS: 45000,
     family: 4,
   })
-  .then(() => {
+  .then(async () => {
     console.log('Connected to MongoDB')
+    const removed = await cleanupOrphanedContent()
+    if (removed.reviews || removed.votes || removed.interests) {
+      console.log(
+        `Cleanup: removidos ${removed.reviews} avaliações, ${removed.votes} votos e ${removed.interests} interesses órfãos (de contas excluídas)`
+      )
+    }
     app.listen(PORT, () => {
       console.log(`CinePrime API running on port ${PORT}`)
     })
