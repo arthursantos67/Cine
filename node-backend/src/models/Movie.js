@@ -15,6 +15,7 @@ const movieSchema = new mongoose.Schema(
     },
     ageRating: { type: String, enum: ['L', '10', '12', '14', '16', '18'] },
     director: { type: String },
+    cast: { type: [String], default: [] },
     spotlightUrl: { type: String, default: null },
     isFeatured: { type: Boolean, default: false },
     translations: { type: mongoose.Schema.Types.Mixed, default: {} },

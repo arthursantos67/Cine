@@ -176,6 +176,7 @@ export const swaggerSpec = {
             example: '14',
           },
           director: { type: 'string', nullable: true, example: 'Christopher Nolan' },
+          cast: { type: 'array', items: { type: 'string' }, example: ['Timothée Chalamet', 'Zendaya'] },
           is_featured: { type: 'boolean', example: true },
           translations: { type: 'object', example: {} },
           average_rating: { type: 'number', nullable: true, example: 4.5 },
@@ -229,6 +230,7 @@ export const swaggerSpec = {
             example: '12',
           },
           director: { type: 'string', example: 'Denis Villeneuve' },
+          cast: { type: 'array', items: { type: 'string' }, example: ['Timothée Chalamet', 'Zendaya'] },
           is_featured: { type: 'boolean', example: true },
           translations: {
             type: 'object',

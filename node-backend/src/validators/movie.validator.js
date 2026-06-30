@@ -10,6 +10,7 @@ const movieBase = z.object({
   status: z.enum(['em_cartaz', 'pre_venda', 'em_breve']).optional(),
   ageRating: z.enum(['L', '10', '12', '14', '16', '18']).optional(),
   director: z.string().optional(),
+  cast: z.array(z.string()).optional(),
   isFeatured: z.boolean().optional(),
 })
 
