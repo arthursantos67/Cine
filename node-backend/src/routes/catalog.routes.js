@@ -76,6 +76,7 @@ function toMovieDTO(m, locale, showTranslations = false) {
     status: m.status,
     age_rating: m.ageRating ?? null,
     director: m.director ?? null,
+    cast: m.cast ?? [],
     is_featured: m.isFeatured,
     ...(showTranslations && { translations: m.translations ?? {} }),
     created_at: m.createdAt?.toISOString?.() ?? m.createdAt,
@@ -282,6 +283,7 @@ function movieFromPayload(body) {
   if (body.status !== undefined) data.status = body.status
   if (body.age_rating !== undefined) data.ageRating = body.age_rating
   if (body.director !== undefined) data.director = body.director
+  if (body.cast !== undefined) data.cast = body.cast
   if (body.is_featured !== undefined) data.isFeatured = body.is_featured
   if (body.translations !== undefined) data.translations = body.translations
   return data
